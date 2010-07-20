@@ -39,10 +39,10 @@ module Validation
       $sinatra.halt 500,"do not set id manually" if params[:id]
       $sinatra.halt 500,"do not set uri manually" if params[:validation_uri]
       super params
-      self.save
+      self.save!
       raise "internal error, validation-id not set "+to_yaml if self.id==nil
       self.attributes = { :validation_uri => $sinatra.url_for("/"+self.id.to_s, :full).to_s }
-      self.save
+      self.save!
     end
     
     # deletes a validation
@@ -79,7 +79,7 @@ module Validation
       model = OpenTox::Model::PredictionModel.build(algorithm_uri, params)
       $sinatra.halt 500,"model building failed" unless model
       self.attributes = { :model_uri => model.uri }
-      self.save
+      self.save!
       
       $sinatra.halt 500,"error after building model: model.dependent_variable != validation.prediciton_feature ("+
         model.dependentVariables.to_s+" != "+self.prediction_feature+")" if self.prediction_feature!=model.dependentVariables
@@ -98,7 +98,7 @@ module Validation
       
       unless self.algorithm_uri
         self.attributes = { :algorithm_uri => model.algorithm }
-        self.save
+        self.save!
       end
       
       if self.prediction_feature
@@ -107,7 +107,7 @@ module Validation
       else
         $sinatra.halt 400, "model has no dependentVariables specified, please give prediction feature for model validation" unless model.dependentVariables
         self.attributes = { :prediction_feature => model.dependentVariables }
-        self.save
+        self.save!
       end
       
       prediction_dataset_uri = ""
@@ -116,24 +116,30 @@ module Validation
       end
       self.attributes = { :prediction_dataset_uri => prediction_dataset_uri,
              :real_runtime => benchmark.real }
-      self.save
+      self.save!
       
-      compute_validation_stats(model)
+      compute_validation_stats_with_model( model )
     end
-    
-    def compute_validation_stats(model = nil)
       
-      model = OpenTox::Model::PredictionModel.find(self.model_uri) unless model
+    def compute_validation_stats_with_model( model=nil )
+      
+      model = OpenTox::Model::PredictionModel.find(self.model_uri) if model==nil and self.model_uri
       $sinatra.halt 400, "model not found: "+self.model_uri.to_s unless model
+      prediction_feature = self.prediction_feature ? nil : model.dependentVariables
+      algorithm_uri = self.algorithm_uri ? nil : model.algorithm
+      compute_validation_stats( model.classification?, model.predictedVariables, prediction_feature, algorithm_uri )
+    end
       
-      self.attributes = { :prediction_feature => model.dependentVariables } unless self.prediction_feature 
-      self.attributes = { :algorithm_uri => model.algorithm } unless self.algorithm_uri
-      self.save
+    def compute_validation_stats( classification, predicted_feature, prediction_feature=nil, algorithm_uri=nil)
+      
+      self.attributes = { :prediction_feature => prediction_feature } if self.prediction_feature==nil && prediction_feature
+      self.attributes = { :algorithm_uri => algorithm_uri } if self.algorithm_uri==nil && algorithm_uri
+      self.save!
       
       LOGGER.debug "computing prediction stats"
-      prediction = Lib::OTPredictions.new( model.classification?, 
+      prediction = Lib::OTPredictions.new( classification, 
         self.test_dataset_uri, self.test_target_dataset_uri, self.prediction_feature, 
-        self.prediction_dataset_uri, model.predictedVariables )
+        self.prediction_dataset_uri, predicted_feature )
       if prediction.classification?
         self.attributes = { :classification_statistics => prediction.compute_stats }
       else
@@ -145,7 +151,7 @@ module Validation
              :percent_without_class => prediction.percent_without_class,
              :num_unpredicted => prediction.num_unpredicted,
              :percent_unpredicted => prediction.percent_unpredicted }
-      self.save
+      self.save!
     end
   end
   
@@ -161,10 +167,10 @@ module Validation
       params[:random_seed] = 1 if params[:random_seed]==nil
       params[:stratified] = false if params[:stratified]==nil
       super params
-      self.save
+      self.save!
       raise "internal error, crossvalidation-id not set" if self.id==nil
       self.attributes = { :crossvalidation_uri => $sinatra.url_for("/crossvalidation/"+self.id.to_s, :full) }
-      self.save
+      self.save!
     end
     
     # deletes a crossvalidation, all validations are deleted as well
@@ -185,8 +191,9 @@ module Validation
     def perform_cv ( algorithm_params=nil )
       
       LOGGER.debug "perform cv validations"
-      Validation.find( :all, :conditions => { :crossvalidation_id => id } ).each do |v|
-        v.validate_algorithm( algorithm_params )
+      @tmp_validations.each do | val |
+        validation = Validation.new val
+        validation.validate_algorithm( algorithm_params )
         #break
       end
     end
@@ -274,6 +281,8 @@ module Validation
       
       test_features = orig_dataset.features.dclone - [prediction_feature]
       
+      @tmp_validations = []
+      
       (1..self.num_folds).each do |n|
         
         datasetname = 'cv'+self.id.to_s +
@@ -305,12 +314,13 @@ module Validation
         LOGGER.debug "test set:     "+datasetname+"_test, compounds: "+test_compounds.size.to_s
         test_dataset_uri = orig_dataset.create_new_dataset( test_compounds, test_features, datasetname + '_test', source )
       
-        validation = Validation.new :training_dataset_uri => train_dataset_uri, 
-                                    :test_dataset_uri => test_dataset_uri,
-                                    :test_target_dataset_uri => self.dataset_uri,
-                                    :crossvalidation_id => self.id, :crossvalidation_fold => n,
-                                    :prediction_feature => prediction_feature,
-                                    :algorithm_uri => self.algorithm_uri
+        tmp_validation = { :training_dataset_uri => train_dataset_uri, 
+                           :test_dataset_uri => test_dataset_uri,
+                           :test_target_dataset_uri => self.dataset_uri,
+                           :crossvalidation_id => self.id, :crossvalidation_fold => n,
+                           :prediction_feature => prediction_feature,
+                           :algorithm_uri => self.algorithm_uri }
+        @tmp_validations << tmp_validation
       end
     end
   end

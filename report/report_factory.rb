@@ -17,12 +17,12 @@ VAL_ATTR_BAR_PLOT_REGR = [ :root_mean_squared_error, :mean_absolute_error, :r_sq
 #
 module Reports::ReportFactory
   
-  RT_FASTTOX = "fasttox"
   RT_VALIDATION = "validation"
   RT_CV = "crossvalidation"
   RT_ALG_COMP = "algorithm_comparison"
+  RT_QMRF = "qmrf"
   
-  REPORT_TYPES = [RT_VALIDATION, RT_CV, RT_ALG_COMP ] #,RT_FASTTOX
+  REPORT_TYPES = [RT_VALIDATION, RT_CV, RT_ALG_COMP, RT_QMRF ]
   
   # creates a report of a certain type according to the validation data in validation_set 
   #
@@ -31,8 +31,6 @@ module Reports::ReportFactory
   #
   def self.create_report(type, validation_set)
     case type
-    when RT_FASTTOX
-      raise "not yet implemented"
     when RT_VALIDATION
       create_report_validation(validation_set)
     when RT_CV
@@ -40,7 +38,7 @@ module Reports::ReportFactory
     when RT_ALG_COMP
       create_report_compare_algorithms(validation_set)
     else
-      raise "unknown report type"
+      raise "unknown report type "+type.to_s
     end
   end
   
