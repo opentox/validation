@@ -20,15 +20,15 @@ module ValidationExamples
   
   class LazarHamsterSplit < HamsterSplit
     def initialize
-      @algorithm_uri = File.join(@@config[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(@@config[:services]["opentox-algorithm"],"fminer")
+      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer")
       super
     end
   end
   
   class MajorityHamsterSplit < HamsterSplit
     def initialize
-      @algorithm_uri = File.join(@@config[:services]["opentox-majority"],"/class/algorithm")
+      @algorithm_uri = File.join(CONFIG[:services]["opentox-majority"],"/class/algorithm")
       super
     end
   end
@@ -46,15 +46,15 @@ module ValidationExamples
   
   class MajorityHamsterTrainingTest < HamsterTrainingTest
     def initialize
-      @algorithm_uri = File.join(@@config[:services]["opentox-majority"],"/class/algorithm")
+      @algorithm_uri = File.join(CONFIG[:services]["opentox-majority"],"/class/algorithm")
       super
     end
   end
   
   class LazarHamsterTrainingTest < HamsterTrainingTest
     def initialize
-      @algorithm_uri = File.join(@@config[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(@@config[:services]["opentox-algorithm"],"fminer")
+      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer")
       super
     end
   end
@@ -71,15 +71,15 @@ module ValidationExamples
   
   class MajorityHamsterCrossvalidation < HamsterCrossvalidation
     def initialize
-      @algorithm_uri = File.join(@@config[:services]["opentox-majority"],"/class/algorithm")
+      @algorithm_uri = File.join(CONFIG[:services]["opentox-majority"],"/class/algorithm")
       super
     end
   end
 
   class LazarHamsterCrossvalidation < HamsterCrossvalidation
     def initialize
-      @algorithm_uri = File.join(@@config[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(@@config[:services]["opentox-algorithm"],"fminer")
+      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer")
       super
     end
   end
@@ -95,15 +95,15 @@ module ValidationExamples
   
   class MajorityISTHamsterCrossvalidation < ISTHamsterCrossvalidationInsilico
     def initialize
-      @algorithm_uri = File.join(@@config[:services]["opentox-majority"],"/class/algorithm")
+      @algorithm_uri = File.join(CONFIG[:services]["opentox-majority"],"/class/algorithm")
       super
     end
   end
   
   class LazarISTHamsterCrossvalidation < ISTHamsterCrossvalidationInsilico
     def initialize
-      @algorithm_uri = File.join(@@config[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(@@config[:services]["opentox-algorithm"],"fminer")
+      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer")
       super
     end
   end
@@ -160,7 +160,7 @@ module ValidationExamples
   
   class MajorityCacoTrainingTest < CacoTrainingTest
     def initialize
-      @algorithm_uri = File.join(@@config[:services]["opentox-majority"],"/regr/algorithm")
+      @algorithm_uri = File.join(CONFIG[:services]["opentox-majority"],"/regr/algorithm")
       super
     end
   end

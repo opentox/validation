@@ -113,12 +113,12 @@ end
 #class Reports::ReportServiceTest < Test::Unit::TestCase
 #  include Lib::TestUtil
 #
-#  WS_VAL = @@config[:services]["opentox-validation"]
-#  WS_DATA=@@config[:services]["opentox-dataset"]
+#  WS_VAL = CONFIG[:services]["opentox-validation"]
+#  WS_DATA=CONFIG[:services]["opentox-dataset"]
 #  FILE=File.new("data/hamster_carcinogenicity.owl","r")
 #  
-#  WS_CLASS_ALG=File.join(@@config[:services]["opentox-algorithm"],"lazar")
-#  WS_FEATURE_ALG=File.join(@@config[:services]["opentox-algorithm"],"fminer")
+#  WS_CLASS_ALG=File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
+#  WS_FEATURE_ALG=File.join(CONFIG[:services]["opentox-algorithm"],"fminer")
 #  
 #  #WS_CLASS_ALG_2="localhost:4008/algorithm"
 #  #WS_FEATURE_ALG_2=nil

@@ -5,13 +5,13 @@ class Example
   
   @@file=File.new("data/hamster_carcinogenicity.yaml","r")
   @@file_type="text/x-yaml"
-  @@model=File.join @@config[:services]["opentox-model"],"1"
+  @@model=File.join CONFIG[:services]["opentox-model"],"1"
   @@feature= URI.encode("http://localhost/toxmodel/feature#Hamster%20Carcinogenicity%20(DSSTOX/CPDB)")
-  @@alg = File.join @@config[:services]["opentox-algorithm"],"lazar"
-  @@alg_params = "feature_generation_uri="+File.join(@@config[:services]["opentox-algorithm"],"fminer")
-  @@data=File.join @@config[:services]["opentox-dataset"],"1"
-  @@train_data=File.join @@config[:services]["opentox-dataset"],"2"
-  @@test_data=File.join @@config[:services]["opentox-dataset"],"3"
+  @@alg = File.join CONFIG[:services]["opentox-algorithm"],"lazar"
+  @@alg_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer")
+  @@data=File.join CONFIG[:services]["opentox-dataset"],"1"
+  @@train_data=File.join CONFIG[:services]["opentox-dataset"],"2"
+  @@test_data=File.join CONFIG[:services]["opentox-dataset"],"3"
   @@css_file="http://apps.ideaconsult.net:8080/ToxPredict/style/global.css"
   
   @@summary=""
@@ -26,7 +26,7 @@ class Example
     end
     file.close
     
-    sub = { "validation_service" => @@config[:services]["opentox-validation"].chomp("/"), 
+    sub = { "validation_service" => CONFIG[:services]["opentox-validation"].chomp("/"), 
             "validation_id" => "1",
             "model_uri" => @@model,
             "dataset_uri" => @@data,
@@ -58,17 +58,17 @@ class Example
     ActiveRecord::Migrator.migrate('db/migrate', 1 )
     ActiveRecord::Migrator.migrate('db/migrate', 2 )
     
-    #delete_all(@@config[:services]["opentox-dataset"])
-    log OpenTox::RestClientWrapper.delete @@config[:services]["opentox-dataset"]
+    #delete_all(CONFIG[:services]["opentox-dataset"])
+    log OpenTox::RestClientWrapper.delete CONFIG[:services]["opentox-dataset"]
     
     log "upload dataset"
     halt 400,"File not found: "+@@file.path.to_s unless File.exist?(@@file.path)
     data = File.read(@@file.path)
-    data_uri = OpenTox::RestClientWrapper.post(@@config[:services]["opentox-dataset"],{:content_type => @@file_type},data).chomp("\n")
+    data_uri = OpenTox::RestClientWrapper.post(CONFIG[:services]["opentox-dataset"],{:content_type => @@file_type},data).chomp("\n")
     
     log "train-test-validation"
-    #delete_all(@@config[:services]["opentox-model"])
-    OpenTox::RestClientWrapper.delete @@config[:services]["opentox-model"]
+    #delete_all(CONFIG[:services]["opentox-model"])
+    OpenTox::RestClientWrapper.delete CONFIG[:services]["opentox-model"]
     
     split_params = Validation::Util.train_test_dataset_split(data_uri, URI.decode(@@feature), 0.9, 1)
     v = Validation::Validation.new :training_dataset_uri => split_params[:training_dataset_uri], 
@@ -84,7 +84,7 @@ class Example
     cv.perform_cv( @@alg_params )
     
     log "create validation report"
-    rep = Reports::ReportService.new(File.join(@@config[:services]["opentox-validation"],"report"))
+    rep = Reports::ReportService.new(File.join(CONFIG[:services]["opentox-validation"],"report"))
     rep.delete_all_reports("validation")
     rep.create_report("validation",v.validation_uri)
     
