@@ -8,11 +8,11 @@ gem 'ruby-plot', '= 0.0.2'
 
 unless ActiveRecord::Base.connected?
   ActiveRecord::Base.establish_connection(  
-     :adapter => @@config[:database][:adapter],
-     :host => @@config[:database][:host],
-     :database => @@config[:database][:database],
-     :username => @@config[:database][:username],
-     :password => @@config[:database][:password]
+     :adapter => CONFIG[:database][:adapter],
+     :host => CONFIG[:database][:host],
+     :database => CONFIG[:database][:database],
+     :username => CONFIG[:database][:username],
+     :password => CONFIG[:database][:password]
   )
   ActiveRecord::Base.logger = Logger.new("/dev/null")
 end

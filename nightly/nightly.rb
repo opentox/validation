@@ -98,7 +98,7 @@ class Nightly
       end
       
       #benchmarks.collect{|b| b.uris}.join(",")
-      File.join(@@config[:services]["opentox-validation"],"nightly")
+      File.join(CONFIG[:services]["opentox-validation"],"nightly")
     end
     if defined?(halt)
       halt 202,task_uri

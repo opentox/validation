@@ -5,7 +5,7 @@ module ValidationExamples
 
     @@dataset_uris = {}
 
-    def self.upload_dataset(file, dataset_service=@@config[:services]["opentox-dataset"], file_type="application/x-yaml")
+    def self.upload_dataset(file, dataset_service=CONFIG[:services]["opentox-dataset"], file_type="application/x-yaml")
       raise "File not found: "+file.path.to_s unless File.exist?(file.path)
       if @@dataset_uris[file.path.to_s]==nil
         data = File.read(file.path)
@@ -40,7 +40,7 @@ module ValidationExamples
         $test_case.post uri,params 
         return wait($test_case.last_response.body)
       else
-        return OpenTox::RestClientWrapper.post(File.join(@@config[:services]["opentox-validation"],uri),params)
+        return OpenTox::RestClientWrapper.post(File.join(CONFIG[:services]["opentox-validation"],uri),params)
       end
     end
     
@@ -50,7 +50,7 @@ module ValidationExamples
         $test_case.get uri,nil,'HTTP_ACCEPT' => accept_header 
         return wait($test_case.last_response.body)
       else
-        return OpenTox::RestClientWrapper.get(File.join(@@config[:services]["opentox-validation"],uri),{:accept => accept_header})
+        return OpenTox::RestClientWrapper.get(File.join(CONFIG[:services]["opentox-validation"],uri),{:accept => accept_header})
       end
     end
     
