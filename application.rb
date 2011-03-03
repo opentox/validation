@@ -3,6 +3,14 @@ gem "opentox-ruby", "~> 0"
 [ 'sinatra', 'sinatra/url_for', 'opentox-ruby' ].each do |lib|
   require lib
 end
+['dm-core', 'dm-serializer', 'dm-timestamps', 'dm-types', 'dm-migrations', 'dm-validations' ].each{|lib| require lib }
+DataMapper.setup(:default, { 
+    :adapter  => CONFIG[:database][:adapter],
+    :database => CONFIG[:database][:database],
+    :username => CONFIG[:database][:username],
+    :password => CONFIG[:database][:password],
+    :host     => CONFIG[:database][:host]})
+set :lock, true
 
 #unless(defined? LOGGER)
   #LOGGER = Logger.new(STDOUT)

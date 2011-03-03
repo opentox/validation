@@ -58,44 +58,6 @@ class Example
     #TODO
     subjectid = nil
     
-<<<<<<< HEAD
-    #delete_all(CONFIG[:services]["opentox-dataset"])
-    log OpenTox::RestClientWrapper.delete CONFIG[:services]["opentox-dataset"]
-    
-    log "upload dataset"
-    halt 400,"File not found: "+@@file.path.to_s unless File.exist?(@@file.path)
-    data = File.read(@@file.path)
-    data_uri = OpenTox::RestClientWrapper.post(CONFIG[:services]["opentox-dataset"],{:content_type => @@file_type},data).chomp("\n")
-    
-    log "train-test-validation"
-    #delete_all(CONFIG[:services]["opentox-model"])
-    OpenTox::RestClientWrapper.delete CONFIG[:services]["opentox-model"]
-    
-    split_params = Validation::Util.train_test_dataset_split(data_uri, URI.decode(@@feature), 0.9, 1)
-    v = Validation::Validation.new :training_dataset_uri => split_params[:training_dataset_uri], 
-                   :test_dataset_uri => split_params[:test_dataset_uri],
-                   :test_target_dataset_uri => data_uri,
-                   :prediction_feature => URI.decode(@@feature),
-                   :algorithm_uri => @@alg
-    v.validate_algorithm( @@alg_params ) 
-    
-    log "crossvalidation"
-    cv = Validation::Crossvalidation.new({ :dataset_uri => data_uri, :algorithm_uri => @@alg, :num_folds => 5, :stratified => false })
-    cv.create_cv_datasets(  URI.decode(@@feature) )
-    cv.perform_cv( @@alg_params )
-    
-    log "create validation report"
-    rep = Reports::ReportService.new(File.join(CONFIG[:services]["opentox-validation"],"report"))
-    rep.delete_all_reports("validation")
-    rep.create_report("validation",v.validation_uri)
-    
-    log "create crossvalidation report"
-    rep.delete_all_reports("crossvalidation")
-    rep.create_report("crossvalidation",cv.crossvalidation_uri)
-    
-    log "done"
-    @@summary
-=======
     task = OpenTox::Task.create("prepare examples", "n/a") do |task|
       @@summary = ""
       #delete validations
@@ -163,7 +125,6 @@ class Example
       @@summary
     end
     return_task(task)
->>>>>>> mguetlein/test
   end
   
   # performs all curl calls listed in examples after ">>>", next line is added if line ends with "\"
