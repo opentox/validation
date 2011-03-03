@@ -162,8 +162,12 @@ module Lib
       raise "no array "+v.class.to_s+" : '"+v.to_s+"'" unless v.is_a?(Array)
       if v.size>1
         v.uniq!
-        raise "not yet implemented: multiple non-equal values "+compound.to_s+" "+v.inspect if v.size>1
-        v = v[0]
+        if v.size>1
+          v = nil
+          LOGGER.warn "not yet implemented: multiple non-equal values "+compound.to_s+" "+v.inspect
+        else
+          v = v[0]
+        end
       elsif v.size==1
         v = v[0]
       else
