@@ -1,9 +1,15 @@
+#['rubygems', 'rexml/document' ].each do |g|
+#    require g
+#end
 
 require "report/xml_report_util.rb"
 
-ENV['REPORT_DTD'] = "docbook-xml-4.5/docbookx.dtd" unless ENV['REPORT_DTD']
+ENV['DOCBOOK_DIRECTORY'] = "docbook-xml-4.5" unless ENV['DOCBOOK_DIRECTORY']
+ENV['REPORT_DTD'] = "docbookx.dtd" unless ENV['REPORT_DTD']
+
 #transfer to absolute path
-ENV['REPORT_DTD'] = File.expand_path(ENV['REPORT_DTD']) if File.exist?(ENV['REPORT_DTD'])
+#ENV['REPORT_DTD'] = File.expand_path(ENV['REPORT_DTD']) if File.exist?(ENV['REPORT_DTD'])
+
 
 # = XMLReport
 # 
@@ -15,13 +21,23 @@ module Reports
   class XMLReport
     include REXML
     
+    def self.dtd_directory
+      if $url_provider
+        $url_provider.url_for('/'+ENV['DOCBOOK_DIRECTORY']+'/'+ENV['REPORT_DTD'], :full)
+      else
+        f = File.expand_path(File.join(ENV['DOCBOOK_DIRECTORY'],ENV['REPORT_DTD']))
+        raise "cannot find dtd" unless File.exist?(f)
+        f
+      end
+    end
+    
     # create new xmlreport
     def initialize(title, pubdate=nil, author_firstname = nil, author_surname = nil)
       
       @doc = Document.new
       decl = XMLDecl.new
       @doc << decl
-      type = DocType.new('article PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "'+ENV['REPORT_DTD']+'"')
+      type = DocType.new('article PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN" "'+XMLReport.dtd_directory+'"')
       @doc << type
   
       @root = Element.new("article")
@@ -84,19 +100,27 @@ module Reports
     # call-seq:
     #   add_imagefigure( element, title, path, filetype, caption = nil ) => REXML::Element
     #
-    def add_imagefigure( element, title, path, filetype, caption = nil )
+    def add_imagefigure( element, title, path, filetype, size_pct=100, caption = nil )
       
       figure = Reports::XMLReportUtil.attribute_element("figure", {"float" => 0})
       figure << Reports::XMLReportUtil.text_element("title", title)
       media = Element.new("mediaobject")
       image = Element.new("imageobject")
       imagedata = Reports::XMLReportUtil.attribute_element("imagedata",
-        {"fileref" => path, "format"=>filetype, "contentwidth" => "6in",  "contentdepth"=> "4in" 
+        {"fileref" => path, "format"=>filetype, "contentwidth" => size_pct.to_s+"%",
+        #"contentdepth"=> "4in" 
         })#"width" => "6in", "height" => "5in"}) #"contentwidth" => "100%"})
       #imagedata = Reports::XMLReportUtil.attribute_element("imagedata",{"width" => "6in", "fileref" => path, "format"=>filetype})
       @resource_path_elements[imagedata] = "fileref"
       image << imagedata
+      
       media << image
+      
+#      ulink = Element.new("ulink")
+#      ulink.add_attributes({"url" => "http://google.de"})
+#      ulink << image
+#      media << ulink
+      
       media << Reports::XMLReportUtil.text_element("caption", caption) if caption
       figure << media
       element << figure
@@ -116,15 +140,17 @@ module Reports
     # adds a table to a REXML:Element, _table_values_ should be a multi-dimensional-array, returns the table as element
     # 
     # call-seq:
-    #   add_table( element, title, table_values, first_row_is_table_header=true ) => REXML::Element
+    #   add_table( element, title, table_values, first_row_header=true ) => REXML::Element
     #
-    def add_table( element, title, table_values, first_row_is_table_header=true, transpose=false, auto_link_urls=true )
+    def add_table( element, title, table_values, first_row_header=true, first_col_header=false, transpose=false, auto_link_urls=true )
       
       raise "table_values is not mulit-dimensional-array" unless table_values && table_values.is_a?(Array) && table_values[0].is_a?(Array) 
       
       values = transpose ? table_values.transpose : table_values
       
-      table = Reports::XMLReportUtil.attribute_element("table",{"frame" => "none", "colsep" => 1, "rowsep" => 1 })
+      params = {"frame" => "none", "colsep" => 1, "rowsep" => 1 }
+      params["rowheader"] = "firstcol" if first_col_header
+      table = Reports::XMLReportUtil.attribute_element("table",params)
       
       table << Reports::XMLReportUtil.text_element("title", title)
       
@@ -134,7 +160,7 @@ module Reports
       
       table_body_values = values
       
-      if first_row_is_table_header
+      if first_row_header
         table_head_values = values[0];
         table_body_values = values[1..-1];
         
@@ -142,7 +168,7 @@ module Reports
         row = Element.new("row")
         table_head_values.each do |v|
           entry = Element.new("entry")
-          if auto_link_urls && v.to_s =~ /^http:\/\//
+          if auto_link_urls && v.to_s =~ /^http(s?):\/\//
             add_url(entry, v.to_s)
           else
             entry.text = v.to_s
@@ -158,9 +184,9 @@ module Reports
         row = Element.new("row")
         r.each do |v|
           entry = Element.new("entry")
-          if auto_link_urls && v.to_s =~ /depict/ #PENDING
+          if auto_link_urls && v.to_s =~ /depict/ || v.to_s =~ /image$/ #PENDING 
             add_image(entry, v.to_s)
-          elsif auto_link_urls && v.to_s =~ /^http:\/\//
+          elsif auto_link_urls && v.to_s =~ /^http(s?):\/\//
            add_url(entry, v.to_s, v.to_s)
           else
            entry.text = v.to_s
@@ -215,7 +241,7 @@ module Reports
         end
       end
       
-      @doc.write(out,2, true, true)
+      @doc.write(out) #,2, true, true)
       out.flush
     end
   
@@ -228,7 +254,7 @@ module Reports
       section1 = rep.add_section(rep.get_root_element, "First Section")
       rep.add_paragraph(section1, "some text")
       rep.add_paragraph(section1, "even more text")
-      rep.add_imagefigure(section1, "Figure", "http://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Siegel_der_Albert-Ludwigs-Universit%C3%A4t_Freiburg.svg/354px-Siegel_der_Albert-Ludwigs-Universit%C3%A4t_Freiburg.svg", "SVG", "this is the logo of freiburg university")
+      rep.add_imagefigure(section1, "Figure", "http://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Siegel_der_Albert-Ludwigs-Universit%C3%A4t_Freiburg.svg/354px-Siegel_der_Albert-Ludwigs-Universit%C3%A4t_Freiburg.svg", "SVG", 100, "this is the logo of freiburg university")
       section2 = rep.add_section(rep.get_root_element,"Second Section")
       rep.add_section(section2,"A Subsection")
       rep.add_section(section2,"Another Subsection")

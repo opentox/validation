@@ -1,5 +1,5 @@
 
-ENV['REPORT_XSL'] = "docbook-xsl-1.75.2/html/docbook.xsl" unless ENV['REPORT_XSL'] 
+ENV['REPORT_XSL'] = "docbook-xsl-1.76.1/html/docbook.xsl" unless ENV['REPORT_XSL'] 
 ENV['JAVA_HOME'] = "/usr/bin" unless ENV['JAVA_HOME']
 ENV['PATH'] = ENV['JAVA_HOME']+":"+ENV['PATH'] unless ENV['PATH'].split(":").index(ENV['JAVA_HOME'])
 ENV['SAXON_JAR'] = "saxonhe9-2-0-3j/saxon9he.jar" unless ENV['SAXON_JAR']
@@ -10,17 +10,18 @@ ENV['SAXON_JAR'] = "saxonhe9-2-0-3j/saxon9he.jar" unless ENV['SAXON_JAR']
 #
 module Reports::ReportFormat
   
-  CONTENT_TYPES = ["application/x-yaml","text/html","application/rdf+xml", "text/xml","application/pdf"]
-  
   # returns report-format, according to header value
   def self.get_format(accept_header_value)
-    begin
-      content_type =  MIMEParse::best_match(CONTENT_TYPES, accept_header_value)
-      raise RuntimeException.new unless content_type
-    rescue
-      raise Reports::BadRequest.new("Accept header '"+accept_header_value.to_s+"' not supported, supported types are "+CONTENT_TYPES.join(", "))
+    case accept_header_value
+    when /application\/rdf\+xml/
+      "application/rdf+xml"
+    when /text\/xml/
+      "text/xml"
+    when /application\/x-yaml/
+      "application/x-yaml"
+    else
+      "text/html"
     end
-    return content_type
   end
   
   def self.get_filename_extension(format)
@@ -60,14 +61,18 @@ module Reports::ReportFormat
   
   def self.format_report_to_html(directory, xml_filename, html_filename, css_style_sheet)
     css_style_sheet = "http://opentox.informatik.uni-freiburg.de/simple_ot_stylesheet.css" unless css_style_sheet
-    css = css_style_sheet ? " html.stylesheet=css_style_sheet?css_style_sheet="+URI.encode(css_style_sheet.to_s) : nil
+  
+    css =  css_style_sheet ? "--stringparam html.stylesheet "+URI.encode(css_style_sheet.to_s) : nil
+    cmd = "xsltproc "+css.to_s+" "+ENV['REPORT_XSL']+" "+File.join(directory,xml_filename.to_s)+" > "+File.join(directory,html_filename.to_s)
+    #css = css_style_sheet ? " html.stylesheet=css_style_sheet?css_style_sheet="+URI.encode(css_style_sheet.to_s) : nil
+    #cmd = "java -jar "+ENV['SAXON_JAR']+" -o:" + File.join(directory,html_filename.to_s)+
+    #  " -s:"+File.join(directory,xml_filename.to_s)+" -xsl:"+ENV['REPORT_XSL']+" -versionmsg:off"+css.to_s
       
-    cmd = "java -jar "+ENV['SAXON_JAR']+" -o:" + File.join(directory,html_filename.to_s)+
-      " -s:"+File.join(directory,xml_filename.to_s)+" -xsl:"+ENV['REPORT_XSL']+" -versionmsg:off"+css.to_s
     LOGGER.debug "Converting report to html: '"+cmd+"'"
     IO.popen(cmd.to_s) do |f|
       while line = f.gets do
-        LOGGER.info "saxon-xslt> "+line 
+        LOGGER.info "xsltproc> "+line
+        #LOGGER.info "saxon-xslt> "+line
       end
     end
     raise "error during conversion" unless $?==0

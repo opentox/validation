@@ -17,14 +17,14 @@ class Reports::ApplicationTest < Test::Unit::TestCase
   
   def test_nothing
 
-      file = File.new("qmrf-report.xml")
-      raise "File not found: "+file.path.to_s unless File.exist?(file.path)
-      data = File.read(file.path)
-      puts  OpenTox::RestClientWrapper.post("http://localhost/validation/report/qmrf/1",{:content_type => "application/qmrf-xml"},data).to_s.chomp
+#      file = File.new("qmrf-report.xml")
+#      raise "File not found: "+file.path.to_s unless File.exist?(file.path)
+#      data = File.read(file.path)
+#      puts  OpenTox::RestClientWrapper.post("http://local-ot/validation/report/qmrf/1",{:content_type => "application/qmrf-xml"},data).to_s.chomp
 
     #get "/report/qmrf/1",nil,'HTTP_ACCEPT' => "application/qmrf-xml"#"application/rdf+xml"#"application/x-yaml"     
-    #get "/report/validation/1",nil,'HTTP_ACCEPT' => "application/rdf+xml"#"application/x-yaml"     
-    #puts last_response.body.to_s
+#    get "/report/validation" # ?model=http://local-ot/model/1" #,nil,'HTTP_ACCEPT' => "application/rdf+xml"#"application/x-yaml"     
+#    puts last_response.body.to_s
     
     #Reports::XMLReport.generate_demo_xml_report.write_to
     #raise "stop"
@@ -33,7 +33,17 @@ class Reports::ApplicationTest < Test::Unit::TestCase
     #puts uri
     #get uri
     
-    #get '/report/validation/1',nil,'HTTP_ACCEPT' => "text/html"     
+    #get '/report/crossvalidation',:model=>"http://local-ot/majority/class/model/101"
+    #puts last_response.body.to_s
+     
+    get '/report/validation/2',nil,'HTTP_ACCEPT' => "application/x-yaml"
+    puts last_response.body.to_s
+
+    get '/report/validation/2',nil,'HTTP_ACCEPT' => "application/rdf+xml"
+    puts last_response.body.to_s
+
+
+    #get '/report/validation/117',nil,'HTTP_ACCEPT' => "text/html"     
     #post '/report/validation/1/format_html',:css_style_sheet=>"http://apps.ideaconsult.net:8180/ToxPredict/style/global.css"
     
     #post 'http://ot.validation.de/report/validation',:validation_uris=>"http://ot.validation.de/1"
@@ -42,7 +52,7 @@ class Reports::ApplicationTest < Test::Unit::TestCase
     #post 'http://ot.validation.de/report/crossvalidation',:validation_uris=>"http://ot.validation.de/crossvalidation/1"
     #uri = last_response.body.to_s
     
-#    val_uris = ["http://localhost/validation/64"]#,"http://localhost/validation/65" ]
+#    val_uris = ["http://local-ot/validation/64"]#,"http://local-ot/validation/65" ]
 #    
 #    post '/report/validation',:validation_uris=>val_uris.join("\n")
 #    uri = wait_for_task(last_response.body.to_s)
@@ -126,7 +136,7 @@ end
 #  WS_CLASS_ALG=File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
 #  WS_FEATURE_ALG=File.join(CONFIG[:services]["opentox-algorithm"],"fminer")
 #  
-#  #WS_CLASS_ALG_2="localhost:4008/algorithm"
+#  #WS_CLASS_ALG_2="local-ot:4008/algorithm"
 #  #WS_FEATURE_ALG_2=nil
 #
 #  def test_service_ot_webservice
@@ -138,7 +148,7 @@ end
 #      assert types.is_a?(String)
 #      assert types.split("\n").size == Reports::ReportFactory::REPORT_TYPES.size
 #      #Reports::ReportFactory::REPORT_TYPES.each{|t| rep.get_all_reports(t)}
-#      #assert_raise(Reports::NotFound){rep.get_all_reports("osterhase")}
+#      #assert_raise(OpenTox::NotFoundError){rep.get_all_reports("osterhase")}
 #      
 #      ### using ot_mock_layer (reporting component does not rely on ot validation webservice)
 #      
@@ -146,11 +156,11 @@ end
 #      #Reports::Validation.reset_validation_access
 #      
 ##      create_report(rep, "validation_uri_1", "validation")
-##      assert_raise(Reports::BadRequest){create_report(rep, ["validation_uri_1","validation_uri_2"], "validation")}
+##      assert_raise(OpenTox::BadRequestError){create_report(rep, ["validation_uri_1","validation_uri_2"], "validation")}
 ##      
 ##      create_report(rep, "crossvalidation_uri_1", "crossvalidation")
 ##      create_report(rep, ["validation_uri_1"]*Reports::OTMockLayer::NUM_FOLDS, "crossvalidation")
-##      assert_raise(Reports::BadRequest){create_report(rep, ["validation_uri_1"]*(Reports::OTMockLayer::NUM_FOLDS-1), "crossvalidation")}
+##      assert_raise(OpenTox::BadRequestError){create_report(rep, ["validation_uri_1"]*(Reports::OTMockLayer::NUM_FOLDS-1), "crossvalidation")}
 ##      
 ##      create_report(rep, ["crossvalidation_uri_1"]* (Reports::OTMockLayer::NUM_DATASETS * Reports::OTMockLayer::NUM_ALGS), "algorithm_comparison")
 ##      create_report(rep, ["validation_uri_1"]* (Reports::OTMockLayer::NUM_DATASETS * Reports::OTMockLayer::NUM_ALGS * Reports::OTMockLayer::NUM_FOLDS), "algorithm_comparison")
@@ -172,13 +182,13 @@ end
 #       #val_uri = create_cross_validation(data_uri, WS_CLASS_ALG_2, WS_FEATURE_ALG_2)
 #       #val_uri = create_cross_validation(data_uri)
 #       val_uri = File.join(WS_VAL,"crossvalidation/1")
-#       #val_uri2 = "http://localhost:4007/crossvalidation/14"
+#       #val_uri2 = "http://local-ot:4007/crossvalidation/14"
 ##       # add_resource val_uri
 #       create_report(rep, val_uri, "crossvalidation")
 #        
 ##         #val_uri2 = create_cross_validation(data_uri, WS_CLASS_ALG_2, WS_FEATURE_ALG_2)
-##         #val_uri = ["http://localhost:4007/crossvalidation/6", "http://localhost:4007/crossvalidation/8"]
-#         #val_uri = ["http://localhost:4007/crossvalidation/7", "http://localhost:4007/crossvalidation/8"]
+##         #val_uri = ["http://local-ot:4007/crossvalidation/6", "http://local-ot:4007/crossvalidation/8"]
+#         #val_uri = ["http://local-ot:4007/crossvalidation/7", "http://local-ot:4007/crossvalidation/8"]
 ##         #add_resource val_uri
 #         #create_report(rep, val_uri, "algorithm_comparison")
 #      
@@ -219,11 +229,11 @@ end
 #    
 #    #puts "created report with id "+id.to_s
 #    
-#    #assert_raise(Reports::BadRequest){report_service.get_report(type, id, "weihnachtsmann")}
+#    #assert_raise(OpenTox::BadRequestError){report_service.get_report(type, id, "weihnachtsmann")}
 #    
 #    report_service.get_report(type, id, "text/html")
 #    #report_service.get_report(type, id, "application/pdf")
-#    #assert_raise(Reports::NotFound){report_service.delete_report(type, 877658)}
+#    #assert_raise(OpenTox::NotFoundError){report_service.delete_report(type, 877658)}
 #
 ##      rep.delete_report(type, id)
 #  end
