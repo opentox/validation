@@ -188,11 +188,7 @@ module ValidationExamples
   class LazarHamsterTrainingTest < HamsterTrainingTest
     def initialize
       @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-<<<<<<< HEAD
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer")
-=======
       @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
->>>>>>> mguetlein/test
       super
     end
   end
@@ -220,11 +216,7 @@ module ValidationExamples
   class LazarHamsterCrossvalidation < HamsterCrossvalidation
     def initialize
       @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-<<<<<<< HEAD
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer")
-=======
       @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
->>>>>>> mguetlein/test
       super
     end
   end

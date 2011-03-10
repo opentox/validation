@@ -66,11 +66,7 @@ module ValidationExamples
         $test_case.post uri,params
         return wait($test_case.last_response.body)
       else
-<<<<<<< HEAD
-        return OpenTox::RestClientWrapper.post(File.join(CONFIG[:services]["opentox-validation"],uri),params)
-=======
         return OpenTox::RestClientWrapper.post(File.join(CONFIG[:services]["opentox-validation"],uri),params,nil,waiting_task).to_s
->>>>>>> mguetlein/test
       end
     end
     
@@ -93,11 +89,7 @@ module ValidationExamples
         $test_case.delete uri,{:subjectid => SUBJECTID},'HTTP_ACCEPT' => accept_header 
         return wait($test_case.last_response.body)
       else
-<<<<<<< HEAD
-        return OpenTox::RestClientWrapper.get(File.join(CONFIG[:services]["opentox-validation"],uri),{:accept => accept_header})
-=======
         return OpenTox::RestClientWrapper.delete(File.join(CONFIG[:services]["opentox-validation"],uri),{:accept => accept_header,:subjectid => SUBJECTID})
->>>>>>> mguetlein/test
       end
     end
     
