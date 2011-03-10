@@ -3,8 +3,10 @@ OpenTox Validation
 
 * An OpenTox REST Webservice for validation and reporting
 
-* see http://opentox.org/dev/apis/api-1.1/Validation for a current version of the  API
+API documentation
+-----------------
 
-* online test-service not yet available
+http://rdoc.info/github/opentox/validation
 
-* see EXAMPLES file for examples using curl, a version without placeholders (in <> brackets) will be available soon   
+Copyright (c) 2009-2011 Christoph Helma, Martin Guetlein, Micha Rautenberg, Andreas Maunz, David Vorgrimmler, Denis Gebele. See LICENSE for details.
+
