@@ -6,12 +6,31 @@ module Reports
   
   class ReportService
     
+    @@persistance = Reports::ExtendedFileReportPersistance.new
+    
+    def self.persistance
+      @@persistance
+    end
+    
+    def self.instance( home_uri=nil )
+      if !defined?@@instance
+        @@instance = ReportService.new(home_uri)
+      elsif home_uri && @@instance.home_uri != home_uri
+        raise "already initialized with different home_uri!!!" 
+      end
+      @@instance
+    end
+    
+    private
     def initialize(home_uri)
+      raise "supposed to be a singleton" if defined?@@instance
+      raise "plz specify home_uri" unless home_uri
       LOGGER.info "init report service"
       @home_uri = home_uri
-      @persistance = Reports::ExtendedFileReportPersistance.new
+      @@instance = self
     end
   
+    public
     # lists all available report types, returns list of uris
     #
     # call-seq:
@@ -20,7 +39,7 @@ module Reports
     def get_report_types
       
       LOGGER.info "list all report types"
-      Reports::ReportFactory::REPORT_TYPES.collect{ |t| get_uri(t) }.join("\n")
+      Reports::ReportFactory::REPORT_TYPES.collect{ |t| get_uri(t) }.join("\n")+"\n"
     end
     
     # lists all stored reports of a certain type, returns a list of uris
@@ -30,9 +49,9 @@ module Reports
     #
     def get_all_reports(type, filter_params)
       
-      LOGGER.info "get all reports of type '"+type.to_s+"'"
+      LOGGER.info "get all reports of type '"+type.to_s+"', filter_params: '"+filter_params.inspect+"'"
       check_report_type(type)
-      @persistance.list_reports(type, filter_params).collect{ |id| get_uri(type,id) }.join("\n")
+      @@persistance.list_reports(type, filter_params).collect{ |id| get_uri(type,id) }.join("\n")+"\n"
     end
     
     # creates a report of a certain type, __validation_uris__ must contain be a list of validation or cross-validation-uris
@@ -41,25 +60,28 @@ module Reports
     # call-seq:
     #   create_report(type, validation_uris) => string
     # 
-    def create_report(type, validation_uris)
+    def create_report(type, validation_uris, subjectid=nil, task=nil)
       
       LOGGER.info "create report of type '"+type.to_s+"'"
       check_report_type(type)
       
       # step1: load validations
-      raise Reports::BadRequest.new("validation_uris missing") unless validation_uris
+      raise OpenTox::BadRequestError.new("validation_uris missing") unless validation_uris
       LOGGER.debug "validation_uri(s): '"+validation_uris.inspect+"'"
-      validation_set = Reports::ValidationSet.new(validation_uris)
-      raise Reports::BadRequest.new("cannot get validations from validation_uris '"+validation_uris.inspect+"'") unless validation_set and validation_set.size > 0
+      validation_set = Reports::ValidationSet.new(validation_uris, subjectid)
+      raise OpenTox::BadRequestError.new("cannot get validations from validation_uris '"+validation_uris.inspect+"'") unless validation_set and validation_set.size > 0
       LOGGER.debug "loaded "+validation_set.size.to_s+" validation/s"
+      task.progress(10) if task
       
       #step 2: create report of type
-      report_content = Reports::ReportFactory.create_report(type, validation_set)
+      report_content = Reports::ReportFactory.create_report(type, validation_set, 
+        OpenTox::SubTask.create(task,10,90))
       LOGGER.debug "report created"
       
       #step 3: persist report if creation not failed
-      id = @persistance.new_report(report_content, type, create_meta_data(type, validation_set, validation_uris), self)
+      id = @@persistance.new_report(report_content, type, create_meta_data(type, validation_set, validation_uris), self, subjectid)
       LOGGER.debug "report persisted with id: '"+id.to_s+"'"
+      task.progress(100) if task
       
       return get_uri(type, id)
     end
@@ -75,7 +97,7 @@ module Reports
         accept_header_value.to_s+"', force-formating:"+force_formating.to_s+" params: '"+params.inspect+"')"
       check_report_type(type)
       format = Reports::ReportFormat.get_format(accept_header_value)
-      return @persistance.get_report(type, id, format, force_formating, params)
+      return @@persistance.get_report(type, id, format, force_formating, params)
     end
     
     # returns a report resource (i.e. image)
@@ -87,7 +109,7 @@ module Reports
       
       LOGGER.info "get resource '"+resource+"' for report '"+id.to_s+"' of type '"+type.to_s+"'"
       check_report_type(type)
-      return @persistance.get_report_resource(type, id, resource)
+      return @@persistance.get_report_resource(type, id, resource)
     end
     
     
@@ -96,19 +118,19 @@ module Reports
     # call-seq:
     #   delete_report( type, id )
     # 
-    def delete_report( type, id )
+    def delete_report( type, id, subjectid=nil )
       
       LOGGER.info "delete report '"+id.to_s+"' of type '"+type.to_s+"'"
       check_report_type(type)
-      @persistance.delete_report(type, id)
+      @@persistance.delete_report(type, id, subjectid)
     end
     
     # no api-access for this method
-    def delete_all_reports( type )
+    def delete_all_reports( type, subjectid=nil )
       
       LOGGER.info "deleting all reports of type '"+type.to_s+"'"
       check_report_type(type)
-      @persistance.list_reports(type).each{ |id| @persistance.delete_report(type, id) }
+      @@persistance.list_reports(type).each{ |id| @@persistance.delete_report(type, id, subjectid) }
     end
     
     def parse_type( report_uri )
@@ -123,8 +145,12 @@ module Reports
       
       raise "invalid uri" unless report_uri.to_s =~/^#{@home_uri}.*/
       id = report_uri.squeeze("/").split("/")[-1]
-      @persistance.check_report_id_format(id)
+      @@persistance.check_report_id_format(id)
       return id
+    end
+    
+    def home_uri
+      @home_uri
     end
     
     def get_uri(type, id=nil)
@@ -133,7 +159,7 @@ module Reports
     
     protected
     def create_meta_data(type, validation_set, validation_uris)
-      # the validtion_set contains the resolved single validations
+      # the validation_set contains the resolved single validations
       # crossvalidation uris are only added if given as validation_uris - param
       meta_data = {}
       { :validation_uri => "validation_uris",  
@@ -151,34 +177,13 @@ module Reports
         cvs << v if v =~ /crossvalidation/ and !cvs.include?(v)
       end
       meta_data[:crossvalidation_uris] = cvs
+      
       meta_data
     end
     
     def check_report_type(type)
-     raise Reports::NotFound.new("report type not found '"+type.to_s+"'") unless Reports::ReportFactory::REPORT_TYPES.index(type)
+     raise OpenTox::NotFoundError.new("report type not found '"+type.to_s+"'") unless Reports::ReportFactory::REPORT_TYPES.index(type)
     end
     
   end
 end
-
-class Reports::LoggedException < Exception
-  
-  def initialize(message)
-    super(message)
-    LOGGER.error(message)
-  end
-  
-end
-
-# corresponds to 400
-#
-class Reports::BadRequest < Reports::LoggedException
-  
-end
-
-# corresponds to 404
-#
-class Reports::NotFound < Reports::LoggedException
-  
-end
-
