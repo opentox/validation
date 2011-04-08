@@ -150,7 +150,7 @@ class ReachTest < Test::Unit::TestCase
     
     
     #model_uri = "http://local-ot/model/104"
-    model_uri = "http://local-ot/majority/class/model/125"
+    model_uri = "http://local-ot/model/72"
     
     
 #    m = OpenTox::Model::Generic.find(model_uri)

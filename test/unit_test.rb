@@ -1,6 +1,6 @@
 #TEST_USER = "mgtest"
 #TEST_PW = "mgpasswd"
-#ENV['RACK_ENV'] = 'test'
+ENV['RACK_ENV'] = 'production'
 
 require "rubygems"
 require "sinatra"
@@ -44,108 +44,124 @@ class ValidationTest < Test::Unit::TestCase
       puts "AA disabled"
       @@subjectid = nil
     end
-    f = File.new("data/hamster_carcinogenicity.mini.csv")
-    @@data_class_mini = ValidationExamples::Util.upload_dataset(f, @@subjectid)
-    @@feat_class_mini = ValidationExamples::Util.prediction_feature_for_file(f)
+    
+    files = [ 
+      File.new("data/hamster_carcinogenicity.mini.csv"),  
+      File.new("data/EPAFHM.mini.csv")
+      ]
+    @@data = {}
+    files.each do |f|
+      d = ValidationExamples::Util.upload_dataset(f, @@subjectid)
+      @@data[d] = ValidationExamples::Util.prediction_feature_for_file(f)
+    end
   end
   
   def global_teardown
     puts "delete and logout"
-    OpenTox::Dataset.find(@@data_class_mini,@@subjectid).delete(@@subjectid) if defined?@@data_class_mini
-    @@cv.delete(@@subjectid) if defined?@@cv
-    @@report.delete(@@subjectid) if defined?@@report
-    @@qmrfReport.delete(@@subjectid) if defined?@@qmrfReport
+    #OpenTox::Dataset.find(@@data,@@subjectid).delete(@@subjectid) if defined?@@data
+    @@cvs.each{|cv| cv.delete(@@subjectid)} if defined?@@cvs
+    @@reports.each{|report| report.delete(@@subjectid)} if defined?@@reports
+    @@qmrfReports.each{|qmrfReport| qmrfReport.delete(@@subjectid)} if defined?@@qmrfReports
     OpenTox::Authorization.logout(@@subjectid) if AA_SERVER
   end
  
   def test_crossvalidation
-    puts "test_crossvalidation"
+    
     #assert_rest_call_error OpenTox::NotFoundError do 
     #  OpenTox::Crossvalidation.find(File.join(CONFIG[:services]["opentox-validation"],"crossvalidation/noexistingid"))
     #end
-    p = { 
-      :dataset_uri => @@data_class_mini,
-      :algorithm_uri => File.join(CONFIG[:services]["opentox-algorithm"],"lazar"),
-      :algorithm_params => "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc"),
-      :prediction_feature => @@feat_class_mini,
-      :num_folds => 2 }
-    t = OpenTox::SubTask.new(nil,0,1)
-    def t.progress(pct)
-      if !defined?@last_msg or @last_msg+3<Time.new
-        puts "waiting for crossvalidation: "+pct.to_s
-        @last_msg=Time.new
+    @@cvs = []
+    @@data.each do |data,feat|
+      puts "test_crossvalidation"
+      p = { 
+        :dataset_uri => data,
+        :algorithm_uri => File.join(CONFIG[:services]["opentox-algorithm"],"lazar"),
+        :algorithm_params => "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc"),
+        :prediction_feature => feat,
+        :num_folds => 2 }
+      t = OpenTox::SubTask.new(nil,0,1)
+      def t.progress(pct)
+        if !defined?@last_msg or @last_msg+3<Time.new
+          puts "waiting for crossvalidation: "+pct.to_s
+          @last_msg=Time.new
+        end
       end
-    end
-    def t.waiting_for(task_uri); end
-    cv = OpenTox::Crossvalidation.create(p, @@subjectid, t)
-    assert cv.uri.uri?
-    if @@subjectid
-      assert_rest_call_error OpenTox::NotAuthorizedError do
-        OpenTox::Crossvalidation.find(cv.uri)
+      def t.waiting_for(task_uri); end
+      cv = OpenTox::Crossvalidation.create(p, @@subjectid, t)
+      assert cv.uri.uri?
+      if @@subjectid
+        assert_rest_call_error OpenTox::NotAuthorizedError do
+          OpenTox::Crossvalidation.find(cv.uri)
+        end
       end
-    end
-    cv = OpenTox::Crossvalidation.find(cv.uri, @@subjectid)
-    assert cv.uri.uri?
-    if @@subjectid
-      assert_rest_call_error OpenTox::NotAuthorizedError do
-        cv.summary(cv)
+      cv = OpenTox::Crossvalidation.find(cv.uri, @@subjectid)
+      assert cv.uri.uri?
+      if @@subjectid
+        assert_rest_call_error OpenTox::NotAuthorizedError do
+          cv.summary(cv)
+        end
       end
+      summary = cv.summary(@@subjectid)
+      assert_kind_of Hash,summary
+      @@cvs << cv
     end
-    summary = cv.summary(@@subjectid)
-    assert_kind_of Hash,summary
-    @@cv = cv
   end
     
   def test_crossvalidation_report
     #@@cv = OpenTox::Crossvalidation.find("http://local-ot/validation/crossvalidation/48", @@subjectid)
     
-    puts "test_crossvalidation_report"
-    assert defined?@@cv,"no crossvalidation defined"
-    assert_kind_of OpenTox::Crossvalidation,@@cv
-    #assert_rest_call_error OpenTox::NotFoundError do 
-    #  OpenTox::CrossvalidationReport.find_for_crossvalidation(@@cv.uri)
-    #end
-    if @@subjectid
-      assert_rest_call_error OpenTox::NotAuthorizedError do
-        OpenTox::CrossvalidationReport.create(@@cv.uri)
+    @@reports = []
+    @@cvs.each do |cv|
+      puts "test_crossvalidation_report"
+      assert defined?cv,"no crossvalidation defined"
+      assert_kind_of OpenTox::Crossvalidation,cv
+      #assert_rest_call_error OpenTox::NotFoundError do 
+      #  OpenTox::CrossvalidationReport.find_for_crossvalidation(cv.uri)
+      #end
+      if @@subjectid
+        assert_rest_call_error OpenTox::NotAuthorizedError do
+          OpenTox::CrossvalidationReport.create(cv.uri)
+        end
       end
-    end
-    report = OpenTox::CrossvalidationReport.create(@@cv.uri,@@subjectid)
-    assert report.uri.uri?
-    if @@subjectid
-      assert_rest_call_error OpenTox::NotAuthorizedError do
-        OpenTox::CrossvalidationReport.find(report.uri)
+      report = OpenTox::CrossvalidationReport.create(cv.uri,@@subjectid)
+      assert report.uri.uri?
+      if @@subjectid
+        assert_rest_call_error OpenTox::NotAuthorizedError do
+          OpenTox::CrossvalidationReport.find(report.uri)
+        end
       end
-    end
-    report = OpenTox::CrossvalidationReport.find(report.uri,@@subjectid)
-    assert report.uri.uri?
-    report2 = OpenTox::CrossvalidationReport.find_for_crossvalidation(@@cv.uri,@@subjectid)
-    assert_equal report.uri,report2.uri
-    report3_uri = @@cv.find_or_create_report(@@subjectid)
-    assert_equal report.uri,report3_uri
-    @report = report2
+      report = OpenTox::CrossvalidationReport.find(report.uri,@@subjectid)
+      assert report.uri.uri?
+      report2 = OpenTox::CrossvalidationReport.find_for_crossvalidation(cv.uri,@@subjectid)
+      assert_equal report.uri,report2.uri
+      report3_uri = cv.find_or_create_report(@@subjectid)
+      assert_equal report.uri,report3_uri
+      @@reports << report2
+    end  
   end
   
   def test_qmrf_report
-    #@@cv = OpenTox::Crossvalidation.find("http://local-ot/validation/crossvalidation/47", @@subjectid)
+    #@@cv = OpenTox::Crossvalidation.find("http://local-ot/validation/crossvalidation/13", @@subjectid)
     
-    puts "test_qmrf_report"
-    assert defined?@@cv,"no crossvalidation defined"
-    
-    validations = @@cv.metadata[OT.validation]
-    assert_kind_of Array,validations
-    assert validations.size==@@cv.metadata[OT.numFolds]
-    
-    val = OpenTox::Validation.find(validations[0], @@subjectid)
-    model_uri = val.metadata[OT.model]
-    model = OpenTox::Model::Generic.find(model_uri, @@subjectid)
-    assert model!=nil
-    
-    #assert_rest_call_error OpenTox::NotFoundError do 
-    #  OpenTox::QMRFReport.find_for_model(model_uri, @@subjectid)
-    #end
-    
-    @@qmrfReport = OpenTox::QMRFReport.create(model_uri, @@subjectid)
+    @@qmrfReports = []
+    @@cvs.each do |cv|
+      puts "test_qmrf_report"
+      assert defined?cv,"no crossvalidation defined"
+      validations = cv.metadata[OT.validation]
+      assert_kind_of Array,validations
+      assert validations.size==cv.metadata[OT.numFolds].to_i,validations.size.to_s+"!="+cv.metadata[OT.numFolds].to_s
+      val = OpenTox::Validation.find(validations[0], @@subjectid)
+      model_uri = val.metadata[OT.model]
+      
+      model = OpenTox::Model::Generic.find(model_uri, @@subjectid)
+      assert model!=nil
+      
+      #assert_rest_call_error OpenTox::NotFoundError do 
+      #  OpenTox::QMRFReport.find_for_model(model_uri, @@subjectid)
+      #end
+      
+      @@qmrfReports << OpenTox::QMRFReport.create(model_uri, @@subjectid)
+    end
   end
   
   ################### utils and overrides ##########################

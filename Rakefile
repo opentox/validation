@@ -1,8 +1,11 @@
 require 'rubygems'
 require 'rake'
 
-REPORT_GEMS = [  'opentox-ruby', 'mime-types', 'ruby-plot', 'rinruby'] #'ar-extensions', 'activerecord', 'activesupport',
-VALIDATION_GEMS = [  'opentox-ruby', 'ruby-plot'] #'ar-extensions', 'activerecord', 'activesupport',
+
+
+REPORT_GEMS = [  'opentox-ruby', 'ruby-plot', 'rinruby', 'dm-core', 'dm-serializer', 'dm-timestamps',
+  'dm-types', 'dm-migrations', 'dm-validations', 'dm-sqlite-adapter', 'benchmark']
+VALIDATION_GEMS = [  'opentox-ruby', 'ruby-plot']
 
 GEM_VERSIONS = { "ruby-plot" => "= 0.0.2" }
 GEM_INSTALL_OPTIONS = {}
@@ -10,7 +13,6 @@ GEM_INSTALL_OPTIONS = {}
 #GEM_VERSIONS = { "activerecord" => "= 2.3.8", "activesupport" => "= 2.3.8", "ar-extensions" => "= 0.9.2", "ruby-plot" => "= 0.0.2" }
 ## this is needed because otherwihse ar-extensions adds activesupport 3.0.0 which confuses things
 #GEM_INSTALL_OPTIONS = { "ar-extensions" => "--ignore-dependencies" }
-
 
 desc "Install required gems"
 task :install_gems do
@@ -29,7 +31,8 @@ task :install_gems do
       options = ""
       options += "--version '"+GEM_VERSIONS[g]+"' " if GEM_VERSIONS.has_key?(g)
       options += GEM_INSTALL_OPTIONS[g]+" " if GEM_INSTALL_OPTIONS.has_key?(g)
-      cmd = "sudo env PATH=$PATH gem install "+options+" "+g
+      #cmd = "sudo env PATH=$PATH gem install "+options+" "+g
+      cmd = "gem install "+options+" "+g
       puts "installing gem, this may take some time..."
       puts cmd
       IO.popen(cmd){ |f| puts f.gets }

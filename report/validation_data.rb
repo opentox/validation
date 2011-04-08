@@ -51,13 +51,13 @@ end
 
 module Reports
   
-  # = Reports::Validation
+  # = ReportValidation
   #
   # contains all values of a validation object
   #
-  class Validation
+  class ReportValidation
     
-    @@validation_access = Reports::ValidationDB.new
+    @@validation_access = ValidationDB.new
     
     # for overwriting validation source (other than using webservices)
     def self.reset_validation_access(validation_access)
@@ -69,7 +69,7 @@ module Reports
     end
     
     # create member variables for all validation properties
-    @@validation_attributes = Lib::ALL_PROPS + 
+    @@validation_attributes = Validation::ALL_PROPS + 
       VAL_ATTR_VARIANCE.collect{ |a| (a.to_s+"_variance").to_sym } +
       VAL_ATTR_RANKING.collect{ |a| (a.to_s+"_ranking").to_sym }
     @@validation_attributes.each{ |a| attr_accessor a } 
@@ -85,7 +85,7 @@ module Reports
     # returns/creates predictions, cache to save rest-calls/computation time
     #
     # call-seq:
-    #   get_predictions => Reports::Predictions
+    #   get_predictions => Predictions
     # 
     def get_predictions( task=nil )
       if @predictions
@@ -127,13 +127,13 @@ module Reports
       @@validation_access.init_cv(self)
     end
     
-    @@persistance = Reports::ReportService.persistance
+    @@persistance = ReportService.persistance
     
     def validation_report_uri
       #puts "searching for validation report: "+self.validation_uri.to_s
       return @validation_report_uri if @validation_report_uri!=nil
       ids = @@persistance.list_reports("validation",{:validation_uris=>validation_uri })
-      @validation_report_uri = Reports::ReportService.instance.get_uri("validation",ids[-1]) if ids and ids.size>0
+      @validation_report_uri = ReportService.instance.get_uri("validation",ids[-1]) if ids and ids.size>0
     end
     
     def cv_report_uri
@@ -142,7 +142,7 @@ module Reports
       raise "no cv uri "+to_yaml unless self.crossvalidation_uri
       ids = @@persistance.list_reports("crossvalidation",{:crossvalidation=>self.crossvalidation_uri.to_s })
       #puts "-> "+ids.inspect
-      @cv_report_uri = Reports::ReportService.instance.get_uri("crossvalidation",ids[-1]) if ids and ids.size>0
+      @cv_report_uri = ReportService.instance.get_uri("crossvalidation",ids[-1]) if ids and ids.size>0
     end
     
     def clone_validation
@@ -160,9 +160,9 @@ module Reports
     
     def initialize(validation_uris=nil, subjectid=nil)
       @unique_values = {}
-      validation_uris = Reports::Validation.resolve_cv_uris(validation_uris, subjectid) if validation_uris
+      validation_uris = ReportValidation.resolve_cv_uris(validation_uris, subjectid) if validation_uris
       @validations = Array.new
-      validation_uris.each{|u| @validations.push(Reports::Validation.new(u, subjectid))} if validation_uris
+      validation_uris.each{|u| @validations.push(ReportValidation.new(u, subjectid))} if validation_uris
     end
 
   
@@ -249,12 +249,12 @@ module Reports
     
     def get_domain_for_attr( attribute )
       class_domain = get_class_domain()
-      if Lib::Validation.classification_property?(attribute) and 
-        !Lib::Validation.depends_on_class_value?(attribute)
+      if Validation::Validation.classification_property?(attribute) and 
+        !Validation::Validation.depends_on_class_value?(attribute)
         [ nil ]
-      elsif Lib::Validation.classification_property?(attribute) and 
+      elsif Validation::Validation.classification_property?(attribute) and 
           class_domain.size==2 and 
-          Lib::Validation.complement_exists?(attribute)
+          Validation::Validation.complement_exists?(attribute)
         [ class_domain[0] ]
       else
         class_domain
@@ -270,10 +270,10 @@ module Reports
     # returns a new set with all validation that have values as specified in the map
     #
     # call-seq:
-    #   filter(map) => Reports::ValidationSet
+    #   filter(map) => ValidationSet
     # 
     def filter(map)
-      new_set = Reports::ValidationSet.new
+      new_set = ValidationSet.new
       validations.each{ |v| new_set.validations.push(v) if v.has_values?(map) }
       return new_set
     end
@@ -282,10 +282,10 @@ module Reports
     # e.g. create set with predictions: collect{ |validation| validation.get_predictions!=null } 
     #
     # call-seq:
-    #   filter_proc(proc) => Reports::ValidationSet
+    #   filter_proc(proc) => ValidationSet
     # 
     def collect
-      new_set = Reports::ValidationSet.new
+      new_set = ValidationSet.new
       validations.each{ |v| new_set.validations.push(v) if yield(v) }
       return new_set
     end
@@ -398,19 +398,19 @@ module Reports
     #   to_array(attributes) => array
     # 
     def merge(equal_attributes)
-      new_set = Reports::ValidationSet.new
+      new_set = ValidationSet.new
       
       # unique values stay unique when merging
       # derive unique values before, because model dependent props cannot be accessed later (when mergin validations from different models)
       new_set.unique_values = @unique_values
       
       #compute grouping
-      grouping = Reports::Util.group(@validations, equal_attributes)
+      grouping = Util.group(@validations, equal_attributes)
       #puts "groups "+grouping.size.to_s
   
-      Lib::MergeObjects.register_merge_attributes( Reports::Validation,
-        Lib::VAL_MERGE_AVG,Lib::VAL_MERGE_SUM,Lib::VAL_MERGE_GENERAL) unless 
-          Lib::MergeObjects.merge_attributes_registered?(Reports::Validation)
+      Lib::MergeObjects.register_merge_attributes( ReportValidation,
+        Validation::VAL_MERGE_AVG,Validation::VAL_MERGE_SUM,Validation::VAL_MERGE_GENERAL) unless 
+          Lib::MergeObjects.merge_attributes_registered?(ReportValidation)
   
       #merge
       grouping.each do |g|
@@ -438,12 +438,12 @@ module Reports
     def compute_ranking(equal_attributes, ranking_attribute, class_value=nil )
       
       #puts "compute_ranking("+equal_attributes.inspect+", "+ranking_attribute.inspect+", "+class_value.to_s+" )"
-      new_set = Reports::ValidationSet.new
+      new_set = ValidationSet.new
       (0..@validations.size-1).each do |i|
         new_set.validations.push(@validations[i].clone_validation)
       end
       
-      grouping = Reports::Util.group(new_set.validations, equal_attributes)
+      grouping = Util.group(new_set.validations, equal_attributes)
       grouping.each do |group|
   
         # put indices and ranking values for current group into hash

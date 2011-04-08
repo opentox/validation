@@ -21,11 +21,11 @@ class Reports::ValidationDB
 #        rescue => ex
 #          raise "could not access crossvalidation with id "+validation_id.to_s+", error-msg: "+ex.message
 #        end
-        cv = Lib::Crossvalidation.get( cv_id )
+        cv = Validation::Crossvalidation.get( cv_id )
         raise OpenTox::NotFoundError.new "crossvalidation with id "+cv_id.to_s+" not found" unless cv
         raise OpenTox::BadRequestError.new("crossvalidation with id '"+cv_id.to_s+"' not finished") unless cv.finished
-        #res += Lib::Validation.find( :all, :conditions => { :crossvalidation_id => cv_id } ).collect{|v| v.validation_uri.to_s}
-        res += Lib::Validation.all( :crossvalidation_id => cv_id ).collect{|v| v.validation_uri.to_s }
+        #res += Validation::Validation.find( :all, :conditions => { :crossvalidation_id => cv_id } ).collect{|v| v.validation_uri.to_s}
+        res += Validation::Validation.find( :crossvalidation_id => cv_id ).collect{|v| v.validation_uri.to_s }
       else
         res += [u.to_s]
       end
@@ -42,16 +42,16 @@ class Reports::ValidationDB
     v = nil
     raise OpenTox::NotAuthorizedError.new "Not authorized: GET "+uri.to_s if
       AA_SERVER and !OpenTox::Authorization.authorized?(uri,"GET",subjectid)
-    v = Lib::Validation.get(validation_id)
+    v = Validation::Validation.get(validation_id)
     raise OpenTox::NotFoundError.new "validation with id "+validation_id.to_s+" not found" unless v
     raise OpenTox::BadRequestError.new "validation with id "+validation_id.to_s+" is not finished yet" unless v.finished
     
-    (Lib::VAL_PROPS + Lib::VAL_CV_PROPS).each do |p|
+    (Validation::VAL_PROPS + Validation::VAL_CV_PROPS).each do |p|
       validation.send("#{p.to_s}=".to_sym, v.send(p))
     end
     
-    {:classification_statistics => Lib::VAL_CLASS_PROPS, 
-     :regression_statistics => Lib::VAL_REGR_PROPS}.each do |subset_name,subset_props|
+    {:classification_statistics => Validation::VAL_CLASS_PROPS, 
+     :regression_statistics => Validation::VAL_REGR_PROPS}.each do |subset_name,subset_props|
       subset = v.send(subset_name)
       subset_props.each{ |prop| validation.send("#{prop.to_s}=".to_sym, subset[prop]) } if subset
     end
@@ -60,11 +60,11 @@ class Reports::ValidationDB
   def init_cv(validation)
     
     #cv = Lib::Crossvalidation.find(validation.crossvalidation_id)
-    cv = Lib::Crossvalidation.get(validation.crossvalidation_id)
+    cv = Validation::Crossvalidation.get(validation.crossvalidation_id)
     raise OpenTox::BadRequestError.new "no crossvalidation found with id "+validation.crossvalidation_id.to_s unless cv
     
-    Lib::CROSS_VAL_PROPS.each do |p|
-      validation.send("#{p.to_s}=".to_sym, cv[p])        
+    Validation::CROSS_VAL_PROPS.each do |p|
+      validation.send("#{p.to_s}=".to_sym, cv.send(p.to_s))        
     end
   end
 
