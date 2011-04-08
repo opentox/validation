@@ -10,7 +10,8 @@ require 'validation/validation_service.rb'
 get '/crossvalidation/?' do
   LOGGER.info "list all crossvalidations"
   #uri_list = Validation::Crossvalidation.all.collect{ |cv| cv.crossvalidation_uri }.join("\n")+"\n"
-  uri_list = Lib::DataMapperUtil.all(Validation::Crossvalidation,params).collect{ |cv| cv.crossvalidation_uri }.join("\n")+"\n"
+  #uri_list = Lib::DataMapperUtil.all(Validation::Crossvalidation,params).collect{ |cv| cv.crossvalidation_uri }.join("\n")+"\n"
+  uri_list = Validation::Crossvalidation.all.collect{|cv| cv.crossvalidation_uri}.join("\n") + "\n"
   
   #uri_list = Validation::Crossvalidation.find_like(params).collect{ |cv| cv.crossvalidation_uri }.join("\n")+"\n"
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
@@ -41,7 +42,7 @@ post '/crossvalidation/?' do
     cv_params = { :dataset_uri => params[:dataset_uri],  
                   :algorithm_uri => params[:algorithm_uri] }
     [ :num_folds, :random_seed, :stratified ].each{ |sym| cv_params[sym] = params[sym] if params[sym] }
-    cv = Validation::Crossvalidation.new cv_params
+    cv = Validation::Crossvalidation.create cv_params
     cv.subjectid = @subjectid
     cv.perform_cv( params[:prediction_feature], params[:algorithm_params], task )
     cv.crossvalidation_uri
@@ -62,7 +63,7 @@ post '/crossvalidation/cleanup/?' do
       deleted << cv.crossvalidation_uri
       #Validation::Crossvalidation.delete(cv.id)
       cv.subjectid = @subjectid
-      cv.delete
+      cv.delete_crossvalidation
     #end
   end
   LOGGER.info "crossvalidation cleanup, deleted "+deleted.size.to_s+" cvs"
@@ -124,13 +125,19 @@ get '/crossvalidation/:id/statistics' do
   raise OpenTox::BadRequestError.new "Crossvalidation '"+params[:id].to_s+"' not finished" unless crossvalidation.finished
   
   Lib::MergeObjects.register_merge_attributes( Validation::Validation,
-    Lib::VAL_MERGE_AVG,Lib::VAL_MERGE_SUM,Lib::VAL_MERGE_GENERAL-[:date,:validation_uri,:crossvalidation_uri]) unless 
+    Validation::VAL_MERGE_AVG,Validation::VAL_MERGE_SUM,Validation::VAL_MERGE_GENERAL-[:date,:validation_uri,:crossvalidation_uri]) unless 
       Lib::MergeObjects.merge_attributes_registered?(Validation::Validation)
   
   #v = Lib::MergeObjects.merge_array_objects( Validation::Validation.find( :all, :conditions => { :crossvalidation_id => params[:id] } ) )
-  v = Lib::MergeObjects.merge_array_objects( Validation::Validation.all( :crossvalidation_id => params[:id] ) )
+  # convert ohm:set into array, as ohm:set[0]=nil(!)
+  vals = Validation::Validation.find( :crossvalidation_id => params[:id] ).collect{|x| x}
+#  LOGGER.debug vals.collect{|v| v.validation_uri}.join("\n")
+#  LOGGER.debug vals.size
+#  LOGGER.debug vals.class
+  
+  v = Lib::MergeObjects.merge_array_objects( vals )
   v.created_at = nil
-  v.id = nil
+  #v.id = nil
   
   case request.env['HTTP_ACCEPT'].to_s
   when /text\/html/
@@ -159,7 +166,7 @@ delete '/crossvalidation/:id/?' do
   cv = Validation::Crossvalidation.get(params[:id])
   cv.subjectid = @subjectid
   raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found." unless cv
-  cv.delete
+  cv.delete_crossvalidation
 end
 
 #get '/crossvalidation/:id/validations' do
@@ -208,8 +215,8 @@ get '/?' do
   LOGGER.info "list all validations, params: "+params.inspect
   #uri_list = Validation::Validation.find_like(params).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #uri_list = Validation::Validation.all(params).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  
+  #uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
+  uri_list = Validation::Validation.all.collect{|v| v.validation_uri}.join("\n") + "\n"
   
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
@@ -241,7 +248,7 @@ post '/test_set_validation' do
   LOGGER.info "creating test-set-validation "+params.inspect
   if params[:model_uri] and params[:test_dataset_uri] and !params[:training_dataset_uri] and !params[:algorithm_uri]
     task = OpenTox::Task.create( "Perform test-set-validation", url_for("/", :full) ) do |task| #, params
-      v = Validation::Validation.new :validation_type => "test_set_validation", 
+      v = Validation::Validation.create :validation_type => "test_set_validation", 
                        :model_uri => params[:model_uri], 
                        :test_dataset_uri => params[:test_dataset_uri],
                        :test_target_dataset_uri => params[:test_target_dataset_uri],
@@ -262,8 +269,9 @@ get '/test_set_validation' do
   
   #uri_list = Validation::Validation.find( :all, :conditions => { :validation_type => "test_set_validation" } ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #uri_list = Validation::Validation.all( :validation_type => "test_set_validation" ).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  params[:validation_type] = "test_set_validation"
-  uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
+  #params[:validation_type] = "test_set_validation"
+  #uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
+  uri_list = Validation::Validation.find(:validation_type => "test_set_validation").collect{|v| v.validation_uri}.join("\n") + "\n"
   
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
@@ -285,7 +293,7 @@ post '/training_test_validation/?' do
   LOGGER.info "creating training-test-validation "+params.inspect
   if params[:algorithm_uri] and params[:training_dataset_uri] and params[:test_dataset_uri] and params[:prediction_feature] and !params[:model_uri]
     task = OpenTox::Task.create( "Perform training-test-validation", url_for("/", :full) ) do |task| #, params
-      v = Validation::Validation.new :validation_type => "training_test_validation", 
+      v = Validation::Validation.create :validation_type => "training_test_validation", 
                         :algorithm_uri => params[:algorithm_uri],
                         :training_dataset_uri => params[:training_dataset_uri], 
                         :test_dataset_uri => params[:test_dataset_uri],
@@ -306,8 +314,9 @@ get '/training_test_validation' do
   LOGGER.info "list all training-test-validations, params: "+params.inspect
   #uri_list = Validation::Validation.find( :all, :conditions => { :validation_type => "training_test_validation" } ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #uri_list = Validation::Validation.all( :validation_type => "training_test_validation" ).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  params[:validation_type] = "training_test_validation"
-  uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
+  #params[:validation_type] = "training_test_validation"
+  #uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
+  uri_list = Validation::Validation.find(:validation_type => "training_test_validation").collect{|v| v.validation_uri}.join("\n") + "\n"
   
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
@@ -340,7 +349,7 @@ post '/bootstrapping' do
     params.merge!( Validation::Util.bootstrapping( params[:dataset_uri], 
       params[:prediction_feature], @subjectid, 
       params[:random_seed], OpenTox::SubTask.create(task,0,33)) )
-    v = Validation::Validation.new :validation_type => "bootstrapping", 
+    v = Validation::Validation.create :validation_type => "bootstrapping", 
                      :test_target_dataset_uri => params[:dataset_uri],
                      :prediction_feature => params[:prediction_feature],
                      :algorithm_uri => params[:algorithm_uri]
@@ -355,8 +364,9 @@ get '/bootstrapping' do
   LOGGER.info "list all bootstrapping-validations, params: "+params.inspect
   #uri_list = Validation::Validation.find( :all, :conditions => { :validation_type => "bootstrapping" } ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #uri_list = Validation::Validation.all( :validation_type => "bootstrapping" ).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  params[:validation_type] = "bootstrapping"
-  uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
+  #params[:validation_type] = "bootstrapping"
+  #uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
+  uri_list = Validation::Validation.find(:validation_type => "bootstrapping").collect{|v| v.validation_uri}.join("\n") + "\n"
   
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
@@ -388,7 +398,7 @@ post '/training_test_split' do
     
     params.merge!( Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], 
       @subjectid, params[:split_ratio], params[:random_seed], OpenTox::SubTask.create(task,0,33)))
-    v = Validation::Validation.new  :validation_type => "training_test_split", 
+    v = Validation::Validation.create  :validation_type => "training_test_split", 
                      :training_dataset_uri => params[:training_dataset_uri], 
                      :test_dataset_uri => params[:test_dataset_uri],
                      :test_target_dataset_uri => params[:dataset_uri],
@@ -406,8 +416,9 @@ get '/training_test_split' do
   LOGGER.info "list all training-test-split-validations, params: "+params.inspect
   #uri_list = Validation::Validation.find( :all, :conditions => { :validation_type => "training_test_split" } ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #uri_list = Validation::Validation.all( :validation_type => "training_test_split" ).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  params[:validation_type] = "training_test_split"
-  uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
+  #params[:validation_type] = "training_test_split"
+  #uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
+  uri_list = Validation::Validation.find(:validation_type => "training_test_split").collect{|v| v.validation_uri}.join("\n") + "\n"
   
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
@@ -440,7 +451,7 @@ post '/cleanup/?' do
     deleted << val.validation_uri
     #Validation::Validation.delete(val.id)
     val.subjectid = @subjectid
-    val.delete
+    val.delete_validation
   end
   LOGGER.info "validation cleanup, deleted "+deleted.size.to_s+" validations"
   deleted.join("\n")+"\n"
@@ -463,7 +474,7 @@ post '/validate_datasets' do
     params[:validation_type] = "validate_datasets" 
     
     if params[:model_uri]
-      v = Validation::Validation.new params
+      v = Validation::Validation.create params
       v.subjectid = @subjectid
       v.compute_validation_stats_with_model(nil,false,task)
     else
@@ -475,7 +486,7 @@ post '/validate_datasets' do
       predicted_feature = params.delete("predicted_feature")
       feature_type = "classification" if params.delete("classification")!=nil
       feature_type = "regression" if params.delete("regression")!=nil
-      v = Validation::Validation.new params  
+      v = Validation::Validation.create params  
       v.subjectid = @subjectid
       v.compute_validation_stats(feature_type,predicted_feature,nil,nil,false,task)
     end
@@ -532,7 +543,7 @@ get '/:id' do
 #  rescue ActiveRecord::RecordNotFound => ex
 #    raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found."
 #  end
-  validation = Validation::Validation.get(params[:id])
+  validation = Validation::Validation[params[:id]]
   raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found." unless validation
   
   case request.env['HTTP_ACCEPT'].to_s
@@ -566,5 +577,5 @@ delete '/:id' do
   validation.subjectid = @subjectid
   raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found." unless validation
   content_type "text/plain"
-  validation.delete
+  validation.delete_validation
 end

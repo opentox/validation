@@ -184,9 +184,9 @@ module Lib
       res = {}
       case @feature_type
       when "classification"
-        (Lib::VAL_CLASS_PROPS).each{ |s| res[s] = send(s)}  
+        (Validation::VAL_CLASS_PROPS).each{ |s| res[s] = send(s)}  
       when "regression"
-        (Lib::VAL_REGR_PROPS).each{ |s| res[s] = send(s) }  
+        (Validation::VAL_REGR_PROPS).each{ |s| res[s] = send(s) }  
       end
       return res
     end

@@ -1,5 +1,8 @@
 
-require "dm-validations"
+['dm-core', 'dm-serializer', 'dm-timestamps', 'dm-types', 'dm-migrations', 'dm-validations' ].each{|lib| require lib }
+db_dir = File.join(File.join(ENV['HOME'], ".opentox"), "db")
+FileUtils.mkdir_p db_dir
+DataMapper::setup(:default, "sqlite3://#{db_dir}/reach_reports.sqlite3")
 
 DataMapper::Model.raise_on_save_failure = true
 

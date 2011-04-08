@@ -4,7 +4,7 @@
 #end
 require "lib/merge.rb"
 
-module Lib
+module Validation
 
   VAL_PROPS_GENERAL = [ :validation_uri, :validation_type, :model_uri, :algorithm_uri, :training_dataset_uri, :prediction_feature,
                 :test_dataset_uri, :test_target_dataset_uri, :prediction_dataset_uri, :date ] 
@@ -48,42 +48,53 @@ module Lib
   VAL_MERGE_AVG = VAL_PROPS_AVG + VAL_CLASS_PROPS_SINGLE_AVG + VAL_CLASS_PROPS_PER_CLASS_AVG + VAL_REGR_PROPS
   
 
-#  class Validation < ActiveRecord::Base
-#    serialize :classification_statistics
-#    serialize :regression_statistics
-#    
-#    alias_attribute :date, :created_at
-    
-  class Validation 
-    include DataMapper::Resource
+  class Validation < Ohm::Model 
   
-    property :id, Serial
-    property :validation_type, String, :length => 512
-    property :model_uri, String, :length => 512
-    property :algorithm_uri, String, :length => 512
-    property :training_dataset_uri, String, :length => 512
-    property :test_target_dataset_uri, String, :length => 512
-    property :test_dataset_uri, String, :length => 512
-    property :prediction_dataset_uri, String, :length => 512
-    property :prediction_feature, String, :length => 512
-    property :created_at, DateTime
-    property :num_instances, Integer
-    property :num_without_class, Integer
-    property :num_unpredicted, Integer
-    property :crossvalidation_id, Integer
-    property :crossvalidation_fold, Integer
-    property :real_runtime, Float
-    property :percent_without_class, Float
-    property :percent_unpredicted, Float
-    property :classification_statistics, Object
-    property :regression_statistics, Object
-    property :finished, Boolean, :default => false
+    attribute :validation_type
+    attribute :model_uri
+    attribute :algorithm_uri
+    attribute :training_dataset_uri
+    attribute :test_target_dataset_uri
+    attribute :test_dataset_uri
+    attribute :prediction_dataset_uri
+    attribute :prediction_feature
+    attribute :created_at
+    attribute :num_instances
+    attribute :num_without_class
+    attribute :num_unpredicted
+    attribute :crossvalidation_id
+    attribute :crossvalidation_fold
+    attribute :real_runtime
+    attribute :percent_without_class
+    attribute :percent_unpredicted
+    attribute :classification_statistics_yaml
+    attribute :regression_statistics_yaml
+    attribute :finished    
+    
+    index :model_uri
+    index :validation_type
+    index :crossvalidation_id
     
     attr_accessor :subjectid
     
-    after :save, :check_policy
-    private
-    def check_policy
+    def classification_statistics
+      YAML.load(self.classification_statistics_yaml) if self.classification_statistics_yaml
+    end
+    
+    def classification_statistics=(cs)
+      self.classification_statistics_yaml = cs.to_yaml
+    end
+    
+    def regression_statistics
+      YAML.load(self.regression_statistics_yaml) if self.regression_statistics_yaml
+    end
+    
+    def regression_statistics=(rs)
+      self.regression_statistics_yaml = rs.to_yaml
+    end
+
+    def save
+      super
       OpenTox::Authorization.check_policy(validation_uri, subjectid)
     end
     
@@ -115,25 +126,27 @@ module Lib
     
   end
   
-#  class Crossvalidation < ActiveRecord::Base
-#    alias_attribute :date, :created_at
-  class Crossvalidation 
-    include DataMapper::Resource
+  class Crossvalidation < Ohm::Model
   
-    property :id, Serial
-    property :algorithm_uri, String, :length => 512
-    property :dataset_uri, String, :length => 512
-    property :created_at, DateTime
-    property :num_folds, Integer, :default => 10
-    property :random_seed, Integer, :default => 1
-    property :finished, Boolean, :default => false
-    property :stratified, Boolean, :default => false
+    attribute :algorithm_uri
+    attribute :dataset_uri
+    attribute :created_at
+    attribute :num_folds
+    attribute :random_seed
+    attribute :finished
+    attribute :stratified
     
     attr_accessor :subjectid
+    
+    index :algorithm_uri
+    index :dataset_uri
+    index :num_folds
+    index :random_seed
+    index :stratified
+    index :finished
         
-    after :save, :check_policy
-    private
-    def check_policy
+    def save
+      super
       OpenTox::Authorization.check_policy(crossvalidation_uri, subjectid)
     end
     
@@ -152,7 +165,7 @@ module Lib
     # further conditions can be specified in __conditions__
     def self.find_all_uniq(conditions={}, subjectid=nil )
       #cvs = Lib::Crossvalidation.find(:all, :conditions => conditions)
-      cvs = Lib::Crossvalidation.all(:conditions => conditions)
+      cvs = Crossvalidation.find( conditions )
       uniq = []
       cvs.each do |cv|
         next if AA_SERVER and !OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"GET",subjectid)
@@ -171,8 +184,3 @@ module Lib
   end
 end
 
-
-Lib::Validation.auto_upgrade!
-Lib::Validation.raise_on_save_failure = true
-Lib::Crossvalidation.auto_upgrade!
-Lib::Crossvalidation.raise_on_save_failure = true

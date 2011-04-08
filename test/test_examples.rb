@@ -85,7 +85,7 @@ module ValidationExamples
   
     class EPAFHMCrossvalidation < CrossValidation
     def initialize
-      @dataset_file = File.new("data/EPAFHM.csv","r")
+      @dataset_file = File.new("data/EPAFHM.mini.csv","r")
       #@prediction_feature = "http://ot-dev.in-silico.ch/toxcreate/feature#IRIS%20unit%20risk"
       @num_folds = 10
     end

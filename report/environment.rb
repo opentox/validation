@@ -13,7 +13,7 @@ end
 
 require "lib/ot_predictions.rb"
 #require "lib/active_record_setup.rb"
-require "lib/data_mapper_util.rb"
+#require "lib/data_mapper_util.rb"
 
 require "report/plot_factory.rb"
 require "report/xml_report.rb"

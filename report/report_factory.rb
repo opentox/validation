@@ -76,7 +76,7 @@ module Reports::ReportFactory
     end
     task.progress(90) if task
     
-    report.add_result(validation_set, Lib::ALL_PROPS, "All Results", "All Results")
+    report.add_result(validation_set, Validation::ALL_PROPS, "All Results", "All Results")
     report.add_predictions( validation_set )
     task.progress(100) if task
     report
@@ -89,7 +89,7 @@ module Reports::ReportFactory
       validation_set.get_values(:crossvalidation_id,false).inspect) if validation_set.unique_value(:crossvalidation_id)==nil
     validation_set.load_cv_attributes
     raise OpenTox::BadRequestError.new("num validations ("+validation_set.size.to_s+") is not equal to num folds ("+
-      validation_set.unique_value(:num_folds).to_s+")") unless validation_set.unique_value(:num_folds)==validation_set.size
+      validation_set.unique_value(:num_folds).to_s+")") unless validation_set.unique_value(:num_folds).to_i==validation_set.size
     raise OpenTox::BadRequestError.new("num different folds is not equal to num validations") unless validation_set.num_different_values(:crossvalidation_fold)==validation_set.size
     raise OpenTox::BadRequestError.new("validations must have unique feature type, i.e. must be either all regression, "+
       +"or all classification validations") unless validation_set.unique_feature_type  
@@ -116,7 +116,7 @@ module Reports::ReportFactory
     end
     task.progress(90) if task
       
-    report.add_result(validation_set, Lib::ALL_PROPS, "All Results", "All Results")
+    report.add_result(validation_set, Validation::ALL_PROPS, "All Results", "All Results")
     report.add_predictions( validation_set ) #, [:crossvalidation_fold] )
     task.progress(100) if task
     report

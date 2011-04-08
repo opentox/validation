@@ -133,11 +133,11 @@ module ReachReports
     val_datasets = []
     
     if algorithm
-      cvs = Lib::Crossvalidation.find_all_uniq({:algorithm_uri => algorithm.uri, :finished => true},r.subjectid)
+      cvs = Validation::Crossvalidation.find_all_uniq({:algorithm_uri => algorithm.uri, :finished => true},r.subjectid)
       # PENDING: cv classification/regression hack
       cvs = cvs.delete_if do |cv|
         #val = Validation::Validation.first( :all, :conditions => { :crossvalidation_id => cv.id } )
-        val = Validation::Validation.first( :crossvalidation_id => cv.id )
+        val = Validation::Validation.find( :crossvalidation_id => cv.id ).first
         raise "should not happen: no validations found for crossvalidation "+cv.id.to_s unless val
         (val.classification_statistics!=nil) != (feature_type=="classification")
       end
@@ -196,7 +196,7 @@ module ReachReports
 
     LOGGER.debug "looking for validations with "+{:model_uri => model.uri}.inspect
     #vals = Lib::Validation.find(:all, :conditions => {:model_uri => model.uri})
-    vals = Lib::Validation.all({:model_uri => model.uri})
+    vals = Validation::Validation.find({:model_uri => model.uri})
     uniq_vals = []
     vals.each do |val|
       match = false
