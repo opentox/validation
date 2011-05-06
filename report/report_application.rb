@@ -82,6 +82,8 @@ get '/report/:type/:id' do
     report = rs.get_report(params[:type],params[:id],accept_header)
     format = Reports::ReportFormat.get_format(accept_header)
     content_type format
+    # default encoding is utf-8, html conversion produces iso-8859-1 encoding
+    content_type "text/html", 'charset' => 'ISO-8859-1' if format=="text/html"
     #PENDING: get_report should return file or string, check for result.is_file instead of format
     if format=="application/x-yaml" or format=="application/rdf+xml"
       report
