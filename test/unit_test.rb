@@ -45,24 +45,86 @@ class ValidationTest < Test::Unit::TestCase
       @@subjectid = nil
     end
     
-    files = [ 
-      File.new("data/hamster_carcinogenicity.mini.csv"),  
-      File.new("data/EPAFHM.mini.csv")
-      ]
-    @@data = {}
-    files.each do |f|
-      d = ValidationExamples::Util.upload_dataset(f, @@subjectid)
-      @@data[d] = ValidationExamples::Util.prediction_feature_for_file(f)
+    files = { File.new("data/hamster_carcinogenicity.mini.csv") => :crossvalidation,  
+              File.new("data/EPAFHM.mini.csv") => :crossvalidation,
+              File.new("data/hamster_carcinogenicity.csv") => :validation,
+              File.new("data/EPAFHM.csv") => :validation,
+#              File.new("data/StJudes-HepG2-testset_Class.csv") => :crossvalidation
+               }
+    @@data = []
+    files.each do |file,type|
+      @@data << { :type => type,
+        :data => ValidationExamples::Util.upload_dataset(file, @@subjectid),
+        :feat => ValidationExamples::Util.prediction_feature_for_file(file),
+        :file => file} 
     end
   end
   
   def global_teardown
     puts "delete and logout"
-    #OpenTox::Dataset.find(@@data,@@subjectid).delete(@@subjectid) if defined?@@data
+    @@data.each{|data| OpenTox::Dataset.find(data[:data],@@subjectid).delete(@@subjectid)}
+    @@vs.each{|v| v.delete(@@subjectid)} if defined?@@vs
     @@cvs.each{|cv| cv.delete(@@subjectid)} if defined?@@cvs
     @@reports.each{|report| report.delete(@@subjectid)} if defined?@@reports
     @@qmrfReports.each{|qmrfReport| qmrfReport.delete(@@subjectid)} if defined?@@qmrfReports
     OpenTox::Authorization.logout(@@subjectid) if AA_SERVER
+  end
+ 
+  def test_training_test_split
+    
+    @@vs = []
+    @@data.each do |data|
+      if data[:type]==:validation
+        puts "test_training_test_split "+data[:file].path.to_s
+        p = { 
+          :dataset_uri => data[:data],
+          :algorithm_uri => File.join(CONFIG[:services]["opentox-algorithm"],"lazar"),
+          :algorithm_params => "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc"),
+          :prediction_feature => data[:feat],
+          :split_ratio => 0.99,
+          :random_seed => 2}
+        v = OpenTox::Validation.create_training_test_split(p, @@subjectid)
+        assert v.uri.uri?
+        if @@subjectid
+          assert_rest_call_error OpenTox::NotAuthorizedError do
+            OpenTox::Crossvalidation.find(v.uri)
+          end
+        end
+        v = OpenTox::Validation.find(v.uri, @@subjectid)
+        assert v.uri.uri?
+        @@vs << v
+      end
+    end
+  end
+  
+  def test_validation_report
+    #@@cv = OpenTox::Crossvalidation.find("http://local-ot/validation/crossvalidation/48", @@subjectid)
+    
+    @@reports = [] unless defined?@@reports
+    @@vs.each do |v|
+      puts "test_validation_report"
+      assert defined?v,"no validation defined"
+      assert_kind_of OpenTox::Validation,v
+      if @@subjectid
+        assert_rest_call_error OpenTox::NotAuthorizedError do
+          OpenTox::CrossvalidationReport.create(v.uri)
+        end
+      end
+      report = OpenTox::ValidationReport.create(v.uri,@@subjectid)
+      assert report.uri.uri?
+      if @@subjectid
+        assert_rest_call_error OpenTox::NotAuthorizedError do
+          OpenTox::CrossvalidationReport.find(report.uri)
+        end
+      end
+      report = OpenTox::ValidationReport.find(report.uri,@@subjectid)
+      assert report.uri.uri?
+      report2 = OpenTox::ValidationReport.find_for_validation(v.uri,@@subjectid)
+      assert_equal report.uri,report2.uri
+      report3_uri = v.find_or_create_report(@@subjectid)
+      assert_equal report.uri,report3_uri
+      @@reports << report2
+    end  
   end
  
   def test_crossvalidation
@@ -71,46 +133,48 @@ class ValidationTest < Test::Unit::TestCase
     #  OpenTox::Crossvalidation.find(File.join(CONFIG[:services]["opentox-validation"],"crossvalidation/noexistingid"))
     #end
     @@cvs = []
-    @@data.each do |data,feat|
-      puts "test_crossvalidation"
-      p = { 
-        :dataset_uri => data,
-        :algorithm_uri => File.join(CONFIG[:services]["opentox-algorithm"],"lazar"),
-        :algorithm_params => "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc"),
-        :prediction_feature => feat,
-        :num_folds => 2 }
-      t = OpenTox::SubTask.new(nil,0,1)
-      def t.progress(pct)
-        if !defined?@last_msg or @last_msg+3<Time.new
-          puts "waiting for crossvalidation: "+pct.to_s
-          @last_msg=Time.new
+    @@data.each do |data|
+      if data[:type]==:crossvalidation
+        puts "test_crossvalidation "+data[:file].path.to_s
+        p = { 
+          :dataset_uri => data[:data],
+          :algorithm_uri => File.join(CONFIG[:services]["opentox-algorithm"],"lazar"),
+          :algorithm_params => "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc"),
+          :prediction_feature => data[:feat],
+          :num_folds => 2 }
+        t = OpenTox::SubTask.new(nil,0,1)
+        def t.progress(pct)
+          if !defined?@last_msg or @last_msg+3<Time.new
+            puts "waiting for crossvalidation: "+pct.to_s
+            @last_msg=Time.new
+          end
         end
-      end
-      def t.waiting_for(task_uri); end
-      cv = OpenTox::Crossvalidation.create(p, @@subjectid, t)
-      assert cv.uri.uri?
-      if @@subjectid
-        assert_rest_call_error OpenTox::NotAuthorizedError do
-          OpenTox::Crossvalidation.find(cv.uri)
+        def t.waiting_for(task_uri); end
+        cv = OpenTox::Crossvalidation.create(p, @@subjectid, t)
+        assert cv.uri.uri?
+        if @@subjectid
+          assert_rest_call_error OpenTox::NotAuthorizedError do
+            OpenTox::Crossvalidation.find(cv.uri)
+          end
         end
-      end
-      cv = OpenTox::Crossvalidation.find(cv.uri, @@subjectid)
-      assert cv.uri.uri?
-      if @@subjectid
-        assert_rest_call_error OpenTox::NotAuthorizedError do
-          cv.summary(cv)
+        cv = OpenTox::Crossvalidation.find(cv.uri, @@subjectid)
+        assert cv.uri.uri?
+        if @@subjectid
+          assert_rest_call_error OpenTox::NotAuthorizedError do
+            cv.summary(cv)
+          end
         end
+        summary = cv.summary(@@subjectid)
+        assert_kind_of Hash,summary
+        @@cvs << cv
       end
-      summary = cv.summary(@@subjectid)
-      assert_kind_of Hash,summary
-      @@cvs << cv
     end
   end
     
   def test_crossvalidation_report
     #@@cv = OpenTox::Crossvalidation.find("http://local-ot/validation/crossvalidation/48", @@subjectid)
     
-    @@reports = []
+    @@reports = [] unless defined?@@reports
     @@cvs.each do |cv|
       puts "test_crossvalidation_report"
       assert defined?cv,"no crossvalidation defined"
