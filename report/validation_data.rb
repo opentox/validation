@@ -104,9 +104,9 @@ module Reports
     
     # returns the predictions feature values (i.e. the domain of the class attribute)
     #
-    def get_class_domain()
-      @class_domain = @@validation_access.get_class_domain(self) unless @class_domain
-      @class_domain
+    def get_accept_values()
+      @accept_values = @@validation_access.get_accept_values(self) unless @accept_values
+      @accept_values
     end
     
     # is classification/regression validation? cache to save rest-calls
@@ -233,7 +233,7 @@ module Reports
     
 #    def get_true_prediction_feature_value
 #      if all_classification?
-#        class_values = get_class_domain
+#        class_values = get_accept_values
 #        if class_values.size == 2
 #          (0..1).each do |i|
 #            return class_values[i] if (class_values[i].to_s.downcase == "true" || class_values[i].to_s.downcase == "active")
@@ -243,21 +243,23 @@ module Reports
 #      return nil
 #    end
     
-    def get_class_domain( )
-      return unique_value("get_class_domain")
+    def get_accept_values( )
+      return unique_value("get_accept_values")
     end
     
-    def get_domain_for_attr( attribute )
-      class_domain = get_class_domain()
-      if Validation::Validation.classification_property?(attribute) and 
-        !Validation::Validation.depends_on_class_value?(attribute)
-        [ nil ]
-      elsif Validation::Validation.classification_property?(attribute) and 
-          class_domain.size==2 and 
-          Validation::Validation.complement_exists?(attribute)
-        [ class_domain[0] ]
+    def get_accept_values_for_attr( attribute )
+      if !Validation::Validation.classification_property?(attribute)
+        []
       else
-        class_domain
+        accept_values = get_accept_values()
+        if !Validation::Validation.depends_on_class_value?(attribute)
+          [ nil ]
+        elsif accept_values.size==2 and 
+            Validation::Validation.complement_exists?(attribute)
+          [ accept_values[0] ]
+        else
+          accept_values
+        end
       end
     end
     
@@ -298,10 +300,10 @@ module Reports
       #puts col_values.inspect
       
       # get domain for classification attribute, i.e. ["true","false"]
-      class_domain = get_domain_for_attr(attribute_val)
+      accept_values = get_accept_values_for_attr(attribute_val)
       # or the attribute has a complementary value, i.e. true_positive_rate
       # -> domain is reduced to one class value
-      first_value_elem = (class_domain.size==1 && class_domain[0]!=nil)
+      first_value_elem = (accept_values.size==1 && accept_values[0]!=nil)
       
       cell_values = {}
       row_values.each do |row|
@@ -311,7 +313,7 @@ module Reports
             if v.send(attribute_row)==row and v.send(attribute_col)==col
               raise "two validation have equal row and column values"if val!=nil
               val = v.send(attribute_val)
-              val = val[class_domain[0]] if first_value_elem
+              val = val[accept_values[0]] if first_value_elem
               val = val.to_nice_s
             end
           end
@@ -357,13 +359,13 @@ module Reports
           else
             attribute_not_nil[index] = true if remove_nil_attributes
             
-            class_domain = get_domain_for_attr(a)
+            accept_values = get_accept_values_for_attr(a)
             # get domain for classification attribute, i.e. ["true","false"]
-            if class_domain.size==1 && class_domain[0]!=nil
+            if accept_values.size==1 && accept_values[0]!=nil
               # or the attribute has a complementary value, i.e. true_positive_rate
               # -> domain is reduced to one class value
               raise "illegal state, value for "+a.to_s+" is no hash: '"+val.to_s+"'" unless (val.is_a?(Hash))
-              val = val[class_domain[0]]
+              val = val[accept_values[0]]
             end
             
             if variance

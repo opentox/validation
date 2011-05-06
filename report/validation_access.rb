@@ -74,8 +74,13 @@ class Reports::ValidationDB
       validation.predicted_variable, subjectid, task)
   end
   
-  def get_class_domain( validation )
-    OpenTox::Feature.new( validation.prediction_feature ).domain
+  def get_accept_values( validation )
+    # PENDING So far, one has to load the whole dataset to get the accept_value from ambit
+    d = OpenTox::Dataset.find( validation.test_target_dataset_uri )
+    accept_values = d.features[validation.prediction_feature][OT.acceptValue]
+    raise "cannot get accept values from dataset "+validation.test_target_dataset_uri.to_s+" for feature "+
+      validation.prediction_feature+":\n"+d.features[validation.prediction_feature].to_yaml unless accept_values!=nil
+    accept_values
   end
   
   def feature_type( validation, subjectid=nil )

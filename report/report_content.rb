@@ -189,9 +189,9 @@ class Reports::ReportContent
       end
       @xml_report.add_paragraph(section_roc, section_text) if section_text
 
-      class_domain = validation_set.get_class_domain
-      class_domain.size.times do |i|
-        class_value = class_domain[i]
+      accept_values = validation_set.get_accept_values
+      accept_values.size.times do |i|
+        class_value = accept_values[i]
         image_title = image_titles ? image_titles[i] : "ROC Plot for class-value '"+class_value.to_s+"'"
         image_caption = image_captions ? image_captions[i] : nil
         plot_file_name = "roc_plot"+@tmp_file_count.to_s+".svg"
@@ -236,11 +236,11 @@ class Reports::ReportContent
                         image_titles=nil,
                         image_captions=nil)
 
-    class_domain = validation_set.get_domain_for_attr(rank_attribute)
-    puts "ranking plot for "+rank_attribute.to_s+", class values: "+class_domain.to_s
+    accept_values = validation_set.get_class_values_for(rank_attribute)
+    puts "ranking plot for "+rank_attribute.to_s+", class values: "+accept_values.to_s
     
-    class_domain.size.times do |i|  
-      class_value = class_domain[i]
+    accept_values.size.times do |i|  
+      class_value = accept_values[i]
       if image_titles
         image_title = image_titles[i]
       else
