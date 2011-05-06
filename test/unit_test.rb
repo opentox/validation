@@ -81,9 +81,17 @@ class ValidationTest < Test::Unit::TestCase
           :algorithm_uri => File.join(CONFIG[:services]["opentox-algorithm"],"lazar"),
           :algorithm_params => "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc"),
           :prediction_feature => data[:feat],
-          :split_ratio => 0.99,
+          :split_ratio => 0.95,
           :random_seed => 2}
-        v = OpenTox::Validation.create_training_test_split(p, @@subjectid)
+        t = OpenTox::SubTask.new(nil,0,1)
+        def t.progress(pct)
+          if !defined?@last_msg or @last_msg+3<Time.new
+            puts "waiting for training-test-split validation: "+pct.to_s
+            @last_msg=Time.new
+          end
+        end
+        def t.waiting_for(task_uri); end
+        v = OpenTox::Validation.create_training_test_split(p, @@subjectid, t)
         assert v.uri.uri?
         if @@subjectid
           assert_rest_call_error OpenTox::NotAuthorizedError do
