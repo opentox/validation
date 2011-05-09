@@ -9,11 +9,7 @@ require 'validation/validation_service.rb'
 
 get '/crossvalidation/?' do
   LOGGER.info "list all crossvalidations"
-  #uri_list = Validation::Crossvalidation.all.collect{ |cv| cv.crossvalidation_uri }.join("\n")+"\n"
-  #uri_list = Lib::DataMapperUtil.all(Validation::Crossvalidation,params).collect{ |cv| cv.crossvalidation_uri }.join("\n")+"\n"
-  uri_list = Validation::Crossvalidation.all.collect{|cv| cv.crossvalidation_uri}.join("\n") + "\n"
-  
-  #uri_list = Validation::Crossvalidation.find_like(params).collect{ |cv| cv.crossvalidation_uri }.join("\n")+"\n"
+  uri_list = Lib::OhmUtil.find( Validation::Crossvalidation, params ).collect{|v| v.crossvalidation_uri}.join("\n") + "\n"
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
       "Single validations:      "+url_for("/",:full)+"\n"+
@@ -134,7 +130,7 @@ get '/crossvalidation/:id/statistics' do
 #  LOGGER.debug vals.collect{|v| v.validation_uri}.join("\n")
 #  LOGGER.debug vals.size
 #  LOGGER.debug vals.class
-  
+  raise "could not load all validations for crossvalidation" if vals.include?(nil)
   v = Lib::MergeObjects.merge_array_objects( vals )
   v.created_at = nil
   #v.id = nil
@@ -213,11 +209,7 @@ end
 get '/?' do
   
   LOGGER.info "list all validations, params: "+params.inspect
-  #uri_list = Validation::Validation.find_like(params).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  #uri_list = Validation::Validation.all(params).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  #uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  uri_list = Validation::Validation.all.collect{|v| v.validation_uri}.join("\n") + "\n"
-  
+  uri_list = Lib::OhmUtil.find( Validation::Validation, params ).collect{|v| v.validation_uri}.join("\n") + "\n"
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
       "To perform a validation:\n"+

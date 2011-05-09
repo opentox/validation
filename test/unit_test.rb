@@ -44,30 +44,47 @@ class ValidationTest < Test::Unit::TestCase
       puts "AA disabled"
       @@subjectid = nil
     end
-    
+
+    @@data = []
     files = { File.new("data/hamster_carcinogenicity.mini.csv") => :crossvalidation,  
               File.new("data/EPAFHM.mini.csv") => :crossvalidation,
               File.new("data/hamster_carcinogenicity.csv") => :validation,
               File.new("data/EPAFHM.csv") => :validation,
 #              File.new("data/StJudes-HepG2-testset_Class.csv") => :crossvalidation
                }
-    @@data = []
     files.each do |file,type|
       @@data << { :type => type,
         :data => ValidationExamples::Util.upload_dataset(file, @@subjectid),
         :feat => ValidationExamples::Util.prediction_feature_for_file(file),
-        :file => file} 
+        :info => file.path, :delete => true} 
     end
+#    @@data << { :type => :crossvalidation,
+#      :data => "http://apps.ideaconsult.net:8080/ambit2/dataset/9?max=50",
+#      :feat => "http://apps.ideaconsult.net:8080/ambit2/feature/21573",
+#      :info => "http://apps.ideaconsult.net:8080/ambit2/dataset/9?max=50" }
+#    @@data << { :type => :validation,
+#      :data => "http://apps.ideaconsult.net:8080/ambit2/dataset/272?max=50",
+#      :feat => "http://apps.ideaconsult.net:8080/ambit2/feature/26221",
+#      :info => "http://apps.ideaconsult.net:8080/ambit2/dataset/272?max=50" } 
   end
   
   def global_teardown
     puts "delete and logout"
-    @@data.each{|data| OpenTox::Dataset.find(data[:data],@@subjectid).delete(@@subjectid)}
+    @@data.each{|data| OpenTox::Dataset.find(data[:data],@@subjectid).delete(@@subjectid) if data[:delete]}
     @@vs.each{|v| v.delete(@@subjectid)} if defined?@@vs
     @@cvs.each{|cv| cv.delete(@@subjectid)} if defined?@@cvs
     @@reports.each{|report| report.delete(@@subjectid)} if defined?@@reports
     @@qmrfReports.each{|qmrfReport| qmrfReport.delete(@@subjectid)} if defined?@@qmrfReports
     OpenTox::Authorization.logout(@@subjectid) if AA_SERVER
+  end
+  
+  def test_validation_list
+    puts "test_validation_list"
+    list = OpenTox::Validation.list
+    assert list.is_a?(Array)
+    list.each do |l|
+      assert l.uri?
+    end
   end
  
   def test_training_test_split
@@ -75,7 +92,7 @@ class ValidationTest < Test::Unit::TestCase
     @@vs = []
     @@data.each do |data|
       if data[:type]==:validation
-        puts "test_training_test_split "+data[:file].path.to_s
+        puts "test_training_test_split "+data[:info].to_s
         p = { 
           :dataset_uri => data[:data],
           :algorithm_uri => File.join(CONFIG[:services]["opentox-algorithm"],"lazar"),
@@ -100,6 +117,11 @@ class ValidationTest < Test::Unit::TestCase
         end
         v = OpenTox::Validation.find(v.uri, @@subjectid)
         assert v.uri.uri?
+        
+        model = v.metadata[OT.model]
+        assert model.uri?
+        v_list = OpenTox::Validation.list( {:model => model} )
+        assert v_list.size==1 and v_list.include?(v.uri)
         @@vs << v
       end
     end
@@ -118,6 +140,8 @@ class ValidationTest < Test::Unit::TestCase
           OpenTox::CrossvalidationReport.create(v.uri)
         end
       end
+      report = OpenTox::ValidationReport.find_for_validation(v.uri,@@subjectid)
+      assert report==nil,"report already exists for validation\nreport: "+(report ? report.uri.to_s : "")+"\nvalidation: "+v.uri.to_s
       report = OpenTox::ValidationReport.create(v.uri,@@subjectid)
       assert report.uri.uri?
       if @@subjectid
@@ -134,7 +158,16 @@ class ValidationTest < Test::Unit::TestCase
       @@reports << report2
     end  
   end
- 
+
+  def test_crossvalidation_list
+    puts "test_crossvalidation_list"
+    list = OpenTox::Crossvalidation.list
+    assert list.is_a?(Array)
+    list.each do |l|
+      assert l.uri?
+    end
+  end
+
   def test_crossvalidation
     
     #assert_rest_call_error OpenTox::NotFoundError do 
@@ -143,7 +176,7 @@ class ValidationTest < Test::Unit::TestCase
     @@cvs = []
     @@data.each do |data|
       if data[:type]==:crossvalidation
-        puts "test_crossvalidation "+data[:file].path.to_s
+        puts "test_crossvalidation "+data[:info].to_s
         p = { 
           :dataset_uri => data[:data],
           :algorithm_uri => File.join(CONFIG[:services]["opentox-algorithm"],"lazar"),
@@ -174,6 +207,16 @@ class ValidationTest < Test::Unit::TestCase
         end
         summary = cv.summary(@@subjectid)
         assert_kind_of Hash,summary
+        
+        algorithm = cv.metadata[OT.algorithm]
+        assert algorithm.uri?
+        cv_list = OpenTox::Crossvalidation.list( {:algorithm => algorithm} )
+        assert cv_list.include?(cv.uri)
+        cv_list.each do |cv_uri|
+          alg = OpenTox::Crossvalidation.find(cv_uri).metadata[OT.algorithm]
+          assert alg==algorithm,"wrong algorithm for filtered crossvalidation, should be: '"+algorithm.to_s+"', is: '"+alg.to_s+"'"
+        end
+        
         @@cvs << cv
       end
     end
@@ -195,6 +238,7 @@ class ValidationTest < Test::Unit::TestCase
           OpenTox::CrossvalidationReport.create(cv.uri)
         end
       end
+      assert OpenTox::ValidationReport.find_for_validation(cv.uri,@@subjectid)==nil
       report = OpenTox::CrossvalidationReport.create(cv.uri,@@subjectid)
       assert report.uri.uri?
       if @@subjectid

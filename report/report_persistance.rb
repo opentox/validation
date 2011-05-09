@@ -198,6 +198,8 @@ module Reports
     attribute :algorithm_uris    
     
     index :report_type
+    index :validation_uris
+    index :crossvalidation_uris
     
     attr_accessor :subjectid
     
@@ -250,16 +252,7 @@ module Reports
     
     def list_reports(type, filter_params={})
       LOGGER.debug "find reports for params: "+filter_params.inspect
-      # unfortunately, datamapper does not allow searching in Objects
-      # do filtering for list = Object params manually
-      list_params = {}
-      [:validation_uris, :crossvalidation_uris, :algorithm_uris, :model_uris].each do |l|
-        list_params[l] = filter_params.delete(l) if filter_params.has_key?(l)
-      end
-      reports = ReportData.find( :report_type => type )
-      list_params.each do |k,v|
-        reports = reports.collect{|x| x}.delete_if{ |r| !r.send(k).include?(v) }
-      end
+      reports = Lib::OhmUtil.find( ReportData, filter_params )
       reports.collect{ |r| r.id }
     end
     
