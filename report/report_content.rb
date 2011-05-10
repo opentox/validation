@@ -8,7 +8,7 @@ class Reports::ReportContent
   attr_accessor :xml_report, :tmp_files
   
   def initialize(title)
-    @xml_report = Reports::XMLReport.new(title, Time.now.strftime("Created at %m.%d.%Y - %H:%M"))
+    @xml_report = Reports::XMLReport.new(title, Time.now.strftime("Created at %d.%m.%Y - %H:%M"))
     @tmp_file_count = 0
     @current_section = @xml_report.get_root_element
   end
