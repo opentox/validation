@@ -132,7 +132,7 @@ get '/crossvalidation/:id/statistics' do
 #  LOGGER.debug vals.class
   raise "could not load all validations for crossvalidation" if vals.include?(nil)
   v = Lib::MergeObjects.merge_array_objects( vals )
-  v.created_at = nil
+  v.date = nil
   #v.id = nil
   
   case request.env['HTTP_ACCEPT'].to_s
