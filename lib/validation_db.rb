@@ -58,7 +58,7 @@ module Validation
     attribute :test_dataset_uri
     attribute :prediction_dataset_uri
     attribute :prediction_feature
-    attribute :created_at
+    attribute :date
     attribute :num_instances
     attribute :num_without_class
     attribute :num_unpredicted
@@ -76,6 +76,11 @@ module Validation
     index :crossvalidation_id
     
     attr_accessor :subjectid
+    
+    def self.create(params={})
+      params[:date] = Time.new
+      super params
+    end
     
     def classification_statistics
       YAML.load(self.classification_statistics_yaml) if self.classification_statistics_yaml
@@ -99,10 +104,6 @@ module Validation
     end
     
     public
-    def date
-      created_at
-    end
-    
     def validation_uri
       raise "no id" if self.id==nil
       $url_provider.url_for("/"+self.id.to_s, :full)
@@ -130,7 +131,7 @@ module Validation
   
     attribute :algorithm_uri
     attribute :dataset_uri
-    attribute :created_at
+    attribute :date
     attribute :num_folds
     attribute :random_seed
     attribute :finished
@@ -144,17 +145,18 @@ module Validation
     index :random_seed
     index :stratified
     index :finished
-        
+
+    def self.create(params={})
+      params[:date] = Time.new
+      super params
+    end
+    
     def save
       super
       OpenTox::Authorization.check_policy(crossvalidation_uri, subjectid)
     end
     
     public
-    def date
-      created_at
-    end
-    
     def crossvalidation_uri
       raise "no id" if self.id==nil
       $url_provider.url_for("/crossvalidation/"+self.id.to_s, :full) if self.id

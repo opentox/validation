@@ -191,7 +191,7 @@ module Reports
   class ReportData < Ohm::Model
   
     attribute :report_type
-    attribute :created_at
+    attribute :date
     attribute :validation_uris 
     attribute :crossvalidation_uris
     attribute :model_uris
@@ -203,14 +203,14 @@ module Reports
     
     attr_accessor :subjectid
     
+    def self.create(params={})
+      params[:date] = Time.new
+      super params
+    end
+    
     def save
       super
       OpenTox::Authorization.check_policy(report_uri, subjectid)
-    end
-    
-    public
-    def date
-      created_at
     end
     
     def report_uri
@@ -242,10 +242,9 @@ module Reports
     
     def new_report(report_content, type, meta_data, uri_provider, subjectid=nil)
       raise "report meta data missing" unless meta_data
-      report = ReportData.new(meta_data)
+      meta_data[:report_type] = type
+      report = ReportData.create(meta_data)
       report.subjectid = subjectid
-      report.report_type = type
-      report.save
       OpenTox::Authorization.check_policy(report.report_uri, subjectid)
       new_report_with_id(report_content, type, report.id)
     end
