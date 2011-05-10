@@ -362,11 +362,11 @@ module Validation
         split_compounds = shuffled_compounds.chunk( self.num_folds.to_i )
       else
         class_compounds = {} # "inactive" => compounds[], "active" => compounds[] .. 
-        shuffled_compounds.each do |c|
-          orig_dataset.features(c).each do |a|
-            value = OpenTox::Feature.new(:uri => a.uri).value(prediction_feature).to_s
-            class_compounds[value] = [] unless class_compounds.has_key?(value)
-            class_compounds[value].push(c)
+        accept_values = orig_dataset.features[prediction_feature][OT.acceptValue]
+        accept_values.each do |value|
+          class_compounds[value] = []
+          shuffled_compounds.each do |c|
+            class_compounds[value] << c if orig_dataset.data_entries[c][prediction_feature].to_s==value
           end
         end
         LOGGER.debug "stratified cv: different class values: "+class_compounds.keys.join(", ")
@@ -374,7 +374,7 @@ module Validation
       
         split_class_compounds = [] # inactive_compounds[fold_i][], active_compounds[fold_i][], ..
         class_compounds.values.each do |compounds|
-          split_class_compounds.push( compounds.chunk( self.num_folds ) )
+          split_class_compounds << compounds.chunk( self.num_folds.to_i )
         end
         LOGGER.debug "stratified cv: splits for class values: "+split_class_compounds.collect{ |c| c.collect{ |cc| cc.size }.join("/") }.join(", ")
         
@@ -385,7 +385,7 @@ module Validation
           # step 1: sort current split in ascending order
           split_comp.sort!{|x,y| x.size <=> y.size }
           # step 2: add splits
-          (0..self.num_folds-1).each do |i|
+          (0..self.num_folds.to_i-1).each do |i|
             unless split_compounds[i]
               split_compounds[i] = split_comp[i]
             else
