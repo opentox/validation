@@ -187,8 +187,7 @@ get '/crossvalidation/:id/predictions' do
   raise OpenTox::BadRequestError.new "Crossvalidation '"+params[:id].to_s+"' not finished" unless crossvalidation.finished
   
   content_type "application/x-yaml"
-  #validations = Validation::Validation.find( :all, :conditions => { :crossvalidation_id => params[:id] } )
-  validations = Validation::Validation.all( :crossvalidation_id => params[:id] )
+  validations = Validation::Validation.find( :crossvalidation_id => params[:id] )
   p = Lib::OTPredictions.to_array( validations.collect{ |v| v.compute_validation_stats_with_model(nil, true) } ).to_yaml
   
   case request.env['HTTP_ACCEPT'].to_s
