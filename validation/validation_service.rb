@@ -366,7 +366,8 @@ module Validation
         accept_values.each do |value|
           class_compounds[value] = []
           shuffled_compounds.each do |c|
-            class_compounds[value] << c if orig_dataset.data_entries[c][prediction_feature].to_s==value
+            #PENDING accept values are type string, data_entries may be boolean
+            class_compounds[value] << c if orig_dataset.data_entries[c][prediction_feature].collect{|v| v.to_s}.include?(value)
           end
         end
         LOGGER.debug "stratified cv: different class values: "+class_compounds.keys.join(", ")
@@ -425,7 +426,8 @@ module Validation
         end
         
         raise "internal error, num test compounds not correct" unless (shuffled_compounds.size/self.num_folds.to_i - test_compounds.size).abs <= 1 
-        raise "internal error, num train compounds not correct" unless shuffled_compounds.size - test_compounds.size == train_compounds.size
+        raise "internal error, num train compounds not correct, should be '"+(shuffled_compounds.size-test_compounds.size).to_s+
+          "', is '"+train_compounds.size.to_s+"'" unless shuffled_compounds.size - test_compounds.size == train_compounds.size
         
         LOGGER.debug "training set: "+datasetname+"_train, compounds: "+train_compounds.size.to_s
         #train_dataset_uri = orig_dataset.create_new_dataset( train_compounds, orig_dataset.features, datasetname + '_train', source ) 
