@@ -324,7 +324,7 @@ module Validation
       cvs.each do |cv|
         next if AA_SERVER and !OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"GET",self.subjectid)
         tmp_val = []
-        Validation.all( :crossvalidation_id => cv.id ).each do |v|
+        Validation.find( :crossvalidation_id => cv.id ).each do |v|
           break unless 
             v.prediction_feature == prediction_feature and
             OpenTox::Dataset.exist?(v.training_dataset_uri,self.subjectid) and 
@@ -340,7 +340,7 @@ module Validation
                        :prediction_feature => prediction_feature,
                        :algorithm_uri => self.algorithm_uri }
         end
-        if tmp_val.size == self.num_folds
+        if tmp_val.size == self.num_folds.to_i
           @tmp_validations = tmp_val
           LOGGER.debug "copied dataset uris from cv "+cv.crossvalidation_uri.to_s #+":\n"+tmp_val.inspect
           return true
