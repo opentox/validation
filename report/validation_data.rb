@@ -105,7 +105,7 @@ module Reports
     # returns the predictions feature values (i.e. the domain of the class attribute)
     #
     def get_accept_values()
-      @accept_values = @@validation_access.get_accept_values(self) unless @accept_values
+      @accept_values = @@validation_access.get_accept_values(self, @subjectid) unless @accept_values
       @accept_values
     end
     
