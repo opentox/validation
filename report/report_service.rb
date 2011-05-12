@@ -83,6 +83,9 @@ module Reports
       LOGGER.debug "report persisted with id: '"+id.to_s+"'"
       task.progress(100) if task
       
+      #HACK - format to html right after creation, as dynamically create html may cause deadlocks 
+      get_report(type, id, "text/html")
+      
       return get_uri(type, id)
     end
     
