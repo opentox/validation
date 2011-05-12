@@ -213,7 +213,7 @@ module Lib
           begin
             #a.push( "http://ambit.uni-plovdiv.bg:8080/ambit2/depict/cdk?search="+
             #  URI.encode(OpenTox::Compound.new(:uri=>p.identifier(i)).smiles) ) if add_pic
-            a << p.identifier(i)+"/image"
+            a << p.identifier(i)+"?media=image/png"
           rescue => ex
             raise ex
             #a.push("Could not add pic: "+ex.message)

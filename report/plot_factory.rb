@@ -161,7 +161,7 @@ module Reports
     end
     
     
-    def self.create_ranking_plot( svg_out_file, validation_set, compare_attribute, equal_attribute, rank_attribute, class_value=nil )
+    def self.create_ranking_plot( out_file, validation_set, compare_attribute, equal_attribute, rank_attribute, class_value=nil )
 
       #compute ranks
       #puts "rank attibute is "+rank_attribute.to_s
@@ -184,14 +184,14 @@ module Reports
                     ranks, 
                     nil, #0.1, 
                     validation_set.num_different_values(equal_attribute), 
-                    svg_out_file) 
+                    out_file) 
     end
   
     protected
-    def self.plot_ranking( title, comparables_array, ranks_array, confidence = nil, numdatasets = nil, svg_out_file = nil )
+    def self.plot_ranking( title, comparables_array, ranks_array, confidence = nil, numdatasets = nil, out_file = nil )
       
       (confidence and numdatasets) ? conf = "-q "+confidence.to_s+" -k "+numdatasets.to_s : conf = ""
-      svg_out_file ? show = "-o" : show = ""  
+      out_file ? show = "-o" : show = ""  
       (title and title.length > 0) ? tit = '-t "'+title+'"' : tit = ""  
       #title = "-t \""+ranking_value_prop+"-Ranking ("+comparables.size.to_s+" "+comparable_prop+"s, "+num_groups.to_s+" "+ranking_group_prop+"s, p < "+p.to_s+")\" "
       
@@ -208,12 +208,12 @@ module Reports
       end
       raise "rank plot failed" unless $?==0
       
-      if svg_out_file
-        f = File.new(svg_out_file, "w")
+      if out_file
+        f = File.new(out_file, "w")
         f.puts res
       end
         
-      svg_out_file ? svg_out_file : res
+      out_file ? out_file : res
     end
     
     def self.demo_ranking_plot
@@ -264,7 +264,7 @@ module Reports
                     :actual_values =>     [0, 1, 0, 0, 1, 1]}
       tp_fp_rates = get_tp_fp_rates(roc_values)
       data = { :names => ["default"], :fp_rate => [tp_fp_rates[:fp_rate]], :tp_rate => [tp_fp_rates[:tp_rate]] }                    
-      RubyPlot::plot_lines("/tmp/plot.svg",
+      RubyPlot::plot_lines("/tmp/plot.png",
         "ROC-Plot", 
         "False positive rate", 
         "True Positive Rate", data[:names], data[:fp_rate], data[:tp_rate], data[:faint] )

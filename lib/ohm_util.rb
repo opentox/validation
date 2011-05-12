@@ -6,7 +6,7 @@ module Lib
       prop_names = model.attributes.collect{|p| p.to_s}
       params.keys.each do |k|
         key = k.to_s
-        if (key == "subjectid")
+        if (key == "subjectid" || key == "media")
           params.delete(k)
         else
           unless prop_names.include?(key)
@@ -28,10 +28,11 @@ module Lib
     end
     
     def self.find(model, filter_params)
-      if (filter_params.size==0)
+      params = check_params(model,filter_params)
+      if (params.size==0)
         model.all
       else
-        model.find(check_params(model,filter_params))
+        model.find(params)
       end
     end
     
