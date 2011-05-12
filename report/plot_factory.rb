@@ -77,7 +77,8 @@ module Reports
         x << x_i
         y << y_i
       end
-      
+  
+      raise "no predictions performed" if x.size==0 || x[0].size==0
       RubyPlot::plot_points(out_file, "Regression plot", "Predicted values", "Actual values", names, x, y )
     end
     

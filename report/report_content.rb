@@ -161,7 +161,7 @@ class Reports::ReportContent
         plot_file_path = add_tmp_file(plot_file_name)
         Reports::PlotFactory.create_regression_plot( plot_file_path, prediction_set, name_attribute )
         @xml_report.add_imagefigure(section_regr, image_title, plot_file_name, "PNG", 100, image_caption)
-      rescue RuntimeError => ex
+      rescue Exception => ex
         LOGGER.error("Could not create regression plot: "+ex.message)
         rm_tmp_file(plot_file_name)
         @xml_report.add_paragraph(section_regr, "could not create regression plot: "+ex.message)
@@ -200,7 +200,7 @@ class Reports::ReportContent
           plot_file_path = add_tmp_file(plot_file_name)
           Reports::PlotFactory.create_roc_plot( plot_file_path, prediction_set, class_value, split_set_attribute, false )#prediction_set.size>1 )
           @xml_report.add_imagefigure(section_roc, image_title, plot_file_name, "PNG", 100, image_caption)
-        rescue RuntimeError => ex
+        rescue Exception => ex
           msg = "WARNING could not create roc plot for class value '"+class_value.to_s+"': "+ex.message
           LOGGER.error(msg)
           rm_tmp_file(plot_file_name)
