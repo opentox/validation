@@ -4,7 +4,7 @@
   'rexml/document',  'ruby-plot', 'opentox-ruby' ].each do |g|
     require g
 end
-gem 'ruby-plot', '= 0.0.3'
+gem 'ruby-plot', "~>0.3.0"
 
 #R.quit
 
