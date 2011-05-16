@@ -457,7 +457,7 @@ module Lib
     
     def mean_absolute_error
       return 0 if (@num_with_actual_value - @num_unpredicted)==0
-      Math.sqrt(@sum_abs_error / (@num_with_actual_value - @num_unpredicted).to_f)
+      @sum_abs_error / (@num_with_actual_value - @num_unpredicted).to_f
     end
     
     def sum_squared_error
