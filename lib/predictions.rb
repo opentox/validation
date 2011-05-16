@@ -88,6 +88,14 @@ module Lib
       
       case @feature_type
       when "classification"
+        
+        # confusion-matrix will contain counts for predictions in a 2d array:
+        # index of first dim: actual values
+        # index of second dim: predicited values
+        # example: 
+        # * summing up over all i with fixed n
+        # * confusion_matrix[i][n]
+        # * will give the number of instances that are predicted as n
         @confusion_matrix = []
         @accept_values.each do |v|
           @confusion_matrix.push( Array.new( @num_classes, 0 ) )
@@ -289,8 +297,8 @@ module Lib
     def precision(class_index=nil)
       return prediction_feature_value_map( lambda{ |i| precision(i) } ) if class_index==nil
       
-      correct = 0
-      total = 0
+      correct = 0 # all instances with prediction class_index that are correctly classified 
+      total = 0 # all instances with prediciton class_index
       (0..@num_classes-1).each do |i|
          correct += @confusion_matrix[i][class_index] if i == class_index
          total += @confusion_matrix[i][class_index]
@@ -487,21 +495,21 @@ module Lib
       return @variance_actual
     end
 
-    # data for roc-plots ###################################################################################
+    # data for (roc-)plots ###################################################################################
     
-    def get_roc_values(class_value)
+    def get_prediction_values(class_value)
       
       #puts "get_roc_values for class_value: "+class_value.to_s
       raise "no confidence values" if @confidence_values==nil
-      raise "no class-value specified" if class_value==nil
+      #raise "no class-value specified" if class_value==nil
       
-      class_index = @accept_values.index(class_value)
-      raise "class not found "+class_value.to_s if class_index==nil
+      class_index = @accept_values.index(class_value) if class_value!=nil
+      raise "class not found "+class_value.to_s if (class_value!=nil && class_index==nil)
       
       c = []; p = []; a = []
       (0..@predicted_values.size-1).each do |i|
         # NOTE: not predicted instances are ignored here
-        if @predicted_values[i]!=nil and @predicted_values[i]==class_index
+        if @predicted_values[i]!=nil and (class_index==nil || @predicted_values[i]==class_index)
           c << @confidence_values[i]
           p << @predicted_values[i]
           a << @actual_values[i]

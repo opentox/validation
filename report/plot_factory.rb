@@ -79,7 +79,7 @@ module Reports
       end
   
       raise "no predictions performed" if x.size==0 || x[0].size==0
-      RubyPlot::plot_points(out_file, "Regression plot", "Predicted values", "Actual values", names, x, y )
+      RubyPlot::regression_point_plot(out_file, "Regression plot", "Predicted values", "Actual values", names, x, y )
     end
     
     
@@ -102,7 +102,7 @@ module Reports
         tp_rates = []
         attribute_values.each do |value|
           begin
-            data = transform_predictions(validation_set.filter({split_set_attribute => value}), class_value, false)
+            data = transform_roc_predictions(validation_set.filter({split_set_attribute => value}), class_value, false)
             names << value.to_s
             fp_rates << data[:fp_rate][0]
             tp_rates << data[:tp_rate][0]
@@ -112,10 +112,49 @@ module Reports
         end
         RubyPlot::plot_lines(out_file, "ROC-Plot", "False positive rate", "True Positive Rate", names, fp_rates, tp_rates )
       else
-        data = transform_predictions(validation_set, class_value, show_single_curves)
+        data = transform_roc_predictions(validation_set, class_value, show_single_curves)
         RubyPlot::plot_lines(out_file, "ROC-Plot", "False positive rate", "True Positive Rate", data[:names], data[:fp_rate], data[:tp_rate], data[:faint] )
       end  
     end
+    
+    
+    def self.create_confidence_plot( out_file, validation_set, class_value, split_set_attribute=nil, show_single_curves=false )
+      
+      LOGGER.debug "creating confidence plot for '"+validation_set.size.to_s+"' validations, out-file:"+out_file.to_s
+      
+      if split_set_attribute
+        attribute_values = validation_set.get_values(split_set_attribute)
+        names = []
+        confidence = []
+        performance = []
+        attribute_values.each do |value|
+          begin
+            data = transform_confidence_predictions(validation_set.filter({split_set_attribute => value}), class_value, false)
+            names << value.to_s
+            confidence << data[:confidence][0]
+            performance << data[:performance][0]
+          rescue
+            LOGGER.warn "could not create confidence plot for "+value.to_s
+          end
+        end
+        #RubyPlot::plot_lines(out_file, "Percent Correct vs Confidence Plot", "Confidence", "Percent Correct", names, fp_rates, tp_rates )
+        case validation_set.unique_feature_type
+        when "classification"
+          RubyPlot::accuracy_confidence_plot(out_file, "Percent Correct vs Confidence Plot", "Confidence", "Percent Correct", names, confidence, performance)
+        when "regression"
+          RubyPlot::accuracy_confidence_plot(out_file, "RMSE vs Confidence Plot", "Confidence", "RMSE", names, confidence, performance, true)
+        end
+      else
+        data = transform_confidence_predictions(validation_set, class_value, show_single_curves)
+        case validation_set.unique_feature_type
+        when "classification"
+          RubyPlot::accuracy_confidence_plot(out_file, "Percent Correct vs Confidence Plot", "Confidence", "Percent Correct", data[:names], data[:confidence], data[:performance])
+        when "regression"
+          RubyPlot::accuracy_confidence_plot(out_file, "RMSE vs Confidence Plot", "Confidence", "RMSE", data[:names], data[:confidence], data[:performance], true)
+        end
+      end  
+    end
+    
     
     def self.create_bar_plot( out_file, validation_set, title_attribute, value_attributes )
   
@@ -128,7 +167,7 @@ module Reports
       validation_set.validations.each do |v|
         values = []
         value_attributes.each do |a|
-          validation_set.get_domain_for_attr(a).each do |class_value|
+          validation_set.get_accept_values_for_attr(a).each do |class_value|
             value = v.send(a)
             if value.is_a?(Hash)
               if class_value==nil
@@ -222,7 +261,7 @@ module Reports
     end
     
     private
-    def self.transform_predictions(validation_set, class_value, add_single_folds=false)
+    def self.transform_roc_predictions(validation_set, class_value, add_single_folds=false)
       
       if (validation_set.size > 1)
         
@@ -230,7 +269,7 @@ module Reports
         sum_roc_values = { :predicted_values => [], :actual_values => [], :confidence_values => []}
         
         (0..validation_set.size-1).each do |i|
-          roc_values = validation_set.get(i).get_predictions.get_roc_values(class_value)
+          roc_values = validation_set.get(i).get_predictions.get_prediction_values(class_value)
           sum_roc_values[:predicted_values] += roc_values[:predicted_values]
           sum_roc_values[:confidence_values] += roc_values[:confidence_values]
           sum_roc_values[:actual_values] += roc_values[:actual_values]
@@ -253,11 +292,50 @@ module Reports
         faint << false
         return { :names => names, :fp_rate => fp_rate, :tp_rate => tp_rate, :faint => faint }
       else
-        roc_values = validation_set.validations[0].get_predictions.get_roc_values(class_value)
+        roc_values = validation_set.validations[0].get_predictions.get_prediction_values(class_value)
         tp_fp_rates = get_tp_fp_rates(roc_values)
         return { :names => ["default"], :fp_rate => [tp_fp_rates[:fp_rate]], :tp_rate => [tp_fp_rates[:tp_rate]] }
       end
     end
+    
+    def self.transform_confidence_predictions(validation_set, class_value, add_single_folds=false)
+      
+      if (validation_set.size > 1)
+        
+        names = []; performance = []; confidence = []; faint = []
+        sum_confidence_values = { :predicted_values => [], :actual_values => [], :confidence_values => []}
+        
+        (0..validation_set.size-1).each do |i|
+          confidence_values = validation_set.get(i).get_predictions.get_prediction_values(class_value)
+          sum_confidence_values[:predicted_values] += confidence_values[:predicted_values]
+          sum_confidence_values[:confidence_values] += confidence_values[:confidence_values]
+          sum_confidence_values[:actual_values] += confidence_values[:actual_values]
+          
+          if add_single_folds
+            begin
+              pref_conf_rates = get_performance_confidence_rates(confidence_values)
+              names << "fold "+i.to_s
+              performance << pref_conf_rates[:performance]
+              confidence << pref_conf_rates[:confidence]
+              faint << true
+            rescue
+              LOGGER.warn "could not get confidence vals for fold "+i.to_s
+            end
+          end
+        end
+        pref_conf_rates = get_performance_confidence_rates(sum_confidence_values, validation_set.unique_feature_type)
+        names << nil # "all"
+        performance << pref_conf_rates[:performance]
+        confidence << pref_conf_rates[:confidence]
+        faint << false
+        return { :names => names, :performance => performance, :confidence => confidence, :faint => faint }
+        
+      else
+        confidence_values = validation_set.validations[0].get_predictions.get_prediction_values(class_value)
+        pref_conf_rates = get_performance_confidence_rates(confidence_values, validation_set.unique_feature_type)
+        return { :names => ["default"], :performance => [pref_conf_rates[:performance]], :confidence => [pref_conf_rates[:confidence]] }
+      end
+    end    
     
     def self.demo_rock_plot
       roc_values = {:confidence_values => [0.1, 0.9, 0.5, 0.6, 0.6, 0.6], 
@@ -270,6 +348,61 @@ module Reports
         "False positive rate", 
         "True Positive Rate", data[:names], data[:fp_rate], data[:tp_rate], data[:faint] )
     end
+    
+    def self.get_performance_confidence_rates(roc_values, feature_type)
+      
+      c = roc_values[:confidence_values]
+      p = roc_values[:predicted_values]
+      a = roc_values[:actual_values]
+      raise "no prediction values for roc-plot" if p.size==0
+     
+      (0..p.size-2).each do |i|
+        ((i+1)..p.size-1).each do |j|
+          if c[i]<c[j]
+            c.swap!(i,j)
+            a.swap!(i,j)
+            p.swap!(i,j)
+          end
+        end
+      end
+      #puts c.inspect+"\n"+a.inspect+"\n"+p.inspect+"\n\n"
+      
+      perf = []
+      conf = []
+      
+      case feature_type
+      when "classification"
+        count = 0
+        correct = 0
+        (0..p.size-1).each do |i|
+          count += 1
+          correct += 1 if p[i]==a[i]
+          if i>0 && (c[i]>=conf[-1]-0.00001)
+            perf.pop
+            conf.pop
+          end
+          perf << correct/count.to_f * 100
+          conf << c[i]
+        end
+      when "regression"
+        count = 0
+        sum_squared_error = 0
+        (0..p.size-1).each do |i|
+          count += 1
+          sum_squared_error += (p[i]-a[i])**2
+          if i>0 && (c[i]>=conf[-1]-0.00001)
+            perf.pop
+            conf.pop
+          end
+          perf << Math.sqrt(sum_squared_error/count.to_f)
+          conf << c[i]
+        end
+      end
+      #puts perf.inspect
+      
+      return {:performance => perf,:confidence => conf}
+    end
+    
     
     def self.get_tp_fp_rates(roc_values)
       
