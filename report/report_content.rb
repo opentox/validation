@@ -31,11 +31,11 @@ class Reports::ReportContent
     level = 0.90                       
     test_matrix = Reports::ReportStatisticalTest.test_matrix( validation_set.validations, 
       group_attribute, test_attribute, "paired_ttest", level )
-    puts test_matrix.inspect
+    #puts test_matrix.inspect
     titles = test_matrix[:titles]
     matrix = test_matrix[:matrix]
     table = []
-    puts titles.inspect
+    #puts titles.inspect
     table << [""] + titles
     titles.size.times do |i|
       table << [titles[i]] + matrix[i].collect{|v| (v==nil || v==0) ? "" : (v<0 ? "-" : "+") }
@@ -47,10 +47,10 @@ class Reports::ReportContent
   end
   
   def add_predictions( validation_set, 
-                              validation_attributes=[],
-                              section_title="Predictions",
-                              section_text=nil,
-                              table_title="Predictions")
+                        validation_attributes=[],
+                        section_title="Predictions",
+                        section_text=nil,
+                        table_title="Predictions")
 
     #PENING
     raise "validation attributes not implemented in get prediction array" if  validation_attributes.size>0
@@ -109,7 +109,7 @@ class Reports::ReportContent
     
     if (search_for_existing_report_type)
       vals.size.times do |i|
-        puts i
+        #puts i
         if (i==0)
           vals[i] = [ "Reports" ] + vals[i]
           puts vals[i].inspect

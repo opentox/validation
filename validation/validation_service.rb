@@ -31,15 +31,49 @@ end
 module Validation
   
   class Validation
-      
-    # constructs a validation object, Rsets id und uri
-    #def initialize( params={} )
-      #raise "do not set id manually" if params[:id]
-      #params[:finished] = false
-      #super params
-      #self.save!
-      #raise "internal error, validation-id not set "+to_yaml if self.id==nil
-    #end
+    
+    def self.from_cv_statistics( cv_id, subjectid=nil )
+      v =  Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation_statistics" ).first
+      unless v
+        crossvalidation = Crossvalidation.get(cv_id)
+        raise OpenTox::NotFoundError.new "Crossvalidation '#{cv_id}' not found." unless crossvalidation
+        raise OpenTox::BadRequestError.new "Crossvalidation '"+cv_id.to_s+"' not finished" unless crossvalidation.finished
+        
+        vals = Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation" ).collect{|x| x}
+        feature_type = OpenTox::Model::Generic.new(vals.first.model_uri).feature_type(@subjectid)
+        test_dataset_uris = vals.collect{|v| v.test_dataset_uri}
+        test_target_dataset_uris = vals.collect{|v| v.test_target_dataset_uri}
+        prediction_feature = vals.first.prediction_feature
+        prediction_dataset_uris = vals.collect{|v| v.prediction_dataset_uri}
+        predicted_variables = vals.collect{|v| nil}
+        prediction = Lib::OTPredictions.new( feature_type, test_dataset_uris, test_target_dataset_uris, prediction_feature, 
+          prediction_dataset_uris, predicted_variables, @subjectid )
+          
+        v = Validation.new
+        case feature_type
+        when "classification"
+          v.classification_statistics = prediction.compute_stats
+        when "regression"
+          v.regression_statistics = prediction.compute_stats
+        end
+        v.update :num_instances => prediction.num_instances,
+               :num_without_class => prediction.num_without_class,
+               :percent_without_class => prediction.percent_without_class,
+               :num_unpredicted => prediction.num_unpredicted,
+               :percent_unpredicted => prediction.percent_unpredicted,
+               :finished => true
+        (VAL_PROPS_GENERAL-[:validation_uri]).each do |p|
+          v.send("#{p.to_s}=".to_sym, vals.collect{ |vv| vv.send(p) }.uniq.join(","))
+        end
+        v.date = crossvalidation.date
+        v.validation_type = "crossvalidation_statistics"
+        v.crossvalidation_id = crossvalidation.id
+        v.crossvalidation_fold = vals.collect{ |vv| vv.crossvalidation_fold }.uniq.join(",")       
+        v.real_runtime = vals.collect{ |vv| vv.real_runtime }.uniq.join(",")
+        v.save
+      end
+      v
+    end
     
     # deletes a validation
     # PENDING: model and referenced datasets are deleted as well, keep it that way?
@@ -238,21 +272,7 @@ module Validation
   
   class Crossvalidation
     
-    # constructs a crossvalidation, id and uri are set
-    #def initialize( params={} )
-    #  
-    #  raise "do not set id manually" if params[:id]
-    #  params[:num_folds] = 10 if params[:num_folds]==nil
-    #  params[:random_seed] = 1 if params[:random_seed]==nil
-    #  params[:stratified] = false if params[:stratified]==nil
-    #  params[:finished] = false
-    #  super params
-    #  self.save!
-    #  raise "internal error, crossvalidation-id not set" if self.id==nil
-    #end
-    
     def perform_cv ( prediction_feature, algorithm_params=nil, task=nil )
-      
       create_cv_datasets( prediction_feature, OpenTox::SubTask.create(task, 0, 33) )
       perform_cv_validations( algorithm_params, OpenTox::SubTask.create(task, 33, 100) )
     end
@@ -324,7 +344,7 @@ module Validation
       cvs.each do |cv|
         next if AA_SERVER and !OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"GET",self.subjectid)
         tmp_val = []
-        Validation.find( :crossvalidation_id => cv.id ).each do |v|
+        Validation.find( :crossvalidation_id => cv.id, :validation_type => "crossvalidation" ).each do |v|
           break unless 
             v.prediction_feature == prediction_feature and
             OpenTox::Dataset.exist?(v.training_dataset_uri,self.subjectid) and 
@@ -353,7 +373,7 @@ module Validation
     # stores uris in validation objects 
     def create_new_cv_datasets( prediction_feature, task = nil )
       LOGGER.debug "creating datasets for crossvalidation"
-      orig_dataset = OpenTox::Dataset.find(self.dataset_uri,self.subjectid)
+      orig_dataset = Lib::DatasetCache.find(self.dataset_uri,self.subjectid)
       raise OpenTox::NotFoundError.new "Dataset not found: "+self.dataset_uri.to_s unless orig_dataset
       
       shuffled_compounds = orig_dataset.compounds.shuffle( self.random_seed )
@@ -465,7 +485,7 @@ module Validation
       
       random_seed=1 unless random_seed
       
-      orig_dataset = OpenTox::Dataset.find orig_dataset_uri,subjectid
+      orig_dataset = Lib::DatasetCache.find orig_dataset_uri,subjectid
       orig_dataset.load_all
       raise OpenTox::NotFoundError.new "Dataset not found: "+orig_dataset_uri.to_s unless orig_dataset
       if prediction_feature
@@ -530,7 +550,7 @@ module Validation
       task.progress(100) if task
       
       if ENV['RACK_ENV'] =~ /test|debug/
-        training_dataset = OpenTox::Dataset.find result[:training_dataset_uri],subjectid
+        training_dataset = Lib::DatasetCache.find result[:training_dataset_uri],subjectid
         raise OpenTox::NotFoundError.new "Training dataset not found: '"+result[:training_dataset_uri].to_s+"'" unless training_dataset
         training_dataset.load_all
         value_count = 0
@@ -539,7 +559,7 @@ module Validation
         end
         raise  "training compounds error" unless value_count==training_compounds.size
         raise OpenTox::NotFoundError.new "Test dataset not found: '"+result[:test_dataset_uri].to_s+"'" unless 
-          OpenTox::Dataset.find result[:test_dataset_uri], subjectid
+          Lib::DatasetCache.find result[:test_dataset_uri], subjectid
       end
       LOGGER.debug "bootstrapping done, training dataset: '"+result[:training_dataset_uri].to_s+"', test dataset: '"+result[:test_dataset_uri].to_s+"'"
       
@@ -554,7 +574,7 @@ module Validation
       random_seed=1 unless random_seed
       random_seed = random_seed.to_i
       
-      orig_dataset = OpenTox::Dataset.find orig_dataset_uri, subjectid
+      orig_dataset = Lib::DatasetCache.find orig_dataset_uri, subjectid
       orig_dataset.load_all subjectid
       raise OpenTox::NotFoundError.new "Dataset not found: "+orig_dataset_uri.to_s unless orig_dataset
       raise OpenTox::NotFoundError.new "Split ratio invalid: "+split_ratio.to_s unless split_ratio and split_ratio=split_ratio.to_f
@@ -597,7 +617,7 @@ module Validation
         subjectid ).uri
       task.progress(66) if task
 
-#      d = OpenTox::Dataset.find(result[:training_dataset_uri])
+#      d = Lib::DatasetCache.find(result[:training_dataset_uri])
 #      d.data_entries.values.each do |v|
 #        puts v.inspect
 #        puts v.values[0].to_s+" "+v.values[0].class.to_s
@@ -617,8 +637,8 @@ module Validation
       
       if ENV['RACK_ENV'] =~ /test|debug/
         raise OpenTox::NotFoundError.new "Training dataset not found: '"+result[:training_dataset_uri].to_s+"'" unless 
-          OpenTox::Dataset.find(result[:training_dataset_uri],subjectid)
-        test_data = OpenTox::Dataset.find result[:test_dataset_uri],subjectid
+          Lib::DatasetCache.find(result[:training_dataset_uri],subjectid)
+        test_data = Lib::DatasetCache.find result[:test_dataset_uri],subjectid
         raise OpenTox::NotFoundError.new "Test dataset not found: '"+result[:test_dataset_uri].to_s+"'" unless test_data 
         test_data.load_compounds subjectid
         raise "Test dataset num coumpounds != "+(compounds.size-split-1).to_s+", instead: "+

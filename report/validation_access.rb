@@ -25,7 +25,7 @@ class Reports::ValidationDB
         raise OpenTox::NotFoundError.new "crossvalidation with id "+cv_id.to_s+" not found" unless cv
         raise OpenTox::BadRequestError.new("crossvalidation with id '"+cv_id.to_s+"' not finished") unless cv.finished
         #res += Validation::Validation.find( :all, :conditions => { :crossvalidation_id => cv_id } ).collect{|v| v.validation_uri.to_s}
-        res += Validation::Validation.find( :crossvalidation_id => cv_id ).collect{|v| v.validation_uri.to_s }
+        res += Validation::Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation" ).collect{|v| v.validation_uri.to_s }
       else
         res += [u.to_s]
       end
@@ -35,7 +35,7 @@ class Reports::ValidationDB
   
   def init_validation(validation, uri, subjectid=nil)
   
-    raise OpenTox::BadRequestError.new "not a validation uri: "+uri.to_s unless uri =~ /.*\/[0-9]+/
+    raise OpenTox::BadRequestError.new "not a validation uri: "+uri.to_s unless uri =~ /\/[0-9]+$/
     validation_id = uri.split("/")[-1]
     raise OpenTox::BadRequestError.new "invalid validation id "+validation_id.to_s unless validation_id!=nil and 
       (validation_id.to_i > 0 || validation_id.to_s=="0" )
@@ -55,6 +55,31 @@ class Reports::ValidationDB
       subset = v.send(subset_name)
       subset_props.each{ |prop| validation.send("#{prop.to_s}=".to_sym, subset[prop]) } if subset
     end
+  end
+  
+  def init_validation_from_cv_statistics( validation, cv_uri, subjectid=nil )
+    
+    raise OpenTox::BadRequestError.new "not a crossvalidation uri: "+cv_uri.to_s unless cv_uri.uri? and cv_uri =~ /crossvalidation.*\/[0-9]+$/
+    cv_id = cv_uri.split("/")[-1]
+    raise OpenTox::NotAuthorizedError.new "Not authorized: GET "+cv_uri.to_s if
+      AA_SERVER and !OpenTox::Authorization.authorized?(cv_uri,"GET",subjectid)
+    cv = Validation::Crossvalidation.get(cv_id)
+    raise OpenTox::NotFoundError.new "crossvalidation with id "+crossvalidation_id.to_s+" not found" unless cv
+    raise OpenTox::BadRequestError.new "crossvalidation with id "+crossvalidation_id.to_s+" is not finished yet" unless cv.finished
+    v = Validation::Validation.from_cv_statistics(cv_id, subjectid)
+    (Validation::VAL_PROPS + Validation::VAL_CV_PROPS).each do |p|
+      validation.send("#{p.to_s}=".to_sym, v.send(p))
+    end
+    {:classification_statistics => Validation::VAL_CLASS_PROPS, 
+     :regression_statistics => Validation::VAL_REGR_PROPS}.each do |subset_name,subset_props|
+      subset = v.send(subset_name)
+      subset_props.each{ |prop| validation.send("#{prop.to_s}=".to_sym, subset[prop]) } if subset
+    end
+    #cv props
+    Validation::CROSS_VAL_PROPS.each do |p|
+      validation.send("#{p.to_s}=".to_sym, cv.send(p.to_s))
+    end
+    validation.crossvalidation_uri = cv_uri
   end
     
   def init_cv(validation)
@@ -76,7 +101,8 @@ class Reports::ValidationDB
   
   def get_accept_values( validation, subjectid=nil )
     # PENDING So far, one has to load the whole dataset to get the accept_value from ambit
-    d = OpenTox::Dataset.find( validation.test_target_dataset_uri, subjectid )
+    d = Lib::DatasetCache.find( validation.test_target_dataset_uri, subjectid )
+    raise "cannot get test target dataset for accept values, dataset: "+validation.test_target_dataset_uri.to_s unless d
     accept_values = d.features[validation.prediction_feature][OT.acceptValue]
     raise "cannot get accept values from dataset "+validation.test_target_dataset_uri.to_s+" for feature "+
       validation.prediction_feature+":\n"+d.features[validation.prediction_feature].to_yaml unless accept_values!=nil

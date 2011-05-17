@@ -3,8 +3,7 @@
   require lib
 end
 
-require 'lib/merge.rb'
-#require 'lib/active_record_setup.rb'
+require 'lib/dataset_cache.rb'
 require 'validation/validation_service.rb'
 
 get '/crossvalidation/?' do
@@ -41,6 +40,8 @@ post '/crossvalidation/?' do
     cv = Validation::Crossvalidation.create cv_params
     cv.subjectid = @subjectid
     cv.perform_cv( params[:prediction_feature], params[:algorithm_params], task )
+    # computation of stats is cheap as dataset are already loaded into the memory
+    Validation::Validation.from_cv_statistics( cv.id, @subjectid )
     cv.crossvalidation_uri
   end
   return_task(task)
@@ -108,33 +109,9 @@ get '/crossvalidation/:id' do
 end
 
 get '/crossvalidation/:id/statistics' do
-  LOGGER.info "get merged validation-result for crossvalidation with id "+params[:id].to_s
-#  begin
-    #crossvalidation = Validation::Crossvalidation.find(params[:id])
-#  rescue ActiveRecord::RecordNotFound => ex
-#    raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found."
-#  end
-  #crossvalidation = Validation::Crossvalidation.find(params[:id])
-  crossvalidation = Validation::Crossvalidation.get(params[:id])
   
-  raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found." unless crossvalidation
-  raise OpenTox::BadRequestError.new "Crossvalidation '"+params[:id].to_s+"' not finished" unless crossvalidation.finished
-  
-  Lib::MergeObjects.register_merge_attributes( Validation::Validation,
-    Validation::VAL_MERGE_AVG,Validation::VAL_MERGE_SUM,Validation::VAL_MERGE_GENERAL-[:date,:validation_uri,:crossvalidation_uri]) unless 
-      Lib::MergeObjects.merge_attributes_registered?(Validation::Validation)
-  
-  #v = Lib::MergeObjects.merge_array_objects( Validation::Validation.find( :all, :conditions => { :crossvalidation_id => params[:id] } ) )
-  # convert ohm:set into array, as ohm:set[0]=nil(!)
-  vals = Validation::Validation.find( :crossvalidation_id => params[:id] ).collect{|x| x}
-#  LOGGER.debug vals.collect{|v| v.validation_uri}.join("\n")
-#  LOGGER.debug vals.size
-#  LOGGER.debug vals.class
-  raise "could not load all validations for crossvalidation" if vals.include?(nil)
-  v = Lib::MergeObjects.merge_array_objects( vals )
-  v.date = nil
-  #v.id = nil
-  
+  LOGGER.info "get crossvalidation statistics for crossvalidation with id "+params[:id].to_s
+  v = Validation::Validation.from_cv_statistics( params[:id], @subjectid )
   case request.env['HTTP_ACCEPT'].to_s
   when /text\/html/
     related_links = 
@@ -187,7 +164,7 @@ get '/crossvalidation/:id/predictions' do
   raise OpenTox::BadRequestError.new "Crossvalidation '"+params[:id].to_s+"' not finished" unless crossvalidation.finished
   
   content_type "application/x-yaml"
-  validations = Validation::Validation.find( :crossvalidation_id => params[:id] )
+  validations = Validation::Validation.find( :crossvalidation_id => params[:id], :validation_type => "crossvalidation" )
   p = Lib::OTPredictions.to_array( validations.collect{ |v| v.compute_validation_stats_with_model(nil, true) } ).to_yaml
   
   case request.env['HTTP_ACCEPT'].to_s

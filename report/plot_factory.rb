@@ -354,7 +354,7 @@ module Reports
       c = roc_values[:confidence_values]
       p = roc_values[:predicted_values]
       a = roc_values[:actual_values]
-      raise "no prediction values for roc-plot" if p.size==0
+      raise "no prediction values for confidence plot" if p.size==0
      
       (0..p.size-2).each do |i|
         ((i+1)..p.size-1).each do |j|

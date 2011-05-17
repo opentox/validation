@@ -81,6 +81,12 @@ module Reports
       @subjectid = subjectid
       #raise "subjectid is nil" unless subjectid
     end
+    
+    def self.from_cv_statistics( cv_uri, subjectid = nil )
+      v = ReportValidation.new(nil, subjectid)
+      @@validation_access.init_validation_from_cv_statistics(v, cv_uri, subjectid)
+      v
+    end
   
     # returns/creates predictions, cache to save rest-calls/computation time
     #
@@ -409,17 +415,30 @@ module Reports
       #compute grouping
       grouping = Util.group(@validations, equal_attributes)
       #puts "groups "+grouping.size.to_s
-  
-      Lib::MergeObjects.register_merge_attributes( ReportValidation,
-        Validation::VAL_MERGE_AVG,Validation::VAL_MERGE_SUM,Validation::VAL_MERGE_GENERAL) unless 
-          Lib::MergeObjects.merge_attributes_registered?(ReportValidation)
-  
-      #merge
-      grouping.each do |g|
-        new_set.validations.push(g[0].clone_validation)
-        g[1..-1].each do |v|
-          new_set.validations[-1] = Lib::MergeObjects.merge_objects(new_set.validations[-1],v)
+
+      if ( equal_attributes.include?(:crossvalidation_id) )
+        # do not merge, use crossvalidation statistics
+        raise "statistics vs merging problem" if equal_attributes.size!=1
+        grouping.each do |g|
+          new_set.validations << ReportValidation.from_cv_statistics(g[0].crossvalidation_uri)
         end
+      else
+        #merge
+        Lib::MergeObjects.register_merge_attributes( ReportValidation,
+          Validation::VAL_MERGE_AVG,Validation::VAL_MERGE_SUM,Validation::VAL_MERGE_GENERAL) unless 
+            Lib::MergeObjects.merge_attributes_registered?(ReportValidation)
+        grouping.each do |g|
+          new_set.validations << g[0].clone_validation
+          w = 1
+          g[1..-1].each do |v|
+            new_set.validations[-1] = Lib::MergeObjects.merge_objects(new_set.validations[-1],v,w,1)
+            w+=1
+          end
+        end
+      end
+      
+      new_set.validations.each do |v|
+        raise "not a validation "+v.class.to_s+" "+v.to_s unless v.is_a?(Reports::ReportValidation)
       end
       
       return new_set
