@@ -167,25 +167,35 @@ module Reports
       validation_set.validations.each do |v|
         values = []
         value_attributes.each do |a|
-          validation_set.get_accept_values_for_attr(a).each do |class_value|
-            value = v.send(a)
-            if value.is_a?(Hash)
-              if class_value==nil
-                avg_value = 0
-                value.values.each{ |val| avg_value+=val }
-                value = avg_value/value.values.size.to_f
-              else
-                raise "bar plot value is hash, but no entry for class-value ("+class_value.to_s+"); value for "+a.to_s+" -> "+value.inspect unless value.key?(class_value)
-                value = value[class_value]
+          
+          accept = validation_set.get_accept_values_for_attr(a)
+          if accept and accept.size>0
+            accept.each do |class_value|
+              value = v.send(a)
+              if value.is_a?(Hash)
+                if class_value==nil
+                  avg_value = 0
+                  value.values.each{ |val| avg_value+=val }
+                  value = avg_value/value.values.size.to_f
+                else
+                  raise "bar plot value is hash, but no entry for class-value ("+class_value.to_s+"); value for "+a.to_s+" -> "+value.inspect unless value.key?(class_value)
+                  value = value[class_value]
+                end
               end
+              raise "value is nil\nattribute: "+a.to_s+"\nvalidation: "+v.inspect if value==nil
+              values.push(value)
+              labels.push(a.to_s.gsub("_","-") + ( class_value==nil ? "" : "("+class_value.to_s+")" ))
             end
-            raise "value is nil\nattribute: "+a.to_s+"\nvalidation: "+v.inspect if value==nil
+          else
+            value = v.send(a)
             values.push(value)
-            labels.push(a.to_s.gsub("_","-") + ( class_value==nil ? "" : "("+class_value.to_s+")" ))
+            labels.push(a.to_s.gsub("_","-"))
           end
+          
         end
         
         titles << v.send(title_attribute).to_s
+        raise "no title for '"+title_attribute.to_s+"' in validation: "+v.to_yaml if titles[-1].to_s.size==0
         data << values
       end
       

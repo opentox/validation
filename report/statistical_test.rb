@@ -58,7 +58,7 @@ module Reports
           end
         end
       end
-      {:titles => titles, :matrix => matrix}
+      {:titles => titles, :matrix => matrix, :num_results => grouped_validations[0].size}
     end
     
     def self.paired_ttest( validations1, validations2, attribute, significance_level=0.95 )

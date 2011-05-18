@@ -114,7 +114,8 @@ end
 post '/report/:type' do
   task = OpenTox::Task.create("Create report",url_for("/report/"+params[:type], :full)) do |task| #,params
     perform do |rs|
-      rs.create_report(params[:type],params[:validation_uris]?params[:validation_uris].split(/\n|,/):nil,@subjectid,task)
+      rs.create_report(params[:type],params[:validation_uris]?params[:validation_uris].split(/\n|,/):nil,
+        params[:identifier]?params[:identifier].split(/\n|,/):nil,@subjectid,task)
     end
   end
   return_task(task)

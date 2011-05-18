@@ -63,13 +63,13 @@ module Validation
                :percent_unpredicted => prediction.percent_unpredicted,
                :finished => true
         (VAL_PROPS_GENERAL-[:validation_uri]).each do |p|
-          v.send("#{p.to_s}=".to_sym, vals.collect{ |vv| vv.send(p) }.uniq.join(","))
+          v.send("#{p.to_s}=".to_sym, vals.collect{ |vv| vv.send(p) }.uniq.join(";"))
         end
         v.date = crossvalidation.date
         v.validation_type = "crossvalidation_statistics"
         v.crossvalidation_id = crossvalidation.id
-        v.crossvalidation_fold = vals.collect{ |vv| vv.crossvalidation_fold }.uniq.join(",")       
-        v.real_runtime = vals.collect{ |vv| vv.real_runtime }.uniq.join(",")
+        v.crossvalidation_fold = vals.collect{ |vv| vv.crossvalidation_fold }.uniq.join(";")       
+        v.real_runtime = vals.collect{ |vv| vv.real_runtime }.uniq.join(";")
         v.save
       end
       v

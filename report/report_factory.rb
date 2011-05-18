@@ -100,33 +100,37 @@ module Reports::ReportFactory
     raise OpenTox::BadRequestError.new("validations must have unique feature type, i.e. must be either all regression, "+
       +"or all classification validations") unless validation_set.unique_feature_type  
     pre_load_predictions( validation_set, OpenTox::SubTask.create(task,0,80) )
+    validation_set.validations.sort! do |x,y|
+      x.crossvalidation_fold.to_f <=> y.crossvalidation_fold.to_f
+    end
+    cv_set = validation_set.replace_with_cv_stats
+    raise unless cv_set.size==1
     
-    merged = validation_set.merge([:crossvalidation_id])
-    raise unless merged.size==1
-    
-    #puts merged.get_values(:percent_correct_variance, false).inspect
+    #puts cv_set.get_values(:percent_correct_variance, false).inspect
     report = Reports::ReportContent.new("Crossvalidation report")
+    res_titel = "Crossvalidation Results"
+    res_text = "These performance statistics have been derieved by accumulating all predictions on the various fold (i.e. these numbers are NOT averaged results over all crossvalidation folds)."
     
     case validation_set.unique_feature_type
     when "classification"
-      report.add_result(merged, [:crossvalidation_uri]+VAL_ATTR_CV+VAL_ATTR_CLASS-[:crossvalidation_fold],"Mean Results","Mean Results")
-      report.add_confusion_matrix(merged.validations[0])
+      report.add_result(cv_set, [:crossvalidation_uri]+VAL_ATTR_CV+VAL_ATTR_CLASS-[:crossvalidation_fold], res_titel, res_titel, res_text)
+      report.add_confusion_matrix(cv_set.validations[0])
       report.add_section("Plots")
       report.add_roc_plot(validation_set)
       report.add_roc_plot(validation_set, :crossvalidation_fold)
       report.add_confidence_plot(validation_set)
       report.add_confidence_plot(validation_set, :crossvalidation_fold)
       report.end_section
-      report.add_result(validation_set, VAL_ATTR_CV+VAL_ATTR_CLASS-[:num_folds],
-        "Results","Results",nil,"validation")
+      report.add_result(validation_set, [:validation_uri, :validation_report_uri]+VAL_ATTR_CV+VAL_ATTR_CLASS-[:num_folds, :dataset_uri, :algorithm_uri],
+        "Results","Results")
     when "regression"
-      report.add_result(merged, [:crossvalidation_uri]+VAL_ATTR_CV+VAL_ATTR_REGR-[:crossvalidation_fold],"Mean Results","Mean Results")
+      report.add_result(cv_set, [:crossvalidation_uri]+VAL_ATTR_CV+VAL_ATTR_REGR-[:crossvalidation_fold],res_titel, res_titel, res_text)
       report.add_section("Plots")
       report.add_regression_plot(validation_set, :crossvalidation_fold)
       report.add_confidence_plot(validation_set)
       report.add_confidence_plot(validation_set, :crossvalidation_fold)
       report.end_section
-      report.add_result(validation_set, VAL_ATTR_CV+VAL_ATTR_REGR-[:num_folds], "Results","Results")
+      report.add_result(validation_set, [:validation_uri, :validation_report_uri]+VAL_ATTR_CV+VAL_ATTR_REGR-[:num_folds, :dataset_uri, :algorithm_uri], "Results","Results")
     end
     task.progress(90) if task
       
@@ -142,8 +146,8 @@ module Reports::ReportFactory
     raise OpenTox::BadRequestError.new("num validations is not >1") unless validation_set.size>1
     raise OpenTox::BadRequestError.new("validations must have unique feature type, i.e. must be either all regression, "+
       +"or all classification validations") unless validation_set.unique_feature_type
-    raise OpenTox::BadRequestError.new("number of different algorithms <2: "+
-      validation_set.get_values(:algorithm_uri).inspect) if validation_set.num_different_values(:algorithm_uri)<2
+    raise OpenTox::BadRequestError.new("number of different identifiers <2: "+
+      validation_set.get_values(:identifier).inspect) if validation_set.num_different_values(:identifier)<2
       
     if validation_set.has_nil_values?(:crossvalidation_id)
       raise OpenTox::BadRequestError.new("algorithm comparison for non crossvalidation not yet implemented")
@@ -160,73 +164,63 @@ module Reports::ReportFactory
     
     # groups results into sets with equal dataset 
     if (validation_set.num_different_values(:dataset_uri)>1)
+      LOGGER.debug "compare report -- num different datasets: "+validation_set.num_different_values(:dataset_uri).to_s
       dataset_grouping = Reports::Util.group(validation_set.validations, [:dataset_uri])
       # check if equal values in each group exist
-      Reports::Util.check_group_matching(dataset_grouping, [:algorithm_uri, :crossvalidation_fold, :num_folds, :stratified, :random_seed])
+      Reports::Util.check_group_matching(dataset_grouping, [:crossvalidation_fold, :num_folds, :stratified, :random_seed])
     else
       dataset_grouping = [ validation_set.validations ]
     end
     
-    # we only checked that equal validations exist in each dataset group, now check for each algorithm
+    # we only checked that equal validations exist in each dataset group, now check for each identifier
     dataset_grouping.each do |validations|
-      algorithm_grouping = Reports::Util.group(validations, [:algorithm_uri])
+      algorithm_grouping = Reports::Util.group(validations, [:identifier])
       Reports::Util.check_group_matching(algorithm_grouping, [:crossvalidation_fold, :num_folds, :stratified, :random_seed])
     end
     
     pre_load_predictions( validation_set, OpenTox::SubTask.create(task,0,80) )
-    report = Reports::ReportContent.new("Algorithm comparison report - Many datasets")
+    report = Reports::ReportContent.new("Algorithm comparison report")
     
     if (validation_set.num_different_values(:dataset_uri)>1)
       all_merged = validation_set.merge([:algorithm_uri, :dataset_uri, :crossvalidation_id, :crossvalidation_uri])
       report.add_ranking_plots(all_merged, :algorithm_uri, :dataset_uri,
         [:percent_correct, :weighted_area_under_roc, :true_positive_rate, :true_negative_rate] )
       report.add_result_overview(all_merged, :algorithm_uri, :dataset_uri, [:percent_correct, :weighted_area_under_roc, :true_positive_rate, :true_negative_rate])
-      
     end
-
+      
+    result_attributes = [:identifier,:crossvalidation_uri,:crossvalidation_report_uri]+VAL_ATTR_CV-[:crossvalidation_fold,:num_folds,:dataset_uri]
     case validation_set.unique_feature_type
     when "classification"
-      attributes = VAL_ATTR_CV+VAL_ATTR_CLASS-[:crossvalidation_fold]
-      attributes = ([ :dataset_uri ] + attributes).uniq
+      result_attributes += VAL_ATTR_CLASS
+      ttest_attributes = [:percent_correct, :weighted_area_under_roc]
+      bar_plot_attributes = VAL_ATTR_BAR_PLOT_CLASS
+    else 
+      result_attributes += VAL_ATTR_REGR
+      ttest_attributes = [:r_square, :root_mean_squared_error]
+      bar_plot_attributes = VAL_ATTR_BAR_PLOT_REGR
+    end
       
-      dataset_grouping.each do |validations|
+    dataset_grouping.each do |validations|
+    
+      set = Reports::ValidationSet.create(validations)
       
-        set = Reports::ValidationSet.create(validations)
-        
-        dataset = validations[0].dataset_uri
-        merged = set.merge([:algorithm_uri, :dataset_uri, :crossvalidation_id, :crossvalidation_uri])
-        merged.sort(:dataset_uri)
-        
-        report.add_section("Dataset: "+dataset)
-        report.add_result(merged,attributes,
-          "Mean Results","Mean Results",nil,"crossvalidation")
-        report.add_paired_ttest_table(set, :algorithm_uri, :percent_correct)
-        
-        report.add_bar_plot(merged, :algorithm_uri, VAL_ATTR_BAR_PLOT_CLASS)
-        report.add_roc_plot(set, :algorithm_uri)
-        report.end_section
+      dataset = validations[0].dataset_uri
+      merged = set.merge([:identifier, :dataset_uri]) #, :crossvalidation_id, :crossvalidation_uri])
+      merged.sort(:identifier)
+      
+      merged.validations.each do |v|
+        v.crossvalidation_uri = v.crossvalidation_uri.split(";").uniq.join(" ")
+        v.crossvalidation_report_uri = v.crossvalidation_report_uri.split(";").uniq.join(" ") if  v.crossvalidation_report_uri
       end
       
-    when "regression"
-      
-      attributes = VAL_ATTR_CV+VAL_ATTR_REGR-[:crossvalidation_fold]
-      attributes = ([ :dataset_uri ] + attributes).uniq
-      
-      dataset_grouping.each do |validations|
-      
-        set = Reports::ValidationSet.create(validations)
-        
-        dataset = validations[0].dataset_uri
-        merged = set.merge([:algorithm_uri, :dataset_uri, :crossvalidation_id, :crossvalidation_uri])
-        merged.sort(:dataset_uri)
-        
-        report.add_section("Dataset: "+dataset)
-        report.add_result(merged,attributes,
-          "Mean Results","Mean Results",nil,"crossvalidation")
-        report.add_paired_ttest_table(set, :algorithm_uri, :r_square)
-        report.end_section
-      end
-      
+      report.add_section("Dataset: "+dataset)
+      res_titel = "Average Results on Folds"
+      res_text = "These performance statistics have been derieved by computing the mean of the statistics on each crossvalidation fold."
+      report.add_result(merged,result_attributes,res_titel,res_titel,res_text)
+      # pending: regression stats have different scales!!!
+      report.add_bar_plot(merged, :identifier, bar_plot_attributes) if validation_set.unique_feature_type=="classification"
+      report.add_paired_ttest_tables(set, :identifier, ttest_attributes)
+      report.end_section
     end
     task.progress(100) if task
     report

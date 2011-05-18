@@ -22,28 +22,32 @@ class Reports::ReportContent
     @current_section = @xml_report.get_root_element
   end
   
-  def add_paired_ttest_table( validation_set,
+  def add_paired_ttest_tables( validation_set,
                        group_attribute, 
-                       test_attribute,
+                       test_attributes,
                        section_title = "Paired t-test",
                        section_text = nil)
-                       
-    level = 0.90                       
-    test_matrix = Reports::ReportStatisticalTest.test_matrix( validation_set.validations, 
-      group_attribute, test_attribute, "paired_ttest", level )
-    #puts test_matrix.inspect
-    titles = test_matrix[:titles]
-    matrix = test_matrix[:matrix]
-    table = []
-    #puts titles.inspect
-    table << [""] + titles
-    titles.size.times do |i|
-      table << [titles[i]] + matrix[i].collect{|v| (v==nil || v==0) ? "" : (v<0 ? "-" : "+") }
-    end
-    
+
     section_test = @xml_report.add_section(@current_section, section_title)
     @xml_report.add_paragraph(section_test, section_text) if section_text
-    @xml_report.add_table(section_test, test_attribute.to_s+", significance-level: "+level.to_s, table, true, true)  
+      
+    test_attributes.each do |test_attribute|                    
+      level = 0.90                       
+      test_matrix = Reports::ReportStatisticalTest.test_matrix( validation_set.validations, 
+        group_attribute, test_attribute, "paired_ttest", level )
+      #puts test_matrix.inspect
+      titles = test_matrix[:titles]
+      matrix = test_matrix[:matrix]
+      table = []
+      #puts titles.inspect
+      table << [""] + titles
+      titles.size.times do |i|
+        table << [titles[i]] + matrix[i].collect{|v| (v==nil || v==0) ? "" : (v<0 ? "-" : "+") }
+      end
+      
+      @xml_report.add_table(section_test, test_attribute.to_s+", significance-level: "+level.to_s+", num results: "+
+        test_matrix[:num_results].to_s, table, true, true)
+    end
   end
   
   def add_predictions( validation_set, 
@@ -98,32 +102,13 @@ class Reports::ReportContent
                         validation_attributes,
                         table_title,
                         section_title="Results",
-                        section_text=nil,
-                        #rem_equal_vals_attr=[],
-                        search_for_existing_report_type=nil)
+                        section_text=nil)
+                        #rem_equal_vals_attr=[])
 
     section_table = @xml_report.add_section(@current_section, section_title)
     @xml_report.add_paragraph(section_table, section_text) if section_text
     vals = validation_set.to_array(validation_attributes, true)
     vals = vals.collect{|a| a.collect{|v| v.to_s }}
-    
-    if (search_for_existing_report_type)
-      vals.size.times do |i|
-        #puts i
-        if (i==0)
-          vals[i] = [ "Reports" ] + vals[i]
-          puts vals[i].inspect
-        else
-          if search_for_existing_report_type=="validation"
-            vals[i] = [ validation_set.validations[i-1].validation_report_uri() ] + vals[i]
-          elsif search_for_existing_report_type=="crossvalidation"
-            vals[i] = [ validation_set.validations[i-1].cv_report_uri() ] + vals[i]
-          else
-            raise "illegal report type: "+search_for_existing_report_type.to_s
-          end
-        end
-      end
-    end
     #PENDING transpose values if there more than 4 columns, and there are more than columns than rows
     transpose = vals[0].size>4 && vals[0].size>vals.size
     @xml_report.add_table(section_table, table_title, vals, !transpose, transpose, transpose)

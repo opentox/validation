@@ -1,6 +1,7 @@
 
 # the variance is computed when merging results for these attributes 
-VAL_ATTR_VARIANCE = [ :area_under_roc, :percent_correct, :root_mean_squared_error, :mean_absolute_error, :r_square, :accuracy  ]
+VAL_ATTR_VARIANCE = [ :area_under_roc, :percent_correct, :root_mean_squared_error, :mean_absolute_error, 
+  :r_square, :accuracy, :weighted_area_under_roc, :weighted_accuracy  ]
 VAL_ATTR_RANKING = [ :area_under_roc, :percent_correct, :true_positive_rate, :true_negative_rate, :weighted_area_under_roc ] #:accuracy ]
 
 ATTR_NICE_NAME = {}
@@ -51,21 +52,31 @@ end
 
 module Reports
   
+  @@validation_access = ValidationDB.new
+  @@persistance = ReportService.persistance
+  
+  def self.persistance
+    @@persistance
+  end
+  
+  def self.validation_access
+    @@validation_access
+  end
+  
+  # for overwriting validation source (other than using webservices)
+  def self.reset_validation_access(validation_access)
+    @@validation_access = validation_access
+  end
+  
+  
   # = ReportValidation
   #
   # contains all values of a validation object
   #
   class ReportValidation
     
-    @@validation_access = ValidationDB.new
-    
-    # for overwriting validation source (other than using webservices)
-    def self.reset_validation_access(validation_access)
-      @@validation_access = validation_access
-    end
-    
-    def self.resolve_cv_uris(validation_uris, subjectid)
-      @@validation_access.resolve_cv_uris(validation_uris, subjectid)
+    def self.resolve_cv_uris(validation_uris, identifier, subjectid)
+      Reports.validation_access.resolve_cv_uris(validation_uris, identifier, subjectid)
     end
     
     # create member variables for all validation properties
@@ -75,16 +86,17 @@ module Reports
     @@validation_attributes.each{ |a| attr_accessor a } 
   
     attr_reader :predictions
+    attr_accessor :identifier, :validation_report_uri, :crossvalidation_report_uri
     
     def initialize(uri = nil, subjectid = nil)
-      @@validation_access.init_validation(self, uri, subjectid) if uri
+      Reports.validation_access.init_validation(self, uri, subjectid) if uri
       @subjectid = subjectid
       #raise "subjectid is nil" unless subjectid
     end
     
     def self.from_cv_statistics( cv_uri, subjectid = nil )
       v = ReportValidation.new(nil, subjectid)
-      @@validation_access.init_validation_from_cv_statistics(v, cv_uri, subjectid)
+      Reports.validation_access.init_validation_from_cv_statistics(v, cv_uri, subjectid)
       v
     end
   
@@ -103,7 +115,7 @@ module Reports
           task.progress(100) if task
           nil
         else
-          @predictions = @@validation_access.get_predictions( self, @subjectid, task )
+          @predictions = Reports.validation_access.get_predictions( self, @subjectid, task )
         end
       end
     end
@@ -111,7 +123,7 @@ module Reports
     # returns the predictions feature values (i.e. the domain of the class attribute)
     #
     def get_accept_values()
-      @accept_values = @@validation_access.get_accept_values(self, @subjectid) unless @accept_values
+      @accept_values = Reports.validation_access.get_accept_values(self, @subjectid) unless @accept_values
       @accept_values
     end
     
@@ -119,36 +131,21 @@ module Reports
     #
     def feature_type
       return @feature_type if @feature_type!=nil
-      @feature_type = @@validation_access.feature_type(self, @subjectid) 
+      @feature_type = Reports.validation_access.feature_type(self, @subjectid) 
     end
     
     def predicted_variable
       return @predicted_variable if @predicted_variable!=nil
-      @predicted_variable = @@validation_access.predicted_variable(self, @subjectid) 
+      @predicted_variable = Reports.validation_access.predicted_variable(self, @subjectid) 
     end
     
     # loads all crossvalidation attributes, of the corresponding cv into this object 
     def load_cv_attributes
       raise "crossvalidation-id not set" unless @crossvalidation_id
-      @@validation_access.init_cv(self)
-    end
-    
-    @@persistance = ReportService.persistance
-    
-    def validation_report_uri
-      #puts "searching for validation report: "+self.validation_uri.to_s
-      return @validation_report_uri if @validation_report_uri!=nil
-      ids = @@persistance.list_reports("validation",{:validation_uris=>validation_uri })
-      @validation_report_uri = ReportService.instance.get_uri("validation",ids[-1]) if ids and ids.size>0
-    end
-    
-    def cv_report_uri
-      #puts "searching for cv report: "+self.crossvalidation_uri.to_s
-      return @cv_report_uri if @cv_report_uri!=nil
-      raise "no cv uri "+to_yaml unless self.crossvalidation_uri
-      ids = @@persistance.list_reports("crossvalidation",{:crossvalidation=>self.crossvalidation_uri.to_s })
-      #puts "-> "+ids.inspect
-      @cv_report_uri = ReportService.instance.get_uri("crossvalidation",ids[-1]) if ids and ids.size>0
+      Reports.validation_access.init_cv(self)
+      # load cv report
+      ids = Reports.persistance.list_reports("crossvalidation",{:crossvalidation=>self.crossvalidation_uri.to_s })
+      @crossvalidation_report_uri = ReportService.instance.get_uri("crossvalidation",ids[-1]) if ids and ids.size>0
     end
     
     def clone_validation
@@ -164,13 +161,20 @@ module Reports
   #
   class ValidationSet
     
-    def initialize(validation_uris=nil, subjectid=nil)
+    def initialize(validation_uris=nil, identifier=nil, subjectid=nil)
       @unique_values = {}
-      validation_uris = ReportValidation.resolve_cv_uris(validation_uris, subjectid) if validation_uris
-      @validations = Array.new
-      validation_uris.each{|u| @validations.push(ReportValidation.new(u, subjectid))} if validation_uris
+      @validations = []
+      if validation_uris    
+        validation_uri_and_ids = ReportValidation.resolve_cv_uris(validation_uris, identifier, subjectid)
+        validation_uri_and_ids.each do |u,id|
+          v = ReportValidation.new(u, subjectid)
+          v.identifier = id if id
+          ids = Reports.persistance.list_reports("validation",{:validation_uris=>v.validation_uri })
+          v.validation_report_uri = ReportService.instance.get_uri("validation",ids[-1]) if ids and ids.size>0
+          @validations << v
+        end
+      end
     end
-
   
     def self.create(validations)
       set = ValidationSet.new
@@ -399,6 +403,17 @@ module Reports
       return array
     end
     
+    def replace_with_cv_stats
+      new_set = ValidationSet.new
+      grouping = Util.group(@validations, [:crossvalidation_id])
+      grouping.each do |g|
+        v = ReportValidation.from_cv_statistics(g[0].crossvalidation_uri)
+        v.identifier = g.collect{|vv| vv.identifier}.uniq.join(";")
+        new_set.validations << v 
+      end
+      return new_set
+    end
+    
     # creates a new validaiton set, that contains merged validations
     # all validation with equal values for __equal_attributes__ are summed up in one validation, i.e. merged 
     #
@@ -416,31 +431,16 @@ module Reports
       grouping = Util.group(@validations, equal_attributes)
       #puts "groups "+grouping.size.to_s
 
-      if ( equal_attributes.include?(:crossvalidation_id) )
-        # do not merge, use crossvalidation statistics
-        raise "statistics vs merging problem" if equal_attributes.size!=1
-        grouping.each do |g|
-          new_set.validations << ReportValidation.from_cv_statistics(g[0].crossvalidation_uri)
-        end
-      else
-        #merge
-        Lib::MergeObjects.register_merge_attributes( ReportValidation,
-          Validation::VAL_MERGE_AVG,Validation::VAL_MERGE_SUM,Validation::VAL_MERGE_GENERAL) unless 
-            Lib::MergeObjects.merge_attributes_registered?(ReportValidation)
-        grouping.each do |g|
-          new_set.validations << g[0].clone_validation
-          w = 1
-          g[1..-1].each do |v|
-            new_set.validations[-1] = Lib::MergeObjects.merge_objects(new_set.validations[-1],v,w,1)
-            w+=1
-          end
+      #merge
+      Lib::MergeObjects.register_merge_attributes( ReportValidation,
+        Validation::VAL_MERGE_AVG+Validation::VAL_MERGE_SUM,[],Validation::VAL_MERGE_GENERAL+[:identifier, :validation_report_uri, :crossvalidation_report_uri]) unless 
+          Lib::MergeObjects.merge_attributes_registered?(ReportValidation)
+      grouping.each do |g|
+        new_set.validations << g[0].clone_validation
+        g[1..-1].each do |v|
+          new_set.validations[-1] = Lib::MergeObjects.merge_objects(new_set.validations[-1],v)
         end
       end
-      
-      new_set.validations.each do |v|
-        raise "not a validation "+v.class.to_s+" "+v.to_s unless v.is_a?(Reports::ReportValidation)
-      end
-      
       return new_set
     end
     

@@ -170,8 +170,8 @@ module Lib
     
     def percent_correct
       raise "no classification" unless @feature_type=="classification"
-      return 0 if @num_with_actual_value==0
-      return 100 * @num_correct / (@num_with_actual_value - @num_unpredicted).to_f
+      pct = 100 * @num_correct / (@num_with_actual_value - @num_unpredicted).to_f
+      pct.nan? ? 0 : pct 
     end
     
     def percent_incorrect
@@ -181,7 +181,8 @@ module Lib
     end
     
     def accuracy
-      return percent_correct / 100.0
+      acc = percent_correct / 100.0
+      acc.nan? ? 0 : acc
     end
     
     def weighted_accuracy
@@ -250,6 +251,7 @@ module Lib
       return res
     end
     
+    # does only take the instances that are classified as <class-index> into account
     def area_under_roc(class_index=nil)
       return prediction_feature_value_map( lambda{ |i| area_under_roc(i) } ) if 
         class_index==nil
@@ -427,8 +429,13 @@ module Lib
       return incorrect
     end
     
+    # Note:
+    # * (un-weighted) area under roc is computed with all __predicted__ isntances for a certain class
+    # * weighted weights each auc with the number of __acutal__ instances
+    # its like that, because its like that in weka   
     def weighted_area_under_roc
-      return weighted_measure( :area_under_roc )
+      w_auc = weighted_measure( :area_under_roc )
+      w_auc.nan? ? 0 : w_auc
     end
     
     def weighted_f_measure
@@ -436,6 +443,7 @@ module Lib
     end
     
     private
+    # the <measure> is weighted with the number of instances for each actual class value 
     def weighted_measure( measure )
       
       sum_instances = 0
@@ -478,9 +486,10 @@ module Lib
     
     def sample_correlation_coefficient
       # formula see http://en.wikipedia.org/wiki/Correlation_and_dependence#Pearson.27s_product-moment_coefficient
-      return ( @num_predicted * @sum_multiply - @sum_actual * @sum_predicted ) /
+      scc = ( @num_predicted * @sum_multiply - @sum_actual * @sum_predicted ) /
              ( Math.sqrt( [0, @num_predicted * @sum_squares_actual - @sum_actual**2].max ) *
                Math.sqrt( [0, @num_predicted * @sum_squares_predicted - @sum_predicted**2].max ) )
+      ( scc.infinite? || scc.nan? ) ? 0 : scc
     end
     
     def total_sum_of_squares

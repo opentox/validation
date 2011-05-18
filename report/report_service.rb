@@ -60,7 +60,7 @@ module Reports
     # call-seq:
     #   create_report(type, validation_uris) => string
     # 
-    def create_report(type, validation_uris, subjectid=nil, task=nil)
+    def create_report(type, validation_uris, identifier=nil, subjectid=nil, task=nil)
       
       LOGGER.info "create report of type '"+type.to_s+"'"
       check_report_type(type)
@@ -68,7 +68,10 @@ module Reports
       # step1: load validations
       raise OpenTox::BadRequestError.new("validation_uris missing") unless validation_uris
       LOGGER.debug "validation_uri(s): '"+validation_uris.inspect+"'"
-      validation_set = Reports::ValidationSet.new(validation_uris, subjectid)
+      LOGGER.debug "identifier: '"+identifier.inspect+"'"
+      raise "illegal num identifiers: "+identifier.size.to_s+" should be equal to num validation-uris ("+validation_uris.size.to_s+")" if
+        identifier and identifier.size!=validation_uris.size
+      validation_set = Reports::ValidationSet.new(validation_uris, identifier, subjectid)
       raise OpenTox::BadRequestError.new("cannot get validations from validation_uris '"+validation_uris.inspect+"'") unless validation_set and validation_set.size > 0
       LOGGER.debug "loaded "+validation_set.size.to_s+" validation/s"
       task.progress(10) if task

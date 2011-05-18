@@ -187,7 +187,13 @@ module Reports
           if auto_link_urls && v.to_s =~ /depict/ || v.to_s =~ /image\/png$/ #PENDING 
             add_image(entry, v.to_s)
           elsif auto_link_urls && v.to_s =~ /^http(s?):\/\//
-           add_url(entry, v.to_s, v.to_s)
+           #add_url(entry, v.to_s, v.to_s)
+           v.to_s.split(" ").each do |vv|
+              add_url(entry, vv.to_s, vv.to_s)
+              space = Element.new("para")
+              space.text = " "
+              entry << space
+           end
           else
            entry.text = v.to_s
           end
@@ -221,11 +227,15 @@ module Reports
       return list
     end
     
-    def add_url (element, url, description=url )
-      
+    def url_element( url, description=url )
       ulink = Element.new("ulink")
       ulink.add_attributes({"url" => url})
       ulink.text = description
+      ulink
+    end
+    
+    def add_url (element, url, description=url )
+      ulink = url_element(url, description)
       element << ulink
       return ulink
     end

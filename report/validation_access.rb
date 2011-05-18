@@ -7,8 +7,9 @@ require "lib/validation_db.rb"
 #  
 class Reports::ValidationDB
   
-  def resolve_cv_uris(validation_uris, subjectid=nil)
-    res = []
+  def resolve_cv_uris(validation_uris, identifier=nil, subjectid=nil)
+    res = {}
+    count = 0
     validation_uris.each do |u|
       if u.to_s =~ /.*\/crossvalidation\/[0-9]+/
         cv_id = u.split("/")[-1].to_i
@@ -25,10 +26,13 @@ class Reports::ValidationDB
         raise OpenTox::NotFoundError.new "crossvalidation with id "+cv_id.to_s+" not found" unless cv
         raise OpenTox::BadRequestError.new("crossvalidation with id '"+cv_id.to_s+"' not finished") unless cv.finished
         #res += Validation::Validation.find( :all, :conditions => { :crossvalidation_id => cv_id } ).collect{|v| v.validation_uri.to_s}
-        res += Validation::Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation" ).collect{|v| v.validation_uri.to_s }
+        Validation::Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation" ).each do |v|
+          res[v.validation_uri.to_s] = identifier ? identifier[count] : nil
+        end
       else
-        res += [u.to_s]
+        res[u.to_s] = identifier ? identifier[count] : nil
       end
+      count += 1
     end
     res
   end
