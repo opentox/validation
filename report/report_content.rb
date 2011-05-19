@@ -124,6 +124,11 @@ class Reports::ReportContent
       Reports::XMLReportUtil::create_confusion_matrix( validation.confusion_matrix ), true, true)
   end
   
+  # bit of a hack to algin the last two plots in the report in to one row 
+  def align_last_two_images( title )
+    @xml_report.align_last_two_elements(@current_section, title )
+  end
+  
   def add_regression_plot( validation_set,
                             name_attribute,
                             section_title="Regression Plot",
@@ -155,13 +160,13 @@ class Reports::ReportContent
       @xml_report.add_paragraph(section_regr, "No prediction info for regression available.")
     end
   end
-
-  def add_roc_plot( validation_set,
-                            split_set_attribute = nil,
-                            section_title="ROC Plots",
-                            section_text=nil,
-                            image_titles=nil,
-                            image_captions=nil)
+  
+  def add_roc_plot( validation_set, 
+                    accept_value, 
+                    split_set_attribute=nil, 
+                    image_title = "ROC Plot", 
+                    section_text=nil,
+                    image_caption=nil)
                             
     #section_roc = @xml_report.add_section(@current_section, section_title)
     section_roc = @current_section
@@ -174,25 +179,18 @@ class Reports::ReportContent
           "validation set size: "+validation_set.size.to_s+", prediction set size: "+prediction_set.size.to_s
       end
       @xml_report.add_paragraph(section_roc, section_text) if section_text
-
-      accept_values = validation_set.get_accept_values
-      accept_values.size.times do |i|
-        class_value = accept_values[i]
-        image_title = image_titles ? image_titles[i] : "ROC Plot for class-value '"+class_value.to_s+"'"
-        image_caption = image_captions ? image_captions[i] : nil
-        plot_file_name = "roc_plot"+@tmp_file_count.to_s+".png"
-        @tmp_file_count += 1
-        begin
-          plot_file_path = add_tmp_file(plot_file_name)
-          Reports::PlotFactory.create_roc_plot( plot_file_path, prediction_set, class_value, split_set_attribute, false )#prediction_set.size>1 )
-          @xml_report.add_imagefigure(section_roc, image_title, plot_file_name, "PNG", 100, image_caption)
-        rescue Exception => ex
-          msg = "WARNING could not create roc plot for class value '"+class_value.to_s+"': "+ex.message
-          LOGGER.error(msg)
-          rm_tmp_file(plot_file_name)
-          @xml_report.add_paragraph(section_roc, msg)
-        end  
-      end
+      plot_file_name = "roc_plot"+@tmp_file_count.to_s+".png"
+      @tmp_file_count += 1
+      begin
+        plot_file_path = add_tmp_file(plot_file_name)
+        Reports::PlotFactory.create_roc_plot( plot_file_path, prediction_set, accept_value, split_set_attribute )#prediction_set.size>1 )
+        @xml_report.add_imagefigure(section_roc, image_title, plot_file_name, "PNG", 100, image_caption)
+      rescue Exception => ex
+        msg = "WARNING could not create roc plot for class value '"+accept_value.to_s+"': "+ex.message
+        LOGGER.error(msg)
+        rm_tmp_file(plot_file_name)
+        @xml_report.add_paragraph(section_roc, msg)
+      end  
     else
       @xml_report.add_paragraph(section_roc, "No prediction-confidence info for roc plot available.")
     end
@@ -200,11 +198,11 @@ class Reports::ReportContent
   end
   
   def add_confidence_plot( validation_set,
+                            accept_value = nil,
                             split_set_attribute = nil,
-                            section_title="Confidence plots",
+                            image_title = "Percent Correct vs Confidence Plot",
                             section_text=nil,
-                            image_titles=nil,
-                            image_captions=nil)
+                            image_caption=nil)
                             
     #section_conf = @xml_report.add_section(@current_section, section_title)
     section_conf = @current_section
@@ -217,30 +215,23 @@ class Reports::ReportContent
           "validation set size: "+validation_set.size.to_s+", prediction set size: "+prediction_set.size.to_s
       end
       @xml_report.add_paragraph(section_conf, section_text) if section_text
-
-      image_title = image_titles ? image_titles[i] : "Percent Correct vs Confidence Plot"
-      image_caption = image_captions ? image_captions[i] : nil
+      
       plot_file_name = "conf_plot"+@tmp_file_count.to_s+".png"
       @tmp_file_count += 1
-      
       begin
-      
         plot_file_path = add_tmp_file(plot_file_name)
-        Reports::PlotFactory.create_confidence_plot( plot_file_path, prediction_set, nil, split_set_attribute, false )
+        Reports::PlotFactory.create_confidence_plot( plot_file_path, prediction_set, accept_value, split_set_attribute, false )
         @xml_report.add_imagefigure(section_conf, image_title, plot_file_name, "PNG", 100, image_caption)
-      
       rescue Exception => ex
         msg = "WARNING could not create confidence plot: "+ex.message
         LOGGER.error(msg)
         rm_tmp_file(plot_file_name)
         @xml_report.add_paragraph(section_conf, msg)
-      end  
-    
+      end   
     else
       @xml_report.add_paragraph(section_conf, "No prediction-confidence info for confidence plot available.")
     end
-    
-  end  
+  end
   
   def add_ranking_plots( validation_set,
                             compare_attribute,

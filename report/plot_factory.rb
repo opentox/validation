@@ -91,7 +91,8 @@ module Reports
     #   * the validation set is splitted into sets of validation_sets with equal attribute values
     #   * each of theses validation sets is plotted as a roc-curve  
     #
-    def self.create_roc_plot( out_file, validation_set, class_value, split_set_attribute=nil, show_single_curves=false )
+    def self.create_roc_plot( out_file, validation_set, class_value, split_set_attribute=nil,
+        x_label="False positive rate", y_label="True Positive Rate", show_single_curves=false )
       
       LOGGER.debug "creating roc plot for '"+validation_set.size.to_s+"' validations, out-file:"+out_file.to_s
       
@@ -110,10 +111,16 @@ module Reports
             LOGGER.warn "could not create ROC plot for "+value.to_s
           end
         end
-        RubyPlot::plot_lines(out_file, "ROC-Plot", "False positive rate", "True Positive Rate", names, fp_rates, tp_rates )
+        RubyPlot::plot_lines(out_file, "ROC-Plot", x_label, y_label, names, fp_rates, tp_rates )
       else
         data = transform_roc_predictions(validation_set, class_value, show_single_curves)
-        RubyPlot::plot_lines(out_file, "ROC-Plot", "False positive rate", "True Positive Rate", data[:names], data[:fp_rate], data[:tp_rate], data[:faint] )
+        labels = []
+        data[:youden].each do |points|
+          points.each do |point,confidence|
+            labels << ["confidence: "+confidence.to_nice_s, point[0], point[1]]
+          end
+        end
+        RubyPlot::plot_lines(out_file, "ROC-Plot", x_label, y_label, data[:names], data[:fp_rate], data[:tp_rate], data[:faint], labels )
       end  
     end
     
@@ -275,7 +282,7 @@ module Reports
       
       if (validation_set.size > 1)
         
-        names = []; fp_rate = []; tp_rate = []; faint = []
+        names = []; fp_rate = []; tp_rate = []; faint = []; youden = []
         sum_roc_values = { :predicted_values => [], :actual_values => [], :confidence_values => []}
         
         (0..validation_set.size-1).each do |i|
@@ -299,12 +306,13 @@ module Reports
         names << nil # "all"
         fp_rate << tp_fp_rates[:fp_rate]
         tp_rate << tp_fp_rates[:tp_rate]
+        youden << tp_fp_rates[:youden]
         faint << false
-        return { :names => names, :fp_rate => fp_rate, :tp_rate => tp_rate, :faint => faint }
+        return { :names => names, :fp_rate => fp_rate, :tp_rate => tp_rate, :faint => faint, :youden => youden }
       else
         roc_values = validation_set.validations[0].get_predictions.get_prediction_values(class_value)
         tp_fp_rates = get_tp_fp_rates(roc_values)
-        return { :names => ["default"], :fp_rate => [tp_fp_rates[:fp_rate]], :tp_rate => [tp_fp_rates[:tp_rate]] }
+        return { :names => ["default"], :fp_rate => [tp_fp_rates[:fp_rate]], :tp_rate => [tp_fp_rates[:tp_rate]], :youden => [tp_fp_rates[:youden]] }
       end
     end
     
@@ -472,13 +480,33 @@ module Reports
       w = w.compress_sum(c2)
       #puts tp_rate.inspect+"\n"+fp_rate.inspect+"\n"+w.inspect+"\n\n"
       
+      youden = []
+      (0..tp_rate.size-1).each do |i|
+        tpr = tp_rate[i]/tp_rate[-1].to_f
+        fpr = fp_rate[i]/fp_rate[-1].to_f
+        youden << tpr + (1 - fpr)
+        #puts youden[-1].to_s+" ("+tpr.to_s+" "+fpr.to_s+")"
+      end
+      max = youden.max
+      youden_hash = {}
+      (0..tp_rate.size-1).each do |i|
+        youden_hash[i] = c2[i] if youden[i]==max
+      end
+      #puts youden.inspect+"\n"+youden_hash.inspect+"\n\n"
+      
       (0..tp_rate.size-1).each do |i|
         tp_rate[i] = tp_rate[-1]>0 ? tp_rate[i]/tp_rate[-1].to_f*100 : 100
         fp_rate[i] = fp_rate[-1]>0 ? fp_rate[i]/fp_rate[-1].to_f*100 : 100
       end
       #puts tp_rate.inspect+"\n"+fp_rate.inspect+"\n\n"
       
-      return {:tp_rate => tp_rate,:fp_rate => fp_rate}
+      youden_coordinates_hash = {}
+      youden_hash.each do |i,c|
+        youden_coordinates_hash[[fp_rate[i],tp_rate[i]]] = c
+      end
+      #puts youden_coordinates_hash.inspect+"\n\n"
+      
+      return {:tp_rate => tp_rate,:fp_rate => fp_rate,:youden => youden_coordinates_hash}
     end
   end
 end

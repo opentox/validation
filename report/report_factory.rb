@@ -70,8 +70,12 @@ module Reports::ReportFactory
       report.add_result(validation_set, [:validation_uri] + VAL_ATTR_TRAIN_TEST + VAL_ATTR_CLASS, "Results", "Results")
       report.add_confusion_matrix(val)
       report.add_section("Plots")
-      report.add_roc_plot(validation_set)
-      report.add_confidence_plot(validation_set)
+      ([nil] + validation_set.get_accept_values).each do |accept_value|
+        report.add_roc_plot(validation_set, accept_value)
+        report.add_confidence_plot(validation_set, accept_value)
+        title = accept_value ? "Plots for predicted class-value '"+accept_value.to_s+"'" : "Plots for all predictions"
+        report.align_last_two_images title
+      end
       report.end_section
     when "regression"
       report.add_result(validation_set, [:validation_uri] + VAL_ATTR_TRAIN_TEST + VAL_ATTR_REGR, "Results", "Results")
@@ -116,10 +120,15 @@ module Reports::ReportFactory
       report.add_result(cv_set, [:crossvalidation_uri]+VAL_ATTR_CV+VAL_ATTR_CLASS-[:crossvalidation_fold], res_titel, res_titel, res_text)
       report.add_confusion_matrix(cv_set.validations[0])
       report.add_section("Plots")
-      report.add_roc_plot(validation_set)
-      report.add_roc_plot(validation_set, :crossvalidation_fold)
-      report.add_confidence_plot(validation_set)
-      report.add_confidence_plot(validation_set, :crossvalidation_fold)
+      [nil, :crossvalidation_fold].each do |split_attribute|
+        ([nil] + validation_set.get_accept_values).each do |accept_value|
+          report.add_roc_plot(validation_set, accept_value, split_attribute)
+          report.add_confidence_plot(validation_set, accept_value, split_attribute)
+          title = accept_value ? "Plots for predicted class-value '"+accept_value.to_s+"'" : "Plots for all predictions"
+          title += split_attribute ? ", separated by crossvalidation fold" : " (accumulated over all folds)"
+          report.align_last_two_images title
+        end
+      end
       report.end_section
       report.add_result(validation_set, [:validation_uri, :validation_report_uri]+VAL_ATTR_CV+VAL_ATTR_CLASS-[:num_folds, :dataset_uri, :algorithm_uri],
         "Results","Results")
@@ -128,7 +137,7 @@ module Reports::ReportFactory
       report.add_section("Plots")
       report.add_regression_plot(validation_set, :crossvalidation_fold)
       report.add_confidence_plot(validation_set)
-      report.add_confidence_plot(validation_set, :crossvalidation_fold)
+      report.add_confidence_plot(validation_set, nil, :crossvalidation_fold)
       report.end_section
       report.add_result(validation_set, [:validation_uri, :validation_report_uri]+VAL_ATTR_CV+VAL_ATTR_REGR-[:num_folds, :dataset_uri, :algorithm_uri], "Results","Results")
     end
