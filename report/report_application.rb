@@ -23,6 +23,10 @@ get '/'+ENV['DOCBOOK_DIRECTORY']+'/:resource' do
   get_docbook_resource ENV['DOCBOOK_DIRECTORY']+"/"+request.env['REQUEST_URI'].split("/")[-1]
 end
 
+get '/resources/:resource' do
+  get_docbook_resource "resources/"+request.env['REQUEST_URI'].split("/")[-1]
+end
+
 get '/report/:type/css_style_sheet/?' do
   perform do |rs|
     "@import \""+params[:css_style_sheet]+"\";"

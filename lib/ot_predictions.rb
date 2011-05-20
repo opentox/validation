@@ -146,11 +146,11 @@ module Lib
                 predicted_values << regression_value(prediction_dataset, c, no_prediction_feature ? nil : predicted_variable)
               end
               # TODO confidence_values << prediction_dataset.get_prediction_confidence(c, predicted_variable)
-              conf = predicted_values[count]!=nil ? 1 : 0 
+              conf = predicted_values[count]!=nil ? 1 : nil 
               begin
                 feature = prediction_dataset.data_entries[c].keys[0]
                 feature_data = prediction_dataset.features[feature]
-                conf = feature_data[OT.confidence] if feature_data[OT.confidence]!=nil 
+                conf = feature_data[OT.confidence].to_f if feature_data[OT.confidence]!=nil 
               rescue
                 LOGGER.warn "could not get confidence"
               end
@@ -259,13 +259,17 @@ module Lib
           a << (format ? p.predicted_value(i).to_nice_s : p.predicted_value(i))
           if p.feature_type=="classification"
             if (p.predicted_value(i)!=nil and p.actual_value(i)!=nil)
-              a << (p.classification_miss?(i) ? 1 : 0)
+              if p.classification_miss?(i)
+                a << (format ? ICON_ERROR : 1)
+              else
+                a << (format ? ICON_OK : 0)
+              end
             else
               a << nil
             end
           end
           if p.confidence_values_available?
-            conf_column = a.size
+            conf_column = a.size if conf_column==nil
             a << p.confidence_value(i) #(format ? p.confidence_value(i).to_nice_s : p.confidence_value(i))
           end
           a << p.identifier(i)
@@ -274,10 +278,10 @@ module Lib
       end
       
       if conf_column!=nil
-        res.sort!{ |x,y| y[4] <=> x[4] }
+        res = res.sort_by{ |n| n[conf_column] || 0 }.reverse
         if format
           res.each do |a|
-            a[4] = a[4].to_nice_s
+            a[conf_column] = a[conf_column].to_nice_s
           end
         end
       end
@@ -291,7 +295,6 @@ module Lib
       res.insert(0, header)
       
       return res
-  end
-    
+    end
   end
 end

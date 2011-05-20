@@ -27,6 +27,8 @@ require "report/validation_data.rb"
 require "report/util.rb"
 require "report/statistical_test.rb"
 
+ICON_ERROR = File.join(CONFIG[:services]["opentox-validation"],"resources/error.png")
+ICON_OK = File.join(CONFIG[:services]["opentox-validation"],"resources/ok.png")
 
 
 

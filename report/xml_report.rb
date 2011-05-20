@@ -159,15 +159,15 @@ module Reports
       table
     end
     
-    def add_image( element, url )
+    def add_image( element, url ) #, scale=false )
       image = Element.new("imageobject")
-      imagedata = Reports::XMLReportUtil.attribute_element("imagedata",
-        {"fileref" => url, "format"=>"PNG", "contentwidth" => "2in" }) #PENDING: do not hardcode size
+      params = {"fileref" => url, "format"=>"PNG"}
+      #params["contentwidth"] = "2in"
+      imagedata = Reports::XMLReportUtil.attribute_element("imagedata",params) 
       image << imagedata
       element << image
       return image    
     end
-    
     
     # adds a table to a REXML:Element, _table_values_ should be a multi-dimensional-array, returns the table as element
     # 
@@ -216,7 +216,7 @@ module Reports
         row = Element.new("row")
         r.each do |v|
           entry = Element.new("entry")
-          if auto_link_urls && v.to_s =~ /depict/ || v.to_s =~ /image\/png$/ #PENDING 
+          if auto_link_urls && v.to_s =~ /depict/ || v.to_s =~ /png$/ #PENDING 
             add_image(entry, v.to_s)
           elsif auto_link_urls && v.to_s =~ /^http(s?):\/\//
            #add_url(entry, v.to_s, v.to_s)
