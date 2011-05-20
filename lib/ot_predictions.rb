@@ -289,7 +289,7 @@ module Lib
       header << "compound" if add_pic
       header << "actual value"
       header << "predicted value"
-      header << "missclassified" if predictions[0].feature_type=="classification"
+      header << "classification" if predictions[0].feature_type=="classification"
       header << "confidence value" if predictions[0].confidence_values_available?
       header << "compound-uri"
       res.insert(0, header)
