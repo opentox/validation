@@ -133,8 +133,7 @@ class Reports::ReportContent
                             name_attribute,
                             section_title="Regression Plot",
                             section_text=nil,
-                            image_title=nil,
-                            image_caption=nil)
+                            image_title=nil)
                             
     image_title = "Regression plot" unless image_title
     #section_regr = @xml_report.add_section(@current_section, section_title)
@@ -145,12 +144,11 @@ class Reports::ReportContent
       
       section_text += "\nWARNING: regression plot information not available for all validation results" if prediction_set.size!=validation_set.size
       @xml_report.add_paragraph(section_regr, section_text) if section_text
-      plot_file_name = "regr_plot"+@tmp_file_count.to_s+".png"
-      @tmp_file_count += 1
       begin
-        plot_file_path = add_tmp_file(plot_file_name)
-        Reports::PlotFactory.create_regression_plot( plot_file_path, prediction_set, name_attribute )
-        @xml_report.add_imagefigure(section_regr, image_title, plot_file_name, "PNG", 100, image_caption)
+        plot_png = add_tmp_file("regr_plot", "png")
+        plot_svg = add_tmp_file("regr_plot", "svg")
+        Reports::PlotFactory.create_regression_plot( [plot_png[:path], plot_svg[:path]], prediction_set, name_attribute )
+        @xml_report.add_imagefigure(section_regr, image_title,  plot_png[:name], "PNG", 100, plot_svg[:name])
       rescue Exception => ex
         LOGGER.error("Could not create regression plot: "+ex.message)
         rm_tmp_file(plot_file_name)
@@ -179,15 +177,14 @@ class Reports::ReportContent
           "validation set size: "+validation_set.size.to_s+", prediction set size: "+prediction_set.size.to_s
       end
       @xml_report.add_paragraph(section_roc, section_text) if section_text
-      plot_file_name = "roc_plot"+@tmp_file_count.to_s+".png"
-      @tmp_file_count += 1
       begin
-        plot_file_path = add_tmp_file(plot_file_name)
-        Reports::PlotFactory.create_roc_plot( plot_file_path, prediction_set, accept_value, split_set_attribute )#prediction_set.size>1 )
-        @xml_report.add_imagefigure(section_roc, image_title, plot_file_name, "PNG", 100, image_caption)
+        plot_png = add_tmp_file("roc_plot", "png")
+        plot_svg = add_tmp_file("roc_plot", "svg")
+        Reports::PlotFactory.create_roc_plot( [plot_png[:path], plot_svg[:path]], prediction_set, accept_value, split_set_attribute )#prediction_set.size>1 )
+        @xml_report.add_imagefigure(section_roc, image_title, plot_png[:name], "PNG", 100, plot_svg[:name])
       rescue Exception => ex
         msg = "WARNING could not create roc plot for class value '"+accept_value.to_s+"': "+ex.message
-        LOGGER.error(msg)
+        #LOGGER.error(msg)
         rm_tmp_file(plot_file_name)
         @xml_report.add_paragraph(section_roc, msg)
       end  
@@ -201,8 +198,7 @@ class Reports::ReportContent
                             accept_value = nil,
                             split_set_attribute = nil,
                             image_title = "Percent Correct vs Confidence Plot",
-                            section_text=nil,
-                            image_caption=nil)
+                            section_text="")
                             
     #section_conf = @xml_report.add_section(@current_section, section_title)
     section_conf = @current_section
@@ -214,14 +210,13 @@ class Reports::ReportContent
         LOGGER.error "WARNING: plot information not available for all validation results:\n"+
           "validation set size: "+validation_set.size.to_s+", prediction set size: "+prediction_set.size.to_s
       end
-      @xml_report.add_paragraph(section_conf, section_text) if section_text
+      @xml_report.add_paragraph(section_conf, section_text) if section_text and section_text.size>0
       
-      plot_file_name = "conf_plot"+@tmp_file_count.to_s+".png"
-      @tmp_file_count += 1
       begin
-        plot_file_path = add_tmp_file(plot_file_name)
-        Reports::PlotFactory.create_confidence_plot( plot_file_path, prediction_set, accept_value, split_set_attribute, false )
-        @xml_report.add_imagefigure(section_conf, image_title, plot_file_name, "PNG", 100, image_caption)
+        plot_png = add_tmp_file("conf_plot", "png")
+        plot_svg = add_tmp_file("conf_plot", "svg")
+        Reports::PlotFactory.create_confidence_plot( [plot_png[:path], plot_svg[:path]], prediction_set, accept_value, split_set_attribute, false )
+        @xml_report.add_imagefigure(section_conf, image_title, plot_png[:name], "PNG", 100, plot_svg[:name])
       rescue Exception => ex
         msg = "WARNING could not create confidence plot: "+ex.message
         LOGGER.error(msg)
@@ -298,13 +293,14 @@ class Reports::ReportContent
   end  
   
   private
-  def add_tmp_file(tmp_file_name)
-    
+  def add_tmp_file(name, extension)
+    tmp_file_name = name.to_s+@tmp_file_count.to_s+"."+extension.to_s
+    @tmp_file_count += 1
     @tmp_files = {} unless @tmp_files
     raise "file name already exits" if @tmp_files[tmp_file_name] || (@text_files && @text_files[tmp_file_name])  
     tmp_file_path = Reports::Util.create_tmp_file(tmp_file_name)
     @tmp_files[tmp_file_name] = tmp_file_path
-    return tmp_file_path
+    return {:name => tmp_file_name, :path => tmp_file_path}
   end
   
   def rm_tmp_file(tmp_file_name)

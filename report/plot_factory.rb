@@ -52,9 +52,10 @@ module Reports
   
   module PlotFactory
     
-    def self.create_regression_plot( out_file, validation_set, name_attribute )
+    def self.create_regression_plot( out_files, validation_set, name_attribute )
       
-      LOGGER.debug "Creating regression plot, out-file:"+out_file.to_s
+      out_files = [out_files] unless out_files.is_a?(Array)
+      LOGGER.debug "Creating regression plot, out-file:"+out_files.to_s
       
       names = []
       x = []
@@ -79,7 +80,9 @@ module Reports
       end
   
       raise "no predictions performed" if x.size==0 || x[0].size==0
-      RubyPlot::regression_point_plot(out_file, "Regression plot", "Predicted values", "Actual values", names, x, y )
+      out_files.each do |out_file|
+        RubyPlot::regression_point_plot(out_file, "Regression plot", "Predicted values", "Actual values", names, x, y )
+      end
     end
     
     
@@ -91,10 +94,11 @@ module Reports
     #   * the validation set is splitted into sets of validation_sets with equal attribute values
     #   * each of theses validation sets is plotted as a roc-curve  
     #
-    def self.create_roc_plot( out_file, validation_set, class_value, split_set_attribute=nil,
+    def self.create_roc_plot( out_files, validation_set, class_value, split_set_attribute=nil,
         x_label="False positive rate", y_label="True Positive Rate", show_single_curves=false )
       
-      LOGGER.debug "creating roc plot for '"+validation_set.size.to_s+"' validations, out-file:"+out_file.to_s
+      out_files = [out_files] unless out_files.is_a?(Array)
+      LOGGER.debug "creating roc plot for '"+validation_set.size.to_s+"' validations, out-files:"+out_files.inspect
       
       if split_set_attribute
         attribute_values = validation_set.get_values(split_set_attribute)
@@ -120,14 +124,17 @@ module Reports
             labels << ["confidence: "+confidence.to_nice_s, point[0], point[1]]
           end
         end
-        RubyPlot::plot_lines(out_file, "ROC-Plot", x_label, y_label, data[:names], data[:fp_rate], data[:tp_rate], data[:faint], labels )
+        out_files.each do |out_file|
+          RubyPlot::plot_lines(out_file, "ROC-Plot", x_label, y_label, data[:names], data[:fp_rate], data[:tp_rate], data[:faint], labels )
+        end
       end  
     end
     
     
-    def self.create_confidence_plot( out_file, validation_set, class_value, split_set_attribute=nil, show_single_curves=false )
+    def self.create_confidence_plot( out_files, validation_set, class_value, split_set_attribute=nil, show_single_curves=false )
       
-      LOGGER.debug "creating confidence plot for '"+validation_set.size.to_s+"' validations, out-file:"+out_file.to_s
+      out_files = [out_files] unless out_files.is_a?(Array)
+      LOGGER.debug "creating confidence plot for '"+validation_set.size.to_s+"' validations, out-file:"+out_files.inspect
       
       if split_set_attribute
         attribute_values = validation_set.get_values(split_set_attribute)
@@ -145,19 +152,23 @@ module Reports
           end
         end
         #RubyPlot::plot_lines(out_file, "Percent Correct vs Confidence Plot", "Confidence", "Percent Correct", names, fp_rates, tp_rates )
-        case validation_set.unique_feature_type
-        when "classification"
-          RubyPlot::accuracy_confidence_plot(out_file, "Percent Correct vs Confidence Plot", "Confidence", "Percent Correct", names, confidence, performance)
-        when "regression"
-          RubyPlot::accuracy_confidence_plot(out_file, "RMSE vs Confidence Plot", "Confidence", "RMSE", names, confidence, performance, true)
+        out_files.each do |out_file|
+          case validation_set.unique_feature_type
+          when "classification"
+            RubyPlot::accuracy_confidence_plot(out_file, "Percent Correct vs Confidence Plot", "Confidence", "Percent Correct", names, confidence, performance)
+          when "regression"
+            RubyPlot::accuracy_confidence_plot(out_file, "RMSE vs Confidence Plot", "Confidence", "RMSE", names, confidence, performance, true)
+          end
         end
       else
         data = transform_confidence_predictions(validation_set, class_value, show_single_curves)
-        case validation_set.unique_feature_type
-        when "classification"
-          RubyPlot::accuracy_confidence_plot(out_file, "Percent Correct vs Confidence Plot", "Confidence", "Percent Correct", data[:names], data[:confidence], data[:performance])
-        when "regression"
-          RubyPlot::accuracy_confidence_plot(out_file, "RMSE vs Confidence Plot", "Confidence", "RMSE", data[:names], data[:confidence], data[:performance], true)
+        out_files.each do |out_file|
+          case validation_set.unique_feature_type
+          when "classification"
+            RubyPlot::accuracy_confidence_plot(out_file, "Percent Correct vs Confidence Plot", "Confidence", "Percent Correct", data[:names], data[:confidence], data[:performance])
+          when "regression"
+            RubyPlot::accuracy_confidence_plot(out_file, "RMSE vs Confidence Plot", "Confidence", "RMSE", data[:names], data[:confidence], data[:performance], true)
+          end
         end
       end  
     end

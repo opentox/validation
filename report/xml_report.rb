@@ -93,10 +93,12 @@ module Reports
       end
     end
     
-    def imagefigure( title, path, filetype, size_pct=100, caption = nil )
+    def imagefigure( title, path, filetype, size_pct=100, altPath = nil )
       figure = Reports::XMLReportUtil.attribute_element("figure", {"float" => 0})
       figure << Reports::XMLReportUtil.text_element("title", title)
-      media = Element.new("mediaobject")
+      
+      #media = Element.new("mediaobject")
+      media = Element.new("inlinemediaobject")
       image = Element.new("imageobject")
       imagedata = Reports::XMLReportUtil.attribute_element("imagedata",
          {"fileref" => path, "format"=>filetype, "contentwidth" => size_pct.to_s+"%",
@@ -106,12 +108,15 @@ module Reports
       @resource_path_elements[imagedata] = "fileref"
       image << imagedata
       media << image
-#      ulink = Element.new("ulink")
-#      ulink.add_attributes({"url" => "http://google.de"})
-#      ulink << image
-#      media << ulink
-      media << Reports::XMLReportUtil.text_element("caption", caption) if caption
-      figure << media      
+      #media << Reports::XMLReportUtil.text_element("caption", caption) if caption
+      #figure << media
+      
+      ulink = Element.new("ulink")
+      ulink.add_attributes({"url" => altPath ? altPath : path })
+      @resource_path_elements[ulink] = "url"
+      ulink << media
+      
+      figure << ulink
       figure
     end
     
@@ -122,8 +127,8 @@ module Reports
     # call-seq:
     #   add_imagefigure( element, title, path, filetype, caption = nil ) => REXML::Element
     #
-    def add_imagefigure( element, title, path, filetype, size_pct=100, caption = nil )
-      figure = imagefigure( title, path, filetype, size_pct, caption)
+    def add_imagefigure( element, title, path, filetype, size_pct=100, altPath = nil )
+      figure = imagefigure( title, path, filetype, size_pct, altPath)
       element << figure
       return figure 
     end
