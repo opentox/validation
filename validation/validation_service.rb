@@ -30,7 +30,7 @@ end
 
 module Validation
   
-  class Validation < Lib::Validation
+  class Validation
       
     # constructs a validation object, Rsets id und uri
     #def initialize( params={} )
@@ -43,7 +43,7 @@ module Validation
     
     # deletes a validation
     # PENDING: model and referenced datasets are deleted as well, keep it that way?
-    def delete( delete_all=true )
+    def delete_validation( delete_all=true )
       if (delete_all)
         to_delete = [:model_uri, :training_dataset_uri, :test_dataset_uri, :test_target_dataset_uri, :prediction_dataset_uri ]
         case self.validation_type
@@ -72,7 +72,7 @@ module Validation
           end
         end
       end
-      self.destroy
+      self.delete
       if (subjectid)
         begin
           res = OpenTox::Authorization.delete_policies_from_uri(validation_uri, subjectid)
@@ -222,17 +222,13 @@ module Validation
 #               :percent_unpredicted => prediction.percent_unpredicted,
 #               :finished => true}
 #        self.save!
-        self.attributes= {:num_instances => prediction.num_instances,
+        self.update :num_instances => prediction.num_instances,
                :num_without_class => prediction.num_without_class,
                :percent_without_class => prediction.percent_without_class,
                :num_unpredicted => prediction.num_unpredicted,
                :percent_unpredicted => prediction.percent_unpredicted,
-               :finished => true}
-        begin 
-          self.save
-        rescue DataMapper::SaveFailureError => e
-           raise "could not save validation: "+e.resource.errors.inspect
-        end
+               :finished => true
+        raise unless self.valid?
       end
       
       task.progress(100) if task
@@ -240,7 +236,7 @@ module Validation
     end
   end
   
-  class Crossvalidation < Lib::Crossvalidation
+  class Crossvalidation
     
     # constructs a crossvalidation, id and uri are set
     #def initialize( params={} )
@@ -262,12 +258,12 @@ module Validation
     end
     
     # deletes a crossvalidation, all validations are deleted as well
-    def delete
-        Validation.all(:crossvalidation_id => self.id).each do |v|
+    def delete_crossvalidation
+        Validation.find(:crossvalidation_id => self.id).each do |v|
           v.subjectid = self.subjectid
-          v.delete
+          v.delete_validation
         end
-        self.destroy
+        self.delete
         if (subjectid)
           begin
             res = OpenTox::Authorization.delete_policies_from_uri(crossvalidation_uri, subjectid)
@@ -281,6 +277,9 @@ module Validation
     
     # creates the cv folds
     def create_cv_datasets( prediction_feature, task=nil )
+      self.random_seed = 1 unless self.random_seed
+      self.num_folds = 10 unless self.num_folds
+      self.stratified = false unless self.stratified
       if copy_cv_datasets( prediction_feature )
         # dataset folds of a previous crossvalidaiton could be used 
         task.progress(100) if task
@@ -296,7 +295,7 @@ module Validation
       i = 0
       task_step = 100 / self.num_folds.to_f;
       @tmp_validations.each do | val |
-        validation = Validation.new val
+        validation = Validation.create val
         validation.subjectid = self.subjectid
         validation.validate_algorithm( algorithm_params, 
           OpenTox::SubTask.create(task, i * task_step, ( i + 1 ) * task_step) )
@@ -316,8 +315,7 @@ module Validation
     # copies datasets from an older crossvalidation on the same dataset and the same folds
     # returns true if successfull, false otherwise
     def copy_cv_datasets( prediction_feature )
-      
-      cvs = Crossvalidation.all( { 
+      cvs = Crossvalidation.find( { 
         :dataset_uri => self.dataset_uri, 
         :num_folds => self.num_folds, 
         :stratified => self.stratified, 
@@ -326,13 +324,13 @@ module Validation
       cvs.each do |cv|
         next if AA_SERVER and !OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"GET",self.subjectid)
         tmp_val = []
-        Validation.all( :crossvalidation_id => cv.id ).each do |v|
+        Validation.find( :crossvalidation_id => cv.id ).each do |v|
           break unless 
             v.prediction_feature == prediction_feature and
             OpenTox::Dataset.exist?(v.training_dataset_uri,self.subjectid) and 
             OpenTox::Dataset.exist?(v.test_dataset_uri,self.subjectid)
           #make sure self.id is set
-          self.save if self.new?
+          #self.save if self.new?
           tmp_val << { :validation_type => "crossvalidation",
                        :training_dataset_uri => v.training_dataset_uri, 
                        :test_dataset_uri => v.test_dataset_uri,
@@ -342,7 +340,7 @@ module Validation
                        :prediction_feature => prediction_feature,
                        :algorithm_uri => self.algorithm_uri }
         end
-        if tmp_val.size == self.num_folds
+        if tmp_val.size == self.num_folds.to_i
           @tmp_validations = tmp_val
           LOGGER.debug "copied dataset uris from cv "+cv.crossvalidation_uri.to_s #+":\n"+tmp_val.inspect
           return true
@@ -354,23 +352,22 @@ module Validation
     # creates cv folds (training and testdatasets)
     # stores uris in validation objects 
     def create_new_cv_datasets( prediction_feature, task = nil )
-      
-      raise "random seed not set "+self.inspect unless self.random_seed
       LOGGER.debug "creating datasets for crossvalidation"
       orig_dataset = OpenTox::Dataset.find(self.dataset_uri,self.subjectid)
       raise OpenTox::NotFoundError.new "Dataset not found: "+self.dataset_uri.to_s unless orig_dataset
       
       shuffled_compounds = orig_dataset.compounds.shuffle( self.random_seed )
       
-      unless self.stratified        
-        split_compounds = shuffled_compounds.chunk( self.num_folds )
+      unless self.stratified    
+        split_compounds = shuffled_compounds.chunk( self.num_folds.to_i )
       else
         class_compounds = {} # "inactive" => compounds[], "active" => compounds[] .. 
-        shuffled_compounds.each do |c|
-          orig_dataset.features(c).each do |a|
-            value = OpenTox::Feature.new(:uri => a.uri).value(prediction_feature).to_s
-            class_compounds[value] = [] unless class_compounds.has_key?(value)
-            class_compounds[value].push(c)
+        accept_values = orig_dataset.features[prediction_feature][OT.acceptValue]
+        accept_values.each do |value|
+          class_compounds[value] = []
+          shuffled_compounds.each do |c|
+            #PENDING accept values are type string, data_entries may be boolean
+            class_compounds[value] << c if orig_dataset.data_entries[c][prediction_feature].collect{|v| v.to_s}.include?(value)
           end
         end
         LOGGER.debug "stratified cv: different class values: "+class_compounds.keys.join(", ")
@@ -378,7 +375,7 @@ module Validation
       
         split_class_compounds = [] # inactive_compounds[fold_i][], active_compounds[fold_i][], ..
         class_compounds.values.each do |compounds|
-          split_class_compounds.push( compounds.chunk( self.num_folds ) )
+          split_class_compounds << compounds.chunk( self.num_folds.to_i )
         end
         LOGGER.debug "stratified cv: splits for class values: "+split_class_compounds.collect{ |c| c.collect{ |cc| cc.size }.join("/") }.join(", ")
         
@@ -389,7 +386,7 @@ module Validation
           # step 1: sort current split in ascending order
           split_comp.sort!{|x,y| x.size <=> y.size }
           # step 2: add splits
-          (0..self.num_folds-1).each do |i|
+          (0..self.num_folds.to_i-1).each do |i|
             unless split_compounds[i]
               split_compounds[i] = split_comp[i]
             else
@@ -406,7 +403,7 @@ module Validation
       
       @tmp_validations = []
       
-      (1..self.num_folds).each do |n|
+      (1..self.num_folds.to_i).each do |n|
         
         datasetname = 'cv'+self.id.to_s +
                #'_d'+orig_dataset.name.to_s +
@@ -418,7 +415,7 @@ module Validation
         test_compounds = []
         train_compounds = []
         
-        (1..self.num_folds).each do |nn|
+        (1..self.num_folds.to_i).each do |nn|
           compounds = split_compounds.at(nn-1)
           
           if n == nn
@@ -428,8 +425,9 @@ module Validation
           end 
         end
         
-        raise "internal error, num test compounds not correct" unless (shuffled_compounds.size/self.num_folds - test_compounds.size).abs <= 1 
-        raise "internal error, num train compounds not correct" unless shuffled_compounds.size - test_compounds.size == train_compounds.size
+        raise "internal error, num test compounds not correct" unless (shuffled_compounds.size/self.num_folds.to_i - test_compounds.size).abs <= 1 
+        raise "internal error, num train compounds not correct, should be '"+(shuffled_compounds.size-test_compounds.size).to_s+
+          "', is '"+train_compounds.size.to_s+"'" unless shuffled_compounds.size - test_compounds.size == train_compounds.size
         
         LOGGER.debug "training set: "+datasetname+"_train, compounds: "+train_compounds.size.to_s
         #train_dataset_uri = orig_dataset.create_new_dataset( train_compounds, orig_dataset.features, datasetname + '_train', source ) 
@@ -442,7 +440,7 @@ module Validation
           { DC.title => datasetname + '_test', DC.creator => source }, self.subjectid ).uri
         
         #make sure self.id is set
-        self.save if self.new?
+        #self.save if self.new?
         tmp_validation = { :validation_type => "crossvalidation",
                            :training_dataset_uri => train_dataset_uri, 
                            :test_dataset_uri => test_dataset_uri,
@@ -551,9 +549,10 @@ module Validation
     # splits a dataset into test and training dataset
     # returns map with training_dataset_uri and test_dataset_uri
     def self.train_test_dataset_split( orig_dataset_uri, prediction_feature, subjectid, split_ratio=nil, random_seed=nil, task=nil )
-      
       split_ratio=0.67 unless split_ratio
+      split_ratio = split_ratio.to_f
       random_seed=1 unless random_seed
+      random_seed = random_seed.to_i
       
       orig_dataset = OpenTox::Dataset.find orig_dataset_uri, subjectid
       orig_dataset.load_all subjectid

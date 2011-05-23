@@ -20,8 +20,7 @@ module Lib
     def self.merge_array_objects( array )
       return nil if array.size == nil
       return array[0] if array.size==1
-        
-      m = self.merge_objects(array[0], array[1] )
+      m = self.merge_objects(array[0], array[1])
       (2..array.size-1).each do |i|
         m = self.merge_objects(m, array[i] )
       end
@@ -33,8 +32,7 @@ module Lib
     end
     
     def self.merge_objects( object1, object2 )
-      
-      raise "classes not equal" if object1.class != object2.class
+      raise "classes not equal : "+object1.class.to_s+" != "+object2.class.to_s if object1.class != object2.class
       object_class = object1.class
       raise "register which attributes to merge first, nothing found for class "+object_class.to_s unless merge_attributes_registered?(object_class)
       raise "not supported, successivly add unmerged object to a merge object" if merge_count(object2)>1
@@ -71,6 +69,11 @@ module Lib
       variance = nil
       
       if (avg=avg_attribute?(object_class, attribute)) || sum_attribute?(object_class, attribute)
+        # we string to numerics if wanted, value1 is no string anymore if weight>1
+        if value2.is_a?(String) and ((weight1==1 and value1.is_a?(String)) or (weight1>1 and value1.is_a?(Numeric)))
+          value1 = value1.to_f
+          value2 = value2.to_f
+        end
         if (value1==nil and value2==nil )
           #do nothing
         elsif value1.is_a?(Numeric) and value2.is_a?(Numeric)
@@ -104,7 +107,8 @@ module Lib
             end
           end        
         else
-          raise "invalid, cannot avg/sum non-numeric content for attribute: "+attribute.to_s+" contents: '"+value1.to_s+"', '"+value2.to_s+"'"
+          raise "invalid, cannot avg/sum non-numeric content for attribute: "+attribute.to_s+" contents: '"+value1.to_s+"' ("+
+            value1.class.to_s+"), '"+value2.to_s+"' ("+value2.class.to_s+")"
         end
       elsif non_numeric_attribute?(object_class, attribute)
         if (value1.is_a?(Hash) and value2.is_a?(Hash))

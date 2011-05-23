@@ -3,11 +3,11 @@ require 'lib/test_util.rb'
 
 class Example
   
-  @@file=File.new("data/hamster_carcinogenicity.yaml","r")
+  @@file=File.new("data/hamster_carcinogenicity.csv","r")
   @@file_type="text/x-yaml"
   @@model=File.join CONFIG[:services]["opentox-model"],"1"
   #@@feature= URI.encode("http://local-ot/toxmodel/feature#Hamster%20Carcinogenicity%20(DSSTOX/CPDB)")
-  @@feature= File.join CONFIG[:services]["opentox-dataset"],"1/feature/hamster_carcinogenicity"
+  @@feature= File.join CONFIG[:services]["opentox-dataset"],"1/feature/Hamster%2520Carcinogenicity"
   #@@predicted_feature= URI.encode("http://local-ot/toxmodel/feature#Hamster%20Carcinogenicity%20(DSSTOX/CPDB)_lazar_classification")
   @@alg = File.join CONFIG[:services]["opentox-algorithm"],"lazar"
   @@alg_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
@@ -58,12 +58,15 @@ class Example
     #TODO
     subjectid = nil
     
+    Ohm.flush
+    
     task = OpenTox::Task.create("prepare examples", "n/a") do |task|
       @@summary = ""
+      
       #delete validations
-      log "delete validations"
-      Lib::Validation.auto_migrate!
-      Lib::Crossvalidation.auto_migrate!
+      #log "delete validations"
+      #Lib::Validation.auto_migrate!
+      #Lib::Crossvalidation.auto_migrate!
       #ActiveRecord::Base.logger = Logger.new("/dev/null")
       #ActiveRecord::Migrator.migrate('db/migrate', 0 )
       #ActiveRecord::Migrator.migrate('db/migrate', 1 )
@@ -80,10 +83,7 @@ class Example
       halt 400,"File not found: "+@@file.path.to_s unless File.exist?(@@file.path)
       #data = File.read(@@file.path)
       #data_uri = OpenTox::RestClientWrapper.post(CONFIG[:services]["opentox-dataset"],{:content_type => @@file_type},data).chomp("\n")
-      data = File.read(@@file.path)
-      dataset = OpenTox::Dataset.create
-      dataset.load_yaml(data)
-      dataset.save
+      dataset = OpenTox::Dataset.create_from_csv_file(@@file.path,nil)
       data_uri = dataset.uri
       log "-> "+data_uri
       task.progress(20)
@@ -92,7 +92,7 @@ class Example
       #delete_all(CONFIG[:services]["opentox-model"])
       OpenTox::RestClientWrapper.delete CONFIG[:services]["opentox-model"]
       
-      split_params = Validation::Util.train_test_dataset_split(data_uri, URI.decode(@@feature), 0.9, 1)
+      split_params = Validation::Util.train_test_dataset_split(data_uri, URI.decode(@@feature), nil, 0.9, 1)
       v = Validation::Validation.new :training_dataset_uri => split_params[:training_dataset_uri], 
                      :validation_type => "test_set_validation",
                      :test_dataset_uri => split_params[:test_dataset_uri],
@@ -102,7 +102,7 @@ class Example
       v.validate_algorithm( @@alg_params, OpenTox::SubTask.new(task, 20, 40) ) 
       
       log "crossvalidation"
-      cv = Validation::Crossvalidation.new({ :dataset_uri => data_uri, :algorithm_uri => @@alg, :num_folds => 5, :stratified => false })
+      cv = Validation::Crossvalidation.create({ :dataset_uri => data_uri, :algorithm_uri => @@alg, :num_folds => 5, :stratified => false })
       cv.perform_cv( URI.decode(@@feature), @@alg_params, OpenTox::SubTask.new(task, 40, 70) )
       
       log "create validation report"
@@ -124,7 +124,7 @@ class Example
       log "done"
       @@summary
     end
-    return_task(task)
+    task
   end
   
   # performs all curl calls listed in examples after ">>>", next line is added if line ends with "\"

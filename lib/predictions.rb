@@ -23,13 +23,13 @@ module Lib
                     actual_values, 
                     confidence_values, 
                     feature_type, 
-                    class_domain=nil )
+                    accept_values=nil )
                     
       @predicted_values = predicted_values
       @actual_values = actual_values
       @confidence_values = confidence_values
       @feature_type = feature_type
-      @class_domain = class_domain
+      @accept_values = accept_values
       @num_classes = 1
       
       #puts "predicted:  "+predicted_values.inspect
@@ -58,15 +58,15 @@ module Lib
       
       case @feature_type
       when "classification"
-        raise "class_domain missing while performing classification" unless @class_domain
-        @num_classes = @class_domain.size
+        raise "accept_values missing while performing classification" unless @accept_values
+        @num_classes = @accept_values.size
         raise "num classes < 2" if @num_classes<2
         { "predicted"=>@predicted_values, "actual"=>@actual_values }.each do |s,values|
           values.each{ |v| raise "illegal "+s+" classification-value ("+v.to_s+"),"+
             "has to be either nil or index of predicted-values" if v!=nil and (!v.is_a?(Numeric) or v<0 or v>@num_classes)}
         end
       when "regresssion"
-        raise "class_domain != nil while performing regression" if @class_domain
+        raise "accept_values != nil while performing regression" if @accept_values
         { "predicted"=>@predicted_values, "actual"=>@actual_values }.each do |s,values|
           values.each{ |v| raise "illegal "+s+" regression-value ("+v.to_s+"),"+
             "has to be either nil or number" unless v==nil or v.is_a?(Numeric)}
@@ -88,8 +88,16 @@ module Lib
       
       case @feature_type
       when "classification"
+        
+        # confusion-matrix will contain counts for predictions in a 2d array:
+        # index of first dim: actual values
+        # index of second dim: predicited values
+        # example: 
+        # * summing up over all i with fixed n
+        # * confusion_matrix[i][n]
+        # * will give the number of instances that are predicted as n
         @confusion_matrix = []
-        @class_domain.each do |v|
+        @accept_values.each do |v|
           @confusion_matrix.push( Array.new( @num_classes, 0 ) )
         end
         
@@ -235,8 +243,8 @@ module Lib
       res = {}
       (0..@num_classes-1).each do |actual|
           (0..@num_classes-1).each do |predicted|
-            res[{:confusion_matrix_actual => @class_domain[actual],
-                 :confusion_matrix_predicted => @class_domain[predicted]}] = @confusion_matrix[actual][predicted]
+            res[{:confusion_matrix_actual => @accept_values[actual],
+                 :confusion_matrix_predicted => @accept_values[predicted]}] = @confusion_matrix[actual][predicted]
         end
       end
       return res
@@ -289,8 +297,8 @@ module Lib
     def precision(class_index=nil)
       return prediction_feature_value_map( lambda{ |i| precision(i) } ) if class_index==nil
       
-      correct = 0
-      total = 0
+      correct = 0 # all instances with prediction class_index that are correctly classified 
+      total = 0 # all instances with prediciton class_index
       (0..@num_classes-1).each do |i|
          correct += @confusion_matrix[i][class_index] if i == class_index
          total += @confusion_matrix[i][class_index]
@@ -457,7 +465,7 @@ module Lib
     
     def mean_absolute_error
       return 0 if (@num_with_actual_value - @num_unpredicted)==0
-      Math.sqrt(@sum_abs_error / (@num_with_actual_value - @num_unpredicted).to_f)
+      @sum_abs_error / (@num_with_actual_value - @num_unpredicted).to_f
     end
     
     def sum_squared_error
@@ -487,21 +495,21 @@ module Lib
       return @variance_actual
     end
 
-    # data for roc-plots ###################################################################################
+    # data for (roc-)plots ###################################################################################
     
-    def get_roc_values(class_value)
+    def get_prediction_values(class_value)
       
       #puts "get_roc_values for class_value: "+class_value.to_s
       raise "no confidence values" if @confidence_values==nil
-      raise "no class-value specified" if class_value==nil
+      #raise "no class-value specified" if class_value==nil
       
-      class_index = @class_domain.index(class_value)
-      raise "class not found "+class_value.to_s if class_index==nil
+      class_index = @accept_values.index(class_value) if class_value!=nil
+      raise "class not found "+class_value.to_s if (class_value!=nil && class_index==nil)
       
       c = []; p = []; a = []
       (0..@predicted_values.size-1).each do |i|
         # NOTE: not predicted instances are ignored here
-        if @predicted_values[i]!=nil and @predicted_values[i]==class_index
+        if @predicted_values[i]!=nil and (class_index==nil || @predicted_values[i]==class_index)
           c << @confidence_values[i]
           p << @predicted_values[i]
           a << @actual_values[i]
@@ -529,7 +537,7 @@ module Lib
     def predicted_value(instance_index)
       case @feature_type 
       when "classification"
-        @predicted_values[instance_index]==nil ? nil : @class_domain[@predicted_values[instance_index]]
+        @predicted_values[instance_index]==nil ? nil : @accept_values[@predicted_values[instance_index]]
       when "regression"
         @predicted_values[instance_index]
       end
@@ -542,7 +550,7 @@ module Lib
     def actual_value(instance_index)
       case @feature_type 
       when "classification"
-        @actual_values[instance_index]==nil ? nil : @class_domain[@actual_values[instance_index]]
+        @actual_values[instance_index]==nil ? nil : @accept_values[@actual_values[instance_index]]
       when "regression"
         @actual_values[instance_index]
       end
@@ -576,7 +584,7 @@ module Lib
     def prediction_feature_value_map(proc)
       res = {}
       (0..@num_classes-1).each do |i|
-        res[@class_domain[i]] = proc.call(i)
+        res[@accept_values[i]] = proc.call(i)
       end
       return res
     end

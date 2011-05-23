@@ -188,28 +188,29 @@ module Reports
 #    serialize :model_uris
 #    alias_attribute :date, :created_at
 
-  class ReportData 
-    include DataMapper::Resource 
+  class ReportData < Ohm::Model
   
-    property :id, Serial
-    property :report_type, String, :length => 255
-    property :created_at, DateTime
-    property :validation_uris, Object 
-    property :crossvalidation_uris, Object
-    property :model_uris, Object
-    property :algorithm_uris, Object
+    attribute :report_type
+    attribute :date
+    attribute :validation_uris 
+    attribute :crossvalidation_uris
+    attribute :model_uris
+    attribute :algorithm_uris    
+    
+    index :report_type
+    index :validation_uris
+    index :crossvalidation_uris
     
     attr_accessor :subjectid
     
-    after :save, :check_policy
-    private
-    def check_policy
-      OpenTox::Authorization.check_policy(report_uri, subjectid)
+    def self.create(params={})
+      params[:date] = Time.new
+      super params
     end
     
-    public
-    def date
-      created_at
+    def save
+      super
+      OpenTox::Authorization.check_policy(report_uri, subjectid)
     end
     
     def report_uri
@@ -241,36 +242,24 @@ module Reports
     
     def new_report(report_content, type, meta_data, uri_provider, subjectid=nil)
       raise "report meta data missing" unless meta_data
-      report = ReportData.new(meta_data)
+      meta_data[:report_type] = type
+      report = ReportData.create(meta_data)
       report.subjectid = subjectid
-      report.report_type = type
-      report.save
+      OpenTox::Authorization.check_policy(report.report_uri, subjectid)
       new_report_with_id(report_content, type, report.id)
     end
     
     def list_reports(type, filter_params={})
-      filter_params["report_type"]=type unless filter_params.has_key?("report_type")
-      #ReportData.find_like(filter_params).delete_if{|r| r.report_type!=type}.collect{ |r| r.id }
-      
-      filter_params = Lib::DataMapperUtil.check_params(ReportData, filter_params)
-      # unfortunately, datamapper does not allow searching in Objects
-      # do filtering for list = Object params manually
-      list_params = {}
-      [:validation_uris, :crossvalidation_uris, :algorithm_uris, :model_uris].each do |l|
-        list_params[l] = filter_params.delete(l) if filter_params.has_key?(l)
-      end
-      
-      reports = ReportData.all(filter_params).delete_if{|r| r.report_type!=type}
-      list_params.each do |k,v|
-        reports = reports.delete_if{ |r| !r.send(k).include?(v) }
-      end
+      LOGGER.debug "find reports for params: "+filter_params.inspect
+      reports = Lib::OhmUtil.find( ReportData, filter_params )
       reports.collect{ |r| r.id }
     end
     
     def get_report(type, id, format, force_formating, params)
       
-      report = ReportData.first({:id => id, :report_type => type})
-      raise OpenTox::NotFoundError.new("Report with id='"+id.to_s+"' and type='"+type.to_s+"' not found.") unless report
+      report = ReportData[id]
+      raise OpenTox::NotFoundError.new("Report with id='"+id.to_s+"' and type='"+type.to_s+"' not found.") if 
+        report==nil or report.report_type!=type
 #      begin
 #        report = ReportData.find(:first, :conditions => {:id => id, :report_type => type})
 #      rescue ActiveRecord::RecordNotFound
@@ -294,9 +283,10 @@ module Reports
 #        raise OpenTox::NotFoundError.new("Report with id='"+id.to_s+"' and type='"+type.to_s+"' not found.")
 #      end
 #      ReportData.delete(id)
-      report = ReportData.first({:id => id, :report_type => type})
-      raise OpenTox::NotFoundError.new("Report with id='"+id.to_s+"' and type='"+type.to_s+"' not found.") unless report
-      report.destroy
+      report = ReportData[id]
+      raise OpenTox::NotFoundError.new("Report with id='"+id.to_s+"' and type='"+type.to_s+"' not found.") if
+        report==nil || report.report_type!=type
+      report.delete
       if (subjectid)
         begin
           res = OpenTox::Authorization.delete_policies_from_uri(report.report_uri, subjectid)
@@ -309,9 +299,6 @@ module Reports
     end
   end
 end
-
-Reports::ReportData.auto_upgrade!
-Reports::ReportData.raise_on_save_failure = true
 
 #module Reports
 #  def self.check_filter_params(model, filter_params)

@@ -54,13 +54,20 @@ module Lib
         @compounds = test_dataset.compounds
         LOGGER.debug "test dataset size: "+@compounds.size.to_s
         raise "test dataset is empty "+test_dataset_uri.to_s unless @compounds.size>0
-        class_values = feature_type=="classification" ? OpenTox::Feature.find(prediction_feature, subjectid).domain : nil
+        
+        if feature_type=="classification"
+          accept_values = test_target_dataset.features[prediction_feature][OT.acceptValue]
+          raise "'"+OT.acceptValue.to_s+"' missing/invalid for feature '"+prediction_feature.to_s+"' in dataset '"+
+            test_target_dataset_uri.to_s+"', acceptValues are: '"+accept_values.inspect+"'" if accept_values==nil or accept_values.length<2 
+        else
+          accept_values=nil
+        end
         
         actual_values = []
         @compounds.each do |c|
           case feature_type
           when "classification"
-            actual_values << classification_value(test_target_dataset, c, prediction_feature, class_values)
+            actual_values << classification_value(test_target_dataset, c, prediction_feature, accept_values)
           when "regression"
             actual_values << regression_value(test_target_dataset, c, prediction_feature)
           end
@@ -108,7 +115,7 @@ module Lib
             case feature_type
             when "classification"
               # TODO: remove LAZAR_PREDICTION_DATASET_HACK
-              predicted_values << classification_value(prediction_dataset, c, no_prediction_feature ? nil : predicted_variable, class_values)
+              predicted_values << classification_value(prediction_dataset, c, no_prediction_feature ? nil : predicted_variable, accept_values)
             when "regression"
               predicted_values << regression_value(prediction_dataset, c, no_prediction_feature ? nil : predicted_variable)
             end
@@ -126,7 +133,7 @@ module Lib
         end
         task.progress(80) if task # loaded predicted values and confidence
         
-        super(predicted_values, actual_values, confidence_values, feature_type, class_values)
+        super(predicted_values, actual_values, confidence_values, feature_type, accept_values)
         raise "illegal num compounds "+num_info if  @compounds.size != @predicted_values.size
         task.progress(100) if task # done with the mathmatics
     end
@@ -143,11 +150,11 @@ module Lib
       end
     end
     
-    def classification_value(dataset, compound, feature, class_values)
+    def classification_value(dataset, compound, feature, accept_values)
       v = value(dataset, compound, feature)
-      i = class_values.index(v)
-      raise "illegal class_value of prediction (value is '"+v.to_s+"', class is '"+v.class.to_s+"'), possible values are "+
-        class_values.inspect unless v==nil or i!=nil
+      i = accept_values.index(v.to_s)
+      raise "illegal class_value of prediction (value is '"+v.to_s+"'), accept values are "+
+        accept_values.inspect unless v==nil or i!=nil
       i
     end
     
@@ -184,9 +191,9 @@ module Lib
       res = {}
       case @feature_type
       when "classification"
-        (Lib::VAL_CLASS_PROPS).each{ |s| res[s] = send(s)}  
+        (Validation::VAL_CLASS_PROPS).each{ |s| res[s] = send(s)}  
       when "regression"
-        (Lib::VAL_REGR_PROPS).each{ |s| res[s] = send(s) }  
+        (Validation::VAL_REGR_PROPS).each{ |s| res[s] = send(s) }  
       end
       return res
     end
@@ -206,7 +213,7 @@ module Lib
           begin
             #a.push( "http://ambit.uni-plovdiv.bg:8080/ambit2/depict/cdk?search="+
             #  URI.encode(OpenTox::Compound.new(:uri=>p.identifier(i)).smiles) ) if add_pic
-            a << p.identifier(i)+"/image"
+            a << p.identifier(i)+"?media=image/png"
           rescue => ex
             raise ex
             #a.push("Could not add pic: "+ex.message)

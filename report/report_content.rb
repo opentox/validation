@@ -8,7 +8,7 @@ class Reports::ReportContent
   attr_accessor :xml_report, :tmp_files
   
   def initialize(title)
-    @xml_report = Reports::XMLReport.new(title, Time.now.strftime("Created at %m.%d.%Y - %H:%M"))
+    @xml_report = Reports::XMLReport.new(title, Time.now.strftime("Created at %d.%m.%Y - %H:%M"))
     @tmp_file_count = 0
     @current_section = @xml_report.get_root_element
   end
@@ -147,21 +147,21 @@ class Reports::ReportContent
                             image_caption=nil)
                             
     image_title = "Regression plot" unless image_title
-    
-    section_regr = @xml_report.add_section(@current_section, section_title)
+    #section_regr = @xml_report.add_section(@current_section, section_title)
+    section_regr = @current_section
     prediction_set = validation_set.collect{ |v| v.get_predictions }
         
     if prediction_set.size>0
       
       section_text += "\nWARNING: regression plot information not available for all validation results" if prediction_set.size!=validation_set.size
       @xml_report.add_paragraph(section_regr, section_text) if section_text
-      plot_file_name = "regr_plot"+@tmp_file_count.to_s+".svg"
+      plot_file_name = "regr_plot"+@tmp_file_count.to_s+".png"
       @tmp_file_count += 1
       begin
         plot_file_path = add_tmp_file(plot_file_name)
         Reports::PlotFactory.create_regression_plot( plot_file_path, prediction_set, name_attribute )
-        @xml_report.add_imagefigure(section_regr, image_title, plot_file_name, "SVG", 120, image_caption)
-      rescue RuntimeError => ex
+        @xml_report.add_imagefigure(section_regr, image_title, plot_file_name, "PNG", 100, image_caption)
+      rescue Exception => ex
         LOGGER.error("Could not create regression plot: "+ex.message)
         rm_tmp_file(plot_file_name)
         @xml_report.add_paragraph(section_regr, "could not create regression plot: "+ex.message)
@@ -178,7 +178,8 @@ class Reports::ReportContent
                             image_titles=nil,
                             image_captions=nil)
                             
-    section_roc = @xml_report.add_section(@current_section, section_title)
+    #section_roc = @xml_report.add_section(@current_section, section_title)
+    section_roc = @current_section
     prediction_set = validation_set.collect{ |v| v.get_predictions && v.get_predictions.confidence_values_available? }
         
     if prediction_set.size>0
@@ -189,18 +190,18 @@ class Reports::ReportContent
       end
       @xml_report.add_paragraph(section_roc, section_text) if section_text
 
-      class_domain = validation_set.get_class_domain
-      class_domain.size.times do |i|
-        class_value = class_domain[i]
+      accept_values = validation_set.get_accept_values
+      accept_values.size.times do |i|
+        class_value = accept_values[i]
         image_title = image_titles ? image_titles[i] : "ROC Plot for class-value '"+class_value.to_s+"'"
         image_caption = image_captions ? image_captions[i] : nil
-        plot_file_name = "roc_plot"+@tmp_file_count.to_s+".svg"
+        plot_file_name = "roc_plot"+@tmp_file_count.to_s+".png"
         @tmp_file_count += 1
         begin
           plot_file_path = add_tmp_file(plot_file_name)
           Reports::PlotFactory.create_roc_plot( plot_file_path, prediction_set, class_value, split_set_attribute, false )#prediction_set.size>1 )
-          @xml_report.add_imagefigure(section_roc, image_title, plot_file_name, "SVG", 120, image_caption)
-        rescue RuntimeError => ex
+          @xml_report.add_imagefigure(section_roc, image_title, plot_file_name, "PNG", 100, image_caption)
+        rescue Exception => ex
           msg = "WARNING could not create roc plot for class value '"+class_value.to_s+"': "+ex.message
           LOGGER.error(msg)
           rm_tmp_file(plot_file_name)
@@ -212,6 +213,49 @@ class Reports::ReportContent
     end
     
   end
+  
+  def add_confidence_plot( validation_set,
+                            split_set_attribute = nil,
+                            section_title="Confidence plots",
+                            section_text=nil,
+                            image_titles=nil,
+                            image_captions=nil)
+                            
+    #section_conf = @xml_report.add_section(@current_section, section_title)
+    section_conf = @current_section
+    prediction_set = validation_set.collect{ |v| v.get_predictions && v.get_predictions.confidence_values_available? }
+        
+    if prediction_set.size>0
+      if prediction_set.size!=validation_set.size
+        section_text += "\nWARNING: plot information not available for all validation results"
+        LOGGER.error "WARNING: plot information not available for all validation results:\n"+
+          "validation set size: "+validation_set.size.to_s+", prediction set size: "+prediction_set.size.to_s
+      end
+      @xml_report.add_paragraph(section_conf, section_text) if section_text
+
+      image_title = image_titles ? image_titles[i] : "Percent Correct vs Confidence Plot"
+      image_caption = image_captions ? image_captions[i] : nil
+      plot_file_name = "conf_plot"+@tmp_file_count.to_s+".png"
+      @tmp_file_count += 1
+      
+      begin
+      
+        plot_file_path = add_tmp_file(plot_file_name)
+        Reports::PlotFactory.create_confidence_plot( plot_file_path, prediction_set, nil, split_set_attribute, false )
+        @xml_report.add_imagefigure(section_conf, image_title, plot_file_name, "PNG", 100, image_caption)
+      
+      rescue Exception => ex
+        msg = "WARNING could not create confidence plot: "+ex.message
+        LOGGER.error(msg)
+        rm_tmp_file(plot_file_name)
+        @xml_report.add_paragraph(section_conf, msg)
+      end  
+    
+    else
+      @xml_report.add_paragraph(section_conf, "No prediction-confidence info for confidence plot available.")
+    end
+    
+  end  
   
   def add_ranking_plots( validation_set,
                             compare_attribute,
@@ -236,11 +280,11 @@ class Reports::ReportContent
                         image_titles=nil,
                         image_captions=nil)
 
-    class_domain = validation_set.get_domain_for_attr(rank_attribute)
-    puts "ranking plot for "+rank_attribute.to_s+", class values: "+class_domain.to_s
+    accept_values = validation_set.get_class_values_for(rank_attribute)
+    puts "ranking plot for "+rank_attribute.to_s+", class values: "+accept_values.to_s
     
-    class_domain.size.times do |i|  
-      class_value = class_domain[i]
+    accept_values.size.times do |i|  
+      class_value = accept_values[i]
       if image_titles
         image_title = image_titles[i]
       else
@@ -270,11 +314,11 @@ class Reports::ReportContent
     section_bar = @xml_report.add_section(@current_section, section_title)
     @xml_report.add_paragraph(section_bar, section_text) if section_text
     
-    plot_file_name = "bar_plot"+@tmp_file_count.to_s+".svg"
+    plot_file_name = "bar_plot"+@tmp_file_count.to_s+".png"
     @tmp_file_count += 1
     plot_file_path = add_tmp_file(plot_file_name)
     Reports::PlotFactory.create_bar_plot(plot_file_path, validation_set, title_attribute, value_attributes )
-    @xml_report.add_imagefigure(section_bar, image_title, plot_file_name, "SVG", 120, image_caption)
+    @xml_report.add_imagefigure(section_bar, image_title, plot_file_name, "PNG", 100, image_caption)
   end  
   
   private

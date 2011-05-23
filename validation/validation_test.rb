@@ -184,13 +184,13 @@ class ValidationTest < Test::Unit::TestCase
 
      #ambit_service = "https://ambit.uni-plovdiv.bg:8443/ambit2"
       #https%3A%2F%2Fambit.uni-plovdiv.bg%3A8443%2Fambit2
-
+      
 #     post "/validate_datasets",{
-#         :test_dataset_uri=>ambit_service+"/dataset/R401577?max=50",
-#         :prediction_dataset_uri=>ambit_service+"/dataset/R401577?max=50&feature_uris[]="+CGI.escape(ambit_service)+"%2Fmodel%2F35194%2Fpredicted",
-#         #:test_target_dataset_uri=>ambit_service+"/dataset/R401560",
-#         :prediction_feature=>ambit_service+"/feature/26221",
-#         :predicted_feature=>ambit_service+"/feature/218699",
+#         :test_dataset_uri=>"http://local-ot/dataset/94",
+#         :prediction_dataset_uri=>'http://local-ot/dataset/96',
+#         :test_target_dataset_uri=>'http://local-ot/dataset/92',
+#         :prediction_feature=>'http://local-ot/dataset/92/feature/Hamster%20Carcinogenicity',
+#         :predicted_feature=>"",
 #         :classification=>"true",
 #         :subjectid=>SUBJECTID}
 #         #:model_uri=>"http://local-ot/model/31"}
@@ -199,8 +199,8 @@ class ValidationTest < Test::Unit::TestCase
 #      uri = last_response.body
 #      val = wait_for_task(uri)
 #      puts val
-#      #get "/"+val.split("/")[-1]
-
+#      get "/"+val.split("/")[-1]
+#      puts last_response.body
 
 #      d = OpenTox::Dataset.find("https://ambit.uni-plovdiv.bg:8443/ambit2/dataset/R545",SUBJECTID)
 #      puts d.compounds.inspect
@@ -257,7 +257,9 @@ class ValidationTest < Test::Unit::TestCase
 
       #delete "/1",:subjectid=>SUBJECTID
       
-      run_test("19i")
+      prepare_examples()
+      
+      #run_test("1a") #,{:validation_uri => "http://local-ot/validation/crossvalidation/1"})
       
       #run_test("3a","http://local-ot/validation/crossvalidation/4")
       #run_test("3b","http://local-ot/validation/crossvalidation/3")
