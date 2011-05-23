@@ -40,7 +40,7 @@ module Validation
         raise OpenTox::BadRequestError.new "Crossvalidation '"+cv_id.to_s+"' not finished" unless crossvalidation.finished
         
         vals = Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation" ).collect{|x| x}
-        models = vals.collect{|v| OpenTox::Model::Generic.find(v.model_uri)}
+        models = vals.collect{|v| OpenTox::Model::Generic.find(v.model_uri, subjectid)}
         feature_type = models.first.feature_type(subjectid)
         test_dataset_uris = vals.collect{|v| v.test_dataset_uri}
         test_target_dataset_uris = vals.collect{|v| v.test_target_dataset_uri}
