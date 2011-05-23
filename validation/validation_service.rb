@@ -40,14 +40,14 @@ module Validation
         raise OpenTox::BadRequestError.new "Crossvalidation '"+cv_id.to_s+"' not finished" unless crossvalidation.finished
         
         vals = Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation" ).collect{|x| x}
-        feature_type = OpenTox::Model::Generic.new(vals.first.model_uri).feature_type(@subjectid)
+        feature_type = OpenTox::Model::Generic.new(vals.first.model_uri).feature_type(subjectid)
         test_dataset_uris = vals.collect{|v| v.test_dataset_uri}
         test_target_dataset_uris = vals.collect{|v| v.test_target_dataset_uri}
         prediction_feature = vals.first.prediction_feature
         prediction_dataset_uris = vals.collect{|v| v.prediction_dataset_uri}
         predicted_variables = vals.collect{|v| nil}
         prediction = Lib::OTPredictions.new( feature_type, test_dataset_uris, test_target_dataset_uris, prediction_feature, 
-          prediction_dataset_uris, predicted_variables, @subjectid )
+          prediction_dataset_uris, predicted_variables, subjectid )
           
         v = Validation.new
         case feature_type
