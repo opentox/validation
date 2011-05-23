@@ -151,7 +151,8 @@ class Reports::ReportContent
         @xml_report.add_imagefigure(section_regr, image_title,  plot_png[:name], "PNG", 100, plot_svg[:name])
       rescue Exception => ex
         LOGGER.error("Could not create regression plot: "+ex.message)
-        rm_tmp_file(plot_file_name)
+        rm_tmp_file(plot_png[:name])
+        rm_tmp_file(plot_svg[:name])
         @xml_report.add_paragraph(section_regr, "could not create regression plot: "+ex.message)
       end  
     else
@@ -184,8 +185,9 @@ class Reports::ReportContent
         @xml_report.add_imagefigure(section_roc, image_title, plot_png[:name], "PNG", 100, plot_svg[:name])
       rescue Exception => ex
         msg = "WARNING could not create roc plot for class value '"+accept_value.to_s+"': "+ex.message
-        #LOGGER.error(msg)
-        rm_tmp_file(plot_file_name)
+        LOGGER.error(msg)
+        rm_tmp_file(plot_png[:name])
+        rm_tmp_file(plot_svg[:name])
         @xml_report.add_paragraph(section_roc, msg)
       end  
     else
@@ -220,7 +222,8 @@ class Reports::ReportContent
       rescue Exception => ex
         msg = "WARNING could not create confidence plot: "+ex.message
         LOGGER.error(msg)
-        rm_tmp_file(plot_file_name)
+        rm_tmp_file(plot_png[:name])
+        rm_tmp_file(plot_svg[:name])
         @xml_report.add_paragraph(section_conf, msg)
       end   
     else

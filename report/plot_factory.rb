@@ -115,7 +115,9 @@ module Reports
             LOGGER.warn "could not create ROC plot for "+value.to_s
           end
         end
-        RubyPlot::plot_lines(out_file, "ROC-Plot", x_label, y_label, names, fp_rates, tp_rates )
+        out_files.each do |out_file|
+          RubyPlot::plot_lines(out_file, "ROC-Plot", x_label, y_label, names, fp_rates, tp_rates )
+        end  
       else
         data = transform_roc_predictions(validation_set, class_value, show_single_curves)
         labels = []
