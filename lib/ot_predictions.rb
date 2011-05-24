@@ -121,8 +121,9 @@ module Lib
             end
           end
   
-          raise "more predicted than test compounds test:"+compounds.size.to_s+" < prediction:"+
-            prediction_dataset.compounds.size.to_s if compounds.size < prediction_dataset.compounds.size
+          raise "more predicted than test compounds, #test: "+compounds.size.to_s+" < #prediction: "+
+            prediction_dataset.compounds.size.to_s+", test-dataset: "+test_dataset_uri.to_s+", prediction-dataset: "+
+             prediction_dataset_uri if compounds.size < prediction_dataset.compounds.size
           if CHECK_VALUES
             prediction_dataset.compounds.each do |c| 
               raise "predicted compound not found in test dataset:\n"+c+"\ntest-compounds:\n"+
