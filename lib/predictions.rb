@@ -481,7 +481,12 @@ module Lib
     end
     
     def r_square
-      return sample_correlation_coefficient ** 2
+      #return sample_correlation_coefficient ** 2
+      
+      # see http://en.wikipedia.org/wiki/Coefficient_of_determination#Definitions
+      # see http://web.maths.unsw.edu.au/~adelle/Garvan/Assays/GoodnessOfFit.html
+      r_2 = 1 - residual_sum_of_squares / total_sum_of_squares
+      ( r_2.infinite? || r_2.nan? ) ? 0 : r_2
     end
     
     def sample_correlation_coefficient
@@ -493,7 +498,16 @@ module Lib
     end
     
     def total_sum_of_squares
-      return @variance_actual * ( @num_predicted - 1 )
+      #return @variance_actual * ( @num_predicted - 1 )
+      sum = 0
+      @predicted_values.size.times do |i|
+        sum += (@actual_values[i]-@actual_mean)**2 if @predicted_values[i]!=nil
+      end
+      sum
+    end
+    
+    def residual_sum_of_squares
+      sum_squared_error
     end
     
     def target_variance_predicted
