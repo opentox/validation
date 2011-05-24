@@ -122,6 +122,9 @@ get '/crossvalidation/:id/statistics' do
        "The averaged statistics for the crossvalidation."
     content_type "text/html"
     OpenTox.text_to_html v.to_yaml,@subjectid,related_links,description
+  when "application/rdf+xml"
+    content_type "application/rdf+xml"
+    v.to_rdf
   else
     content_type "application/x-yaml"
     v.to_yaml
