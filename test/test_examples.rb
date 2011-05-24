@@ -100,7 +100,7 @@ module ValidationExamples
   
     class EPAFHMCrossvalidation < CrossValidation
     def initialize
-      @dataset_file = File.new("data/EPAFHM.med.csv","r")
+      @dataset_file = File.new("data/EPAFHM.csv","r")
       #@prediction_feature = "http://ot-dev.in-silico.ch/toxcreate/feature#IRIS%20unit%20risk"
       @num_folds = 10
     end
@@ -505,6 +505,26 @@ module ValidationExamples
     end
   end  
   
+  class AnotherAmbitJ48TrainingTest < TrainingTestValidation
+    def initialize
+      @algorithm_uri = "http://apps.ideaconsult.net:8080/ambit2/algorithm/J48"
+      @training_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/585758"
+      @test_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/585758"
+      @prediction_feature= "http://apps.ideaconsult.net:8080/ambit2/feature/111148"
+    end
+  end    
+
+ class TumTrainingTest < TrainingTestValidation
+    def initialize
+      @algorithm_uri = "http://lxkramer34.informatik.tu-muenchen.de:8080/OpenTox-dev/algorithm/kNNclassification"
+      @training_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/585758"
+      @test_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/585758"
+      @prediction_feature= "http://apps.ideaconsult.net:8080/ambit2/feature/111148"
+    end
+  end    
+
+  
+ 
   
   class LazarVsNtuaCrossvalidation < CrossValidation
     def initialize
@@ -803,7 +823,11 @@ module ValidationExamples
       "22b" =>  [ NtuaTrainingTestSplit ],
       "22c" =>  [ NtuaCrossvalidation ],
       "22d" =>  [ LazarVsNtuaCrossvalidation ],
+
+      #impt      
       "22e" =>  [ AmbitVsNtuaTrainingTest ],
+      "22f" =>  [ AnotherAmbitJ48TrainingTest ],
+      "22g" =>  [ TumTrainingTest ],
       
     }
   

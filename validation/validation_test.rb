@@ -60,7 +60,23 @@ class ValidationTest < Test::Unit::TestCase
     begin
       $test_case = self
       
-      #get 'crossvalidation/138/statistics'
+#      post "/validate_datasets",{
+#        :test_dataset_uri=>"http://local-ot/dataset/6907",
+#        :prediction_dataset_uri=>"http://local-ot/dataset/6909",
+#        :test_target_dataset_uri=>"http://local-ot/dataset/6905",
+#        :prediction_feature=>"http://local-ot/dataset/6905/feature/Hamster%20Carcinogenicity",
+#        #:model_uri=>"http://local-ot/model/1078",
+#        :predicted_variable=>"http://local-ot/dataset/6909/feature/prediction/Hamster%20Carcinogenicity/value",
+#        :predicted_confidence=>"http://local-ot/dataset/6909/feature/prediction/Hamster%20Carcinogenicity/confidence",
+#        #:regression=>"true"}
+#        :classification=>"true"}
+#        
+#      puts last_response.body
+#      uri = last_response.body
+#      rep = wait_for_task(uri)
+#      puts rep
+      
+      #get 'crossvalidation/19/statistics'
       #get 'crossvalidation/189/statistics'
       #puts last_response.body
 #      run_test("1b")       
@@ -68,7 +84,9 @@ class ValidationTest < Test::Unit::TestCase
       #get '/crossvalidation/79/predictions',nil,'HTTP_ACCEPT' => "application/x-yaml"
       #puts last_response.body
       
-      #run_test("22e") #,:validation_uri=>"http://local-ot/validation/84" )
+      run_test("22f") #,:validation_uri=>"http://local-ot/validation/84" )
+    
+
       #run_test("21b")
       #run_test("21c")
 
@@ -97,16 +115,16 @@ class ValidationTest < Test::Unit::TestCase
 #      rep = wait_for_task(uri)
 #      puts rep
       
-      #run_test("1a", {:validation_uri=>"http://local-ot/validation/466"})
+      #run_test("1a", {:validation_uri=>"http://local-ot/validation/305"})
 #      puts "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-      #run_test("3a",{:validation_uri=>"http://local-ot/validation/crossvalidation/149"})
+      #run_test("3a",{:validation_uri=>"http://local-ot/validation/crossvalidation/6"})
       #puts "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-      #run_test("13a", {:validation_uri=>"http://local-ot/validation/406"})
+     #run_test("13a") #, {:validation_uri=>"http://local-ot/validation/406"})
 #      puts "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-      #run_test("14a",{:validation_uri=>"http://local-ot/validation/crossvalidation/148"})
+      #run_test("14a") #,{:validation_uri=>"http://local-ot/validation/crossvalidation/148"})
 #      puts "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
-      run_test("1a")
+      #run_test("1a")
       
 #      run_test("3d",{
 #        :dataset_uri => "http://local-ot/dataset/2897", 
