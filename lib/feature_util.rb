@@ -42,19 +42,15 @@ module Lib
         d.load_features(subjectid)
         d.features.keys.each do |f|
           if d.features[f][OT.hasSource]==model.uri
-            puts "source matching"
             # PENDING identify confidence
             if f =~ /(?i)confidence/
-              puts "conf matiching"
               raise "duplicate confidence feature, what to choose?" if predicted_confidence!=nil
               predicted_confidence = f
             elsif d.features[f][RDF.type].include? OT.ModelPrediction
-              puts "type include prediction"
               raise "duplicate predicted variable, what to choose?" if predicted_variable!=nil
               predicted_variable = f
             end
           end
-          puts d.features[f][OT.hasSource]
         end
         raise "could not estimate predicted variable" unless predicted_variable
       end
