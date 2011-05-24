@@ -45,16 +45,6 @@ module Lib
       raise "illegal num confidence values "+num_info if  @confidence_values.size != @predicted_values.size
       
       @confidence_values.each{ |c| raise "illegal confidence value: '"+c.to_s+"'" unless c==nil or (c.is_a?(Numeric) and c>=0 and c<=1) }
-      ## check if there is more than one different conf value
-      ## DEPRECATED? not sure anymore what this was about, 
-      ##             I am pretty sure this was for r-plot of roc curves
-      ##             roc curvers are now plotted manually
-      #conf_val_tmp = {}
-      #@confidence_values.each{ |c| conf_val_tmp[c] = nil }
-      #if conf_val_tmp.keys.size<2
-      #  LOGGER.warn("prediction w/o confidence values");
-      #  @confidence_values=nil
-      #end
       
       case @feature_type
       when "classification"
@@ -75,11 +65,13 @@ module Lib
       
       init_stats()
       (0..@predicted_values.size-1).each do |i|
-        update_stats( @predicted_values[i], @actual_values[i], (@confidence_values!=nil)?@confidence_values[i]:nil )
+        update_stats( @predicted_values[i], @actual_values[i], @confidence_values[i] )
       end
     end
     
     def init_stats
+      @conf_provided = false
+      
       @num_no_actual_value = 0
       @num_with_actual_value = 0 
       
@@ -134,6 +126,8 @@ module Lib
         else
           @num_predicted += 1
           
+          @conf_provided |= confidence_value!=nil
+          
           case @feature_type
           when "classification"
             @confusion_matrix[actual_value][predicted_value] += 1
@@ -186,6 +180,7 @@ module Lib
     end
     
     def weighted_accuracy
+      return 0 unless confidence_values_available?      
       raise "no classification" unless @feature_type=="classification"
       total = 0
       correct = 0
@@ -255,7 +250,7 @@ module Lib
     def area_under_roc(class_index=nil)
       return prediction_feature_value_map( lambda{ |i| area_under_roc(i) } ) if 
         class_index==nil
-      return 0.0 if @confidence_values==nil
+      return 0 unless confidence_values_available?
       
       LOGGER.warn("TODO: implement approx computiation of AUC,"+
         "so far Wilcoxon-Man-Whitney is used (exponential)") if 
@@ -485,7 +480,9 @@ module Lib
       
       # see http://en.wikipedia.org/wiki/Coefficient_of_determination#Definitions
       # see http://web.maths.unsw.edu.au/~adelle/Garvan/Assays/GoodnessOfFit.html
-      r_2 = 1 - residual_sum_of_squares / total_sum_of_squares
+      ss_tot = total_sum_of_squares
+      return 0 if ss_tot==0
+      r_2 = 1 - residual_sum_of_squares / ss_tot
       ( r_2.infinite? || r_2.nan? ) ? 0 : r_2
     end
     
@@ -523,7 +520,7 @@ module Lib
     def get_prediction_values(class_value)
       
       #puts "get_roc_values for class_value: "+class_value.to_s
-      raise "no confidence values" if @confidence_values==nil
+      raise "no confidence values" unless confidence_values_available?
       #raise "no class-value specified" if class_value==nil
       
       class_index = @accept_values.index(class_value) if class_value!=nil
@@ -594,7 +591,7 @@ module Lib
     end
     
     def confidence_values_available?
-      return @confidence_values!=nil
+      @conf_provided
     end
     
     ###################################################################################################################

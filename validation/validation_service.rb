@@ -46,9 +46,15 @@ module Validation
         test_target_dataset_uris = vals.collect{|v| v.test_target_dataset_uri}
         prediction_feature = vals.first.prediction_feature
         prediction_dataset_uris = vals.collect{|v| v.prediction_dataset_uri}
-        predicted_variables = models.collect{|m| m.metadata[OT.predictedVariables]}
+        predicted_variables = []
+        predicted_confidences = []
+        models.size.times do |i|
+          predicted = Lib::FeatureUtil.predicted_variables(models[i], prediction_dataset_uris[i], subjectid)
+          predicted_variables << predicted[:predicted_variable]
+          predicted_confidences << predicted[:predicted_confidence]
+        end
         prediction = Lib::OTPredictions.new( feature_type, test_dataset_uris, test_target_dataset_uris, prediction_feature, 
-          prediction_dataset_uris, predicted_variables, subjectid )
+          prediction_dataset_uris, predicted_variables, predicted_confidences, subjectid )
           
         v = Validation.new
         case feature_type
@@ -218,13 +224,15 @@ module Validation
       dependentVariables = model.metadata[OT.dependentVariables]
       prediction_feature = self.prediction_feature ? nil : dependentVariables
       algorithm_uri = self.algorithm_uri ? nil : model.metadata[OT.algorithm]
-      predictedVariables = model.metadata[OT.predictedVariables]
-      compute_validation_stats( model.feature_type(self.subjectid), predictedVariables, 
+      predicted_variables = Lib::FeatureUtil.predicted_variables(model, prediction_dataset_uri, subjectid)
+      predicted_variable = predicted_variables[:predicted_variable]
+      predicted_confidence = predicted_variables[:predicted_confidence]
+      compute_validation_stats( model.feature_type(self.subjectid), predicted_variable, predicted_confidence, 
         prediction_feature, algorithm_uri, dry_run, task )
     end
       
-    def compute_validation_stats( feature_type, predicted_feature, prediction_feature=nil, 
-        algorithm_uri=nil, dry_run=false, task=nil )
+    def compute_validation_stats( feature_type, predicted_variable, predicted_confidence, prediction_feature, 
+        algorithm_uri, dry_run, task )        
       
 #      self.attributes = { :prediction_feature => prediction_feature } if self.prediction_feature==nil && prediction_feature
 #      self.attributes = { :algorithm_uri => algorithm_uri } if self.algorithm_uri==nil && algorithm_uri
@@ -237,7 +245,7 @@ module Validation
       LOGGER.debug "computing prediction stats"
       prediction = Lib::OTPredictions.new( feature_type, 
         self.test_dataset_uri, self.test_target_dataset_uri, self.prediction_feature, 
-        self.prediction_dataset_uri, predicted_feature, self.subjectid, OpenTox::SubTask.create(task, 0, 80) )
+        self.prediction_dataset_uri, predicted_variable, predicted_confidence, self.subjectid, OpenTox::SubTask.create(task, 0, 80) )
       #reading datasets and computing the main stats is 80% the work 
       
       unless dry_run

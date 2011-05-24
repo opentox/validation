@@ -139,6 +139,11 @@ module Reports
       @predicted_variable = Reports.validation_access.predicted_variable(self, @subjectid) 
     end
     
+    def predicted_confidence
+      return @predicted_confidence if @predicted_confidence!=nil
+      @predicted_confidence = Reports.validation_access.predicted_confidence(self, @subjectid) 
+    end    
+    
     # loads all crossvalidation attributes, of the corresponding cv into this object 
     def load_cv_attributes
       raise "crossvalidation-id not set" unless @crossvalidation_id

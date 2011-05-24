@@ -16,16 +16,18 @@ module Lib
     end
   
     def initialize( feature_type, test_dataset_uris, test_target_dataset_uris, 
-      prediction_feature, prediction_dataset_uris, predicted_variables, subjectid=nil, task=nil)
+      prediction_feature, prediction_dataset_uris, predicted_variables, predicted_confidences, subjectid=nil, task=nil)      
       
         test_dataset_uris = [test_dataset_uris] unless test_dataset_uris.is_a?(Array)
         test_target_dataset_uris = [test_target_dataset_uris] unless test_target_dataset_uris.is_a?(Array)
         prediction_dataset_uris = [prediction_dataset_uris] unless prediction_dataset_uris.is_a?(Array)
         predicted_variables = [predicted_variables] unless predicted_variables.is_a?(Array)
+        predicted_confidences = [predicted_confidences] unless predicted_confidences.is_a?(Array)
         LOGGER.debug "loading prediciton -- test-dataset:       "+test_dataset_uris.inspect
         LOGGER.debug "loading prediciton -- test-target-datset: "+test_target_dataset_uris.inspect
         LOGGER.debug "loading prediciton -- prediction-dataset: "+prediction_dataset_uris.inspect
         LOGGER.debug "loading prediciton -- predicted_variable: "+predicted_variables.inspect
+        LOGGER.debug "loading prediciton -- predicted_confidence: "+predicted_confidences.inspect
         LOGGER.debug "loading prediciton -- prediction_feature: "+prediction_feature.to_s
         raise "prediction_feature missing" unless prediction_feature
         
@@ -46,6 +48,7 @@ module Lib
           test_target_dataset_uri = test_target_dataset_uris[i]
           prediction_dataset_uri = prediction_dataset_uris[i]
           predicted_variable = predicted_variables[i]
+          predicted_confidence = predicted_confidences[i]
           
           predicted_variable=prediction_feature if predicted_variable==nil
         
@@ -72,7 +75,7 @@ module Lib
                   "test_target_dataset: '"+test_target_dataset_uri.to_s+"'\n"+
                   "available features are: "+test_target_dataset.features.inspect if test_target_dataset.features.keys.index(prediction_feature)==nil
           end
-            
+          
           compounds = test_dataset.compounds
           LOGGER.debug "test dataset size: "+compounds.size.to_s
           raise "test dataset is empty "+test_dataset_uri.to_s unless compounds.size>0
@@ -92,35 +95,24 @@ module Lib
           compounds.each do |c|
             case feature_type
             when "classification"
-              actual_values << classification_value(test_target_dataset, c, prediction_feature, accept_values)
+              actual_values << classification_val(test_target_dataset, c, prediction_feature, accept_values)
             when "regression"
-              actual_values << regression_value(test_target_dataset, c, prediction_feature)
+              actual_values << regression_val(test_target_dataset, c, prediction_feature)
             end
           end
           task.progress( task_status += task_step ) if task # loaded actual values
         
           prediction_dataset = Lib::DatasetCache.find prediction_dataset_uri,subjectid
           raise "prediction dataset not found: '"+prediction_dataset_uri.to_s+"'" unless prediction_dataset
-        
-          # TODO: remove LAZAR_PREDICTION_DATASET_HACK
-          no_prediction_feature = prediction_dataset.features.keys.index(predicted_variable)==nil
-          if no_prediction_feature
-            one_entry_per_compound = true
-            compounds.each do |c|
-              if prediction_dataset.data_entries[c] and prediction_dataset.data_entries[c].size != 1
-                one_entry_per_compound = false
-                break
-              end
-            end
-            msg = "prediction-feature not found: '"+predicted_variable+"' in prediction-dataset: "+prediction_dataset_uri.to_s+", available features: "+
-              prediction_dataset.features.keys.inspect
-            if one_entry_per_compound
-              LOGGER.warn msg
-            else
-              raise msg
-            end
-          end
-  
+          raise "predicted_variable not found in prediction_dataset\n"+
+                  "predicted_variable '"+predicted_variable.to_s+"'\n"+
+                  "prediction_dataset: '"+prediction_dataset_uri.to_s+"'\n"+
+                  "available features are: "+prediction_dataset.features.inspect if prediction_dataset.features.keys.index(predicted_variable)==nil
+          raise "predicted_confidence not found in prediction_dataset\n"+
+                  "predicted_confidence '"+predicted_confidence.to_s+"'\n"+
+                  "prediction_dataset: '"+prediction_dataset_uri.to_s+"'\n"+
+                  "available features are: "+prediction_dataset.features.inspect if predicted_confidence and prediction_dataset.features.keys.index(predicted_confidence)==nil
+
           raise "more predicted than test compounds, #test: "+compounds.size.to_s+" < #prediction: "+
             prediction_dataset.compounds.size.to_s+", test-dataset: "+test_dataset_uri.to_s+", prediction-dataset: "+
              prediction_dataset_uri if compounds.size < prediction_dataset.compounds.size
@@ -141,25 +133,18 @@ module Lib
             else
               case feature_type
               when "classification"
-                # TODO: remove LAZAR_PREDICTION_DATASET_HACK
-                predicted_values << classification_value(prediction_dataset, c, no_prediction_feature ? nil : predicted_variable, accept_values)
+                predicted_values << classification_val(prediction_dataset, c, predicted_variable, accept_values)
               when "regression"
-                predicted_values << regression_value(prediction_dataset, c, no_prediction_feature ? nil : predicted_variable)
+                predicted_values << regression_val(prediction_dataset, c, predicted_variable)
               end
-              # TODO confidence_values << prediction_dataset.get_prediction_confidence(c, predicted_variable)
-              conf = predicted_values[count]!=nil ? 1 : nil 
-              begin
-                feature = prediction_dataset.data_entries[c].keys[0]
-                feature_data = prediction_dataset.features[feature]
-                conf = feature_data[OT.confidence].to_f if feature_data[OT.confidence]!=nil 
-              rescue
-                LOGGER.warn "could not get confidence"
+              if predicted_confidence
+                confidence_values << confidence_val(prediction_dataset, c, predicted_confidence)
+              else
+                confidence_values << nil
               end
-              confidence_values << conf
             end
             count += 1
           end
-          
           @compounds += compounds
           all_predicted_values += predicted_values
           all_actual_values += actual_values
@@ -174,7 +159,7 @@ module Lib
     end
     
     private
-    def regression_value(dataset, compound, feature)
+    def regression_val(dataset, compound, feature)
       v = value(dataset, compound, feature)
       begin
         v = v.to_f unless v==nil or v.is_a?(Numeric)
@@ -185,7 +170,18 @@ module Lib
       end
     end
     
-    def classification_value(dataset, compound, feature, accept_values)
+    def confidence_val(dataset, compound, confidence)
+      v = value(dataset, compound, confidence)
+      begin
+        v = v.to_f unless v==nil or v.is_a?(Numeric)
+        v
+      rescue
+        LOGGER.warn "no numeric value for confidence '"+v.to_s+"'"
+        nil
+      end
+    end
+    
+    def classification_val(dataset, compound, feature, accept_values)
       v = value(dataset, compound, feature)
       i = accept_values.index(v.to_s)
       raise "illegal class_value of prediction (value is '"+v.to_s+"'), accept values are "+
@@ -239,6 +235,10 @@ module Lib
     
     def self.to_array( predictions, add_pic=false, format=false )
   
+      confidence_available = false
+      predictions.each do |p|
+        confidence_available |= p.confidence_values_available?
+      end
       res = []
       conf_column = nil
       predictions.each do |p|
@@ -269,9 +269,9 @@ module Lib
               a << nil
             end
           end
-          if p.confidence_values_available?
+          if confidence_available
             conf_column = a.size if conf_column==nil
-            a << p.confidence_value(i) #(format ? p.confidence_value(i).to_nice_s : p.confidence_value(i))
+            a << p.confidence_value(i)
           end
           a << p.identifier(i)
           res << a
@@ -279,6 +279,7 @@ module Lib
       end
       
       if conf_column!=nil
+        LOGGER.debug "sort via confidence: "+res.collect{|n| n[conf_column]}.inspect
         res = res.sort_by{ |n| n[conf_column] || 0 }.reverse
         if format
           res.each do |a|

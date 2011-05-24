@@ -4,6 +4,7 @@
 end
 
 require 'lib/dataset_cache.rb'
+require 'lib/feature_util.rb'
 require 'validation/validation_service.rb'
 
 get '/crossvalidation/?' do
@@ -443,21 +444,22 @@ post '/validate_datasets' do
     params[:validation_type] = "validate_datasets" 
     
     if params[:model_uri]
+      raise OpenTox::BadRequestError.new "please specify 'model_uri' or set either 'classification' or 'regression' flag" if params[:classification] or params[:regression]
       v = Validation::Validation.create params
       v.subjectid = @subjectid
       v.compute_validation_stats_with_model(nil,false,task)
     else
       raise OpenTox::BadRequestError.new "please specify 'model_uri' or 'prediction_feature'" unless params[:prediction_feature]
-      raise OpenTox::BadRequestError.new "please specify 'model_uri' or 'predicted_feature'" unless params[:predicted_feature]
+      raise OpenTox::BadRequestError.new "please specify 'model_uri' or 'predicted_variable'" unless params[:predicted_variable]
       raise OpenTox::BadRequestError.new "please specify 'model_uri' or set either 'classification' or 'regression' flag" unless 
             params[:classification] or params[:regression]
-      
-      predicted_feature = params.delete("predicted_feature")
+      predicted_variable = params.delete("predicted_variable")
+      predicted_confidence = params.delete("predicted_confidence")
       feature_type = "classification" if params.delete("classification")!=nil
       feature_type = "regression" if params.delete("regression")!=nil
       v = Validation::Validation.create params  
       v.subjectid = @subjectid
-      v.compute_validation_stats(feature_type,predicted_feature,nil,nil,false,task)
+      v.compute_validation_stats(feature_type,predicted_variable,predicted_confidence,nil,nil,false,task)
     end
     v.validation_uri
   end

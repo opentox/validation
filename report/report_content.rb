@@ -287,12 +287,9 @@ class Reports::ReportContent
     
     section_bar = @xml_report.add_section(@current_section, section_title)
     @xml_report.add_paragraph(section_bar, section_text) if section_text
-    
-    plot_file_name = "bar_plot"+@tmp_file_count.to_s+".png"
-    @tmp_file_count += 1
-    plot_file_path = add_tmp_file(plot_file_name)
-    Reports::PlotFactory.create_bar_plot(plot_file_path, validation_set, title_attribute, value_attributes )
-    @xml_report.add_imagefigure(section_bar, image_title, plot_file_name, "PNG", 100, image_caption)
+    plot_bar = add_tmp_file("bar_plot", "svg")
+    Reports::PlotFactory.create_bar_plot(plot_bar[:path], validation_set, title_attribute, value_attributes )
+    @xml_report.add_imagefigure(section_bar, image_title, plot_bar[:name], "PNG", 100, image_caption)
   end  
   
   private

@@ -100,15 +100,17 @@ class Reports::ValidationDB
   def get_predictions(validation, subjectid=nil, task=nil)
     Lib::OTPredictions.new( validation.feature_type, validation.test_dataset_uri, 
       validation.test_target_dataset_uri, validation.prediction_feature, validation.prediction_dataset_uri, 
-      validation.predicted_variable, subjectid, task)
+      validation.predicted_variable, validation.predicted_confidence, subjectid, task)
   end
   
   def get_accept_values( validation, subjectid=nil )
     # PENDING So far, one has to load the whole dataset to get the accept_value from ambit
-    d = Lib::DatasetCache.find( validation.test_target_dataset_uri, subjectid )
-    raise "cannot get test target dataset for accept values, dataset: "+validation.test_target_dataset_uri.to_s unless d
+    test_target_dataset = validation.test_target_dataset_uri
+    test_target_dataset = validation.test_dataset_uri unless test_target_dataset
+    d = Lib::DatasetCache.find( test_target_dataset, subjectid )
+    raise "cannot get test target dataset for accept values, dataset: "+test_target_dataset.to_s unless d
     accept_values = d.features[validation.prediction_feature][OT.acceptValue]
-    raise "cannot get accept values from dataset "+validation.test_target_dataset_uri.to_s+" for feature "+
+    raise "cannot get accept values from dataset "+test_target_dataset.to_s+" for feature "+
       validation.prediction_feature+":\n"+d.features[validation.prediction_feature].to_yaml unless accept_values!=nil
     accept_values
   end
@@ -122,9 +124,15 @@ class Reports::ValidationDB
     raise "cannot derive model depended props for merged validations" if Lib::MergeObjects.merged?(validation)
     model = OpenTox::Model::Generic.find(validation.model_uri, subjectid)
     raise OpenTox::NotFoundError.new "model not found '"+validation.model_uri+"'" unless model
-    model.metadata[OT.predictedVariables]
-    #get_model(validation).predictedVariables
+    Lib::FeatureUtil.predicted_variables(model, validation.prediction_dataset_uri, subjectid)[:predicted_variable]
   end
+  
+  def predicted_confidence(validation, subjectid=nil)
+    raise "cannot derive model depended props for merged validations" if Lib::MergeObjects.merged?(validation)
+    model = OpenTox::Model::Generic.find(validation.model_uri, subjectid)
+    raise OpenTox::NotFoundError.new "model not found '"+validation.model_uri+"'" unless model
+    Lib::FeatureUtil.predicted_variables(model, validation.prediction_dataset_uri, subjectid)[:predicted_confidence]
+  end  
   
 #  private
 #  def get_model(validation)
