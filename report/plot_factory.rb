@@ -163,9 +163,10 @@ module Reports
     end
     
     
-    def self.create_bar_plot( out_file, validation_set, title_attribute, value_attributes )
+    def self.create_bar_plot( out_files, validation_set, title_attribute, value_attributes )
   
-      LOGGER.debug "creating bar plot, out-file:"+out_file.to_s
+      out_files = [out_files] unless out_files.is_a?(Array)
+      LOGGER.debug "creating bar plot, out-files:"+out_files.inspect
       
       data = []
       titles = []
@@ -214,7 +215,9 @@ module Reports
       LOGGER.debug "bar plot labels: "+labels.inspect 
       LOGGER.debug "bar plot data: "+data.inspect
       
-      RubyPlot::plot_bars('Bar plot', labels, data, out_file)
+      out_files.each do |out_file|
+        RubyPlot::plot_bars('Bar plot', labels, data, out_file)
+      end
     end
     
     
