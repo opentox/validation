@@ -181,7 +181,7 @@ module Reports
     #
     def add_table( element, title, table_values, first_row_header=true, first_col_header=false, transpose=false, auto_link_urls=true )
       
-      raise "table_values is not mulit-dimensional-array" unless table_values && table_values.is_a?(Array) && table_values[0].is_a?(Array) 
+      raise "table_values is not multi-dimensional-array" unless table_values && table_values.is_a?(Array) && table_values[0].is_a?(Array) 
       
       values = transpose ? table_values.transpose : table_values
       
@@ -231,8 +231,10 @@ module Reports
               space.text = " "
               entry << space
            end
-          else
-           entry.text = v.to_s
+         else
+           text = v.to_s
+           text.gsub!(/\+\-/,"&plusmn;")
+           entry << Text.new(text, true, nil, true)
           end
           row << entry
         end
