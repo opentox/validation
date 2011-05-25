@@ -331,6 +331,7 @@ module Validation
         raise "validation '"+validation.validation_uri+"' for crossvaldation could not be finished" unless 
           validation.finished
         i += 1
+        LOGGER.debug "fold "+i.to_s+" done: "+validation.validation_uri.to_s
       end
       
 #      self.attributes = { :finished => true }
