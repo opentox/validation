@@ -9,7 +9,7 @@ require 'validation/validation_service.rb'
 
 get '/crossvalidation/?' do
   LOGGER.info "list all crossvalidations"
-  uri_list = Lib::OhmUtil.find( Validation::Crossvalidation, params ).collect{|v| v.crossvalidation_uri}.join("\n") + "\n"
+  uri_list = Lib::OhmUtil.find( Validation::Crossvalidation, params ).sort.collect{|v| v.crossvalidation_uri}.join("\n") + "\n"
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
       "Single validations:      "+url_for("/",:full)+"\n"+
@@ -190,7 +190,7 @@ end
 get '/?' do
   
   LOGGER.info "list all validations, params: "+params.inspect
-  uri_list = Lib::OhmUtil.find( Validation::Validation, params ).collect{|v| v.validation_uri}.join("\n") + "\n"
+  uri_list = Lib::OhmUtil.find( Validation::Validation, params ).sort.collect{|v| v.validation_uri}.join("\n") + "\n"
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
       "To perform a validation:\n"+
@@ -244,7 +244,7 @@ get '/test_set_validation' do
   #uri_list = Validation::Validation.all( :validation_type => "test_set_validation" ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #params[:validation_type] = "test_set_validation"
   #uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  uri_list = Validation::Validation.find(:validation_type => "test_set_validation").collect{|v| v.validation_uri}.join("\n") + "\n"
+  uri_list = Validation::Validation.find(:validation_type => "test_set_validation").sort.collect{|v| v.validation_uri}.join("\n") + "\n"
   
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
@@ -289,7 +289,7 @@ get '/training_test_validation' do
   #uri_list = Validation::Validation.all( :validation_type => "training_test_validation" ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #params[:validation_type] = "training_test_validation"
   #uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  uri_list = Validation::Validation.find(:validation_type => "training_test_validation").collect{|v| v.validation_uri}.join("\n") + "\n"
+  uri_list = Validation::Validation.find(:validation_type => "training_test_validation").sort.collect{|v| v.validation_uri}.join("\n") + "\n"
   
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
@@ -339,7 +339,7 @@ get '/bootstrapping' do
   #uri_list = Validation::Validation.all( :validation_type => "bootstrapping" ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #params[:validation_type] = "bootstrapping"
   #uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  uri_list = Validation::Validation.find(:validation_type => "bootstrapping").collect{|v| v.validation_uri}.join("\n") + "\n"
+  uri_list = Validation::Validation.find(:validation_type => "bootstrapping").sort.collect{|v| v.validation_uri}.join("\n") + "\n"
   
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
@@ -391,7 +391,7 @@ get '/training_test_split' do
   #uri_list = Validation::Validation.all( :validation_type => "training_test_split" ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #params[:validation_type] = "training_test_split"
   #uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  uri_list = Validation::Validation.find(:validation_type => "training_test_split").collect{|v| v.validation_uri}.join("\n") + "\n"
+  uri_list = Validation::Validation.find(:validation_type => "training_test_split").sort.collect{|v| v.validation_uri}.join("\n") + "\n"
   
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
