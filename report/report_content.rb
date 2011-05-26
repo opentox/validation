@@ -126,7 +126,7 @@ class Reports::ReportContent
   
   # bit of a hack to algin the last two plots in the report in to one row 
   def align_last_two_images( title )
-    @xml_report.align_last_two_elements(@current_section, title )
+    @xml_report.align_last_two_images(@current_section, title )
   end
   
   def add_regression_plot( validation_set,

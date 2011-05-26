@@ -134,7 +134,7 @@ module Reports
     end
     
     # bit of a hack to algin the last two figures that have been added to element into one row
-    def align_last_two_figures( element, title  )
+    def align_last_two_images( element, title  )
       imgs = []
       element.elements.each do |e|
         imgs[0] = imgs[1]
