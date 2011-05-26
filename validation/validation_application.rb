@@ -12,8 +12,9 @@ get '/crossvalidation/?' do
   uri_list = Lib::OhmUtil.find( Validation::Crossvalidation, params ).sort.collect{|v| v.crossvalidation_uri}.join("\n") + "\n"
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
-      "Single validations:      "+url_for("/",:full)+"\n"+
-      "Crossvalidation reports: "+url_for("/report/crossvalidation",:full)
+      "Single validations:             "+url_for("/",:full)+"\n"+
+      "Leave-one-out crossvalidations: "+url_for("/crossvalidation/loo",:full)+"\n"+
+      "Crossvalidation reports:        "+url_for("/report/crossvalidation",:full)
     description = 
       "A list of all crossvalidations.\n"+
       "Use the POST method to perform a crossvalidation."
@@ -36,7 +37,8 @@ post '/crossvalidation/?' do
       params[:num_folds].to_i>1
     
     cv_params = { :dataset_uri => params[:dataset_uri],  
-                  :algorithm_uri => params[:algorithm_uri] }
+                  :algorithm_uri => params[:algorithm_uri],
+                  :loo => "false" }
     [ :num_folds, :random_seed ].each{ |sym| cv_params[sym] = params[sym] if params[sym] }
     cv_params[:stratified] = (params[:stratified].size>0 && params[:stratified]!="false" && params[:stratified]!="0") if params[:stratified]
     cv = Validation::Crossvalidation.create cv_params
@@ -70,11 +72,47 @@ post '/crossvalidation/cleanup/?' do
 end
 
 post '/crossvalidation/loo/?' do
-  raise "not yet implemented"
+  task = OpenTox::Task.create( "Perform loo-crossvalidation", url_for("/crossvalidation/loo", :full) ) do |task| #, params
+    LOGGER.info "creating loo-crossvalidation "+params.inspect
+    raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri]
+    raise OpenTox::BadRequestError.new "algorithm_uri missing" unless params[:algorithm_uri]
+    raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature]
+    raise OpenTox::BadRequestError.new "illegal param: num_folds, stratified, random_seed not allowed for loo-crossvalidation" if params[:num_folds] or 
+      params[:stratifed] or params[:random_seed]
+    
+    cv_params = { :dataset_uri => params[:dataset_uri],  
+                  :algorithm_uri => params[:algorithm_uri],
+                  :loo => "true" }
+    cv = Validation::Crossvalidation.create cv_params
+    cv.subjectid = @subjectid
+    cv.perform_cv( params[:prediction_feature], params[:algorithm_params], task )
+    # computation of stats is cheap as dataset are already loaded into the memory
+    Validation::Validation.from_cv_statistics( cv.id, @subjectid )
+    cv.crossvalidation_uri
+  end
+  return_task(task)
 end
 
 get '/crossvalidation/loo/?' do
-  raise OpenTox::BadRequestError.new "GET operation not supported, use POST for performing a loo-crossvalidation, see "+url_for("/crossvalidation", :full)+" for crossvalidation results"
+  LOGGER.info "list all crossvalidations"
+  params[:loo]="true"
+  uri_list = Lib::OhmUtil.find( Validation::Crossvalidation, params ).sort.collect{|v| v.crossvalidation_uri}.join("\n") + "\n"
+  if request.env['HTTP_ACCEPT'] =~ /text\/html/
+    related_links = 
+      "Single validations:      "+url_for("/",:full)+"\n"+
+      "All crossvalidations:    "+url_for("/crossvalidation",:full)+"\n"+
+      "Crossvalidation reports: "+url_for("/report/crossvalidation",:full)
+    description = 
+      "A list of all leave one out crossvalidations.\n"+
+      "Use the POST method to perform a crossvalidation."
+    post_params = [[:dataset_uri,:algorithm_uri,:prediction_feature,[:algorithm_params,""]]]
+    content_type "text/html"
+    OpenTox.text_to_html uri_list,@subjectid,related_links,description,post_params
+  else
+    content_type "text/uri-list"
+    uri_list
+  end
+  
 end
 
 get '/crossvalidation/:id' do

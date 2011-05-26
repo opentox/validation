@@ -136,6 +136,7 @@ module Validation
     attribute :random_seed
     attribute :finished
     attribute :stratified
+    attribute :loo
     
     attr_accessor :subjectid
     
@@ -145,6 +146,7 @@ module Validation
     index :random_seed
     index :stratified
     index :finished
+    index :loo
 
     def self.create(params={})
       params[:date] = Time.new

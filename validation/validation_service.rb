@@ -306,9 +306,16 @@ module Validation
     
     # creates the cv folds
     def create_cv_datasets( prediction_feature, task=nil )
-      self.random_seed = 1 unless self.random_seed
-      self.num_folds = 10 unless self.num_folds
-      self.stratified = false unless self.stratified
+      if self.loo=="true"
+        orig_dataset = Lib::DatasetCache.find(self.dataset_uri,self.subjectid)
+        self.num_folds = orig_dataset.compounds.size
+        self.random_seed = 0
+        self.stratified = false
+      else
+        self.random_seed = 1 unless self.random_seed
+        self.num_folds = 10 unless self.num_folds
+        self.stratified = false unless self.stratified
+      end
       if copy_cv_datasets( prediction_feature )
         # dataset folds of a previous crossvalidaiton could be used 
         task.progress(100) if task
@@ -350,6 +357,7 @@ module Validation
         :num_folds => self.num_folds, 
         :stratified => self.stratified, 
         :random_seed => self.random_seed,
+        :loo => self.loo,
         :finished => true} ).reject{ |cv| cv.id == self.id }
       cvs.each do |cv|
         next if AA_SERVER and !OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"GET",self.subjectid)
@@ -386,7 +394,11 @@ module Validation
       orig_dataset = Lib::DatasetCache.find(self.dataset_uri,self.subjectid)
       raise OpenTox::NotFoundError.new "Dataset not found: "+self.dataset_uri.to_s unless orig_dataset
       
-      shuffled_compounds = orig_dataset.compounds.shuffle( self.random_seed )
+      if self.loo=="true"
+        shuffled_compounds = orig_dataset.compounds
+      else
+        shuffled_compounds = orig_dataset.compounds.shuffle( self.random_seed )
+      end
       
       unless self.stratified    
         split_compounds = shuffled_compounds.chunk( self.num_folds.to_i )

@@ -52,7 +52,8 @@ module Lib
             end
           end
         end
-        raise "could not estimate predicted variable" unless predicted_variable
+        raise "could not estimate predicted variable, model: '"+model.uri.to_s+"', prediction_dataset: '"+
+          prediction_dataset_uri.to_s+"'" unless predicted_variable
       end
       
       {:predicted_variable => predicted_variable, :predicted_confidence => predicted_confidence}
