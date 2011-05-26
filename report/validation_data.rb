@@ -85,7 +85,7 @@ module Reports
       VAL_ATTR_RANKING.collect{ |a| (a.to_s+"_ranking").to_sym }
     @@validation_attributes.each{ |a| attr_accessor a } 
   
-    attr_reader :predictions
+    attr_reader :predictions, :subjectid
     attr_accessor :identifier, :validation_report_uri, :crossvalidation_report_uri
     
     def initialize(uri = nil, subjectid = nil)
@@ -412,7 +412,7 @@ module Reports
       new_set = ValidationSet.new
       grouping = Util.group(@validations, [:crossvalidation_id])
       grouping.each do |g|
-        v = ReportValidation.from_cv_statistics(g[0].crossvalidation_uri)
+        v = ReportValidation.from_cv_statistics(g[0].crossvalidation_uri, g[0].subjectid)
         v.identifier = g.collect{|vv| vv.identifier}.uniq.join(";")
         new_set.validations << v 
       end
