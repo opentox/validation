@@ -109,7 +109,7 @@ class Reports::ValidationDB
     test_target_dataset = validation.test_dataset_uri unless test_target_dataset
     d = Lib::DatasetCache.find( test_target_dataset, subjectid )
     raise "cannot get test target dataset for accept values, dataset: "+test_target_dataset.to_s unless d
-    accept_values = d.features[validation.prediction_feature][OT.acceptValue]
+    accept_values = d.accept_values(validation.prediction_feature)
     raise "cannot get accept values from dataset "+test_target_dataset.to_s+" for feature "+
       validation.prediction_feature+":\n"+d.features[validation.prediction_feature].to_yaml unless accept_values!=nil
     accept_values

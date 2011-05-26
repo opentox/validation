@@ -81,7 +81,7 @@ module Lib
           raise "test dataset is empty "+test_dataset_uri.to_s unless compounds.size>0
           
           if feature_type=="classification"
-            av = test_target_dataset.features[prediction_feature][OT.acceptValue]
+            av = test_target_dataset.accept_values(prediction_feature)
             raise "'"+OT.acceptValue.to_s+"' missing/invalid for feature '"+prediction_feature.to_s+"' in dataset '"+
               test_target_dataset_uri.to_s+"', acceptValues are: '"+av.inspect+"'" if av==nil or av.length<2
             if accept_values==nil
