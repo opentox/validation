@@ -164,8 +164,7 @@ class Reports::ReportContent
                     accept_value, 
                     split_set_attribute=nil, 
                     image_title = "ROC Plot", 
-                    section_text=nil,
-                    image_caption=nil)
+                    section_text="")
                             
     #section_roc = @xml_report.add_section(@current_section, section_title)
     section_roc = @current_section
@@ -282,8 +281,7 @@ class Reports::ReportContent
                             value_attributes,
                             section_title="Bar Plot",
                             section_text=nil,
-                            image_title="Bar Plot",
-                            image_caption=nil)
+                            image_title="Bar Plot")
     
     section_bar = @xml_report.add_section(@current_section, section_title)
     @xml_report.add_paragraph(section_bar, section_text) if section_text

@@ -133,16 +133,18 @@ module Reports
       return figure 
     end
     
-    # bit of a hack to algin the last two elements that have been added to element into one row
-    def align_last_two_elements( element, title  )
+    # bit of a hack to algin the last two figures that have been added to element into one row
+    def align_last_two_figures( element, title  )
       imgs = []
-      element.elements.each do |e| 
+      element.elements.each do |e|
         imgs[0] = imgs[1]
-        imgs[1] = e
+        imgs[1] = e if e.name=="figure"
       end
-      element.delete_element imgs[0]
-      element.delete_element imgs[1]
-      add_imagefigures_in_row( element, imgs, title )
+      if (imgs[0] and imgs[1])
+        element.delete_element imgs[0]
+        element.delete_element imgs[1]
+        add_imagefigures_in_row( element, imgs, title )
+      end
     end
 
     def add_imagefigures_in_row( element, imagefigures, title )
