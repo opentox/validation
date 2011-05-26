@@ -393,7 +393,7 @@ module Validation
       else
         class_compounds = {} # "inactive" => compounds[], "active" => compounds[] .. 
         accept_values = orig_dataset.accept_values(prediction_feature)
-        raise BadRequestError.new("cannot apply stratification (not implemented for regression), acceptValue missing for prediction-feature '"+
+        raise OpenTox::BadRequestError.new("cannot apply stratification (not implemented for regression), acceptValue missing for prediction-feature '"+
           prediction_feature.to_s+"' in dataset '"+dataset_uri.to_s+"'") unless accept_values and accept_values.size>0
         accept_values.each do |value|
           class_compounds[value] = []
