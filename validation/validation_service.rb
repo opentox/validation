@@ -32,7 +32,7 @@ module Validation
   
   class Validation
     
-    def self.from_cv_statistics( cv_id, subjectid=nil )
+    def self.from_cv_statistics( cv_id, subjectid=nil, waiting_task=nil )
       v =  Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation_statistics" ).first
       unless v
         crossvalidation = Crossvalidation.get(cv_id)
@@ -49,7 +49,7 @@ module Validation
         predicted_variables = models.collect{|m| m.predicted_variable(subjectid)}
         predicted_confidences = models.collect{|m| m.predicted_confidence(subjectid)}
         prediction = Lib::OTPredictions.new( feature_type, test_dataset_uris, test_target_dataset_uris, prediction_feature, 
-          prediction_dataset_uris, predicted_variables, predicted_confidences, subjectid )
+          prediction_dataset_uris, predicted_variables, predicted_confidences, subjectid, OpenTox::SubTask.create(waiting_task, 0, 90) )
           
         v = Validation.new
         case feature_type
@@ -74,6 +74,7 @@ module Validation
         v.real_runtime = vals.collect{ |vv| vv.real_runtime }.uniq.join(";")
         v.save
       end
+      waiting_task.progress(100) if waiting_task
       v
     end
     
