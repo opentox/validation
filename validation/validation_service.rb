@@ -216,12 +216,16 @@ module Validation
       model = OpenTox::Model::Generic.find(self.model_uri, self.subjectid) if model==nil and self.model_uri
       raise OpenTox::NotFoundError.new "model not found: "+self.model_uri.to_s unless model
       
+      feature_type = model.feature_type(self.subjectid)
       dependentVariables = model.metadata[OT.dependentVariables]
       prediction_feature = self.prediction_feature ? nil : dependentVariables
       algorithm_uri = self.algorithm_uri ? nil : model.metadata[OT.algorithm]
       predicted_variable = model.predicted_variable(self.subjectid)
       predicted_confidence = model.predicted_confidence(self.subjectid)
-      compute_validation_stats( model.feature_type(self.subjectid), predicted_variable, predicted_confidence, 
+      raise "cannot determine whether model '"+model.uri.to-s+"' performs classification or regression, "+
+          "please set rdf-type of predictedVariables feature '"+predicted_variable.to_s+
+          "' to NominalFeature or NumericFeature" if (feature_type.to_s!="classification" and feature_type.to_s!="regression")        
+      compute_validation_stats( feature_type, predicted_variable, predicted_confidence, 
         prediction_feature, algorithm_uri, dry_run, task )
     end
       
