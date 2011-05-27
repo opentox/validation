@@ -46,13 +46,8 @@ module Validation
         test_target_dataset_uris = vals.collect{|v| v.test_target_dataset_uri}
         prediction_feature = vals.first.prediction_feature
         prediction_dataset_uris = vals.collect{|v| v.prediction_dataset_uri}
-        predicted_variables = []
-        predicted_confidences = []
-        models.size.times do |i|
-          predicted = Lib::FeatureUtil.predicted_variables(models[i], prediction_dataset_uris[i], subjectid)
-          predicted_variables << predicted[:predicted_variable]
-          predicted_confidences << predicted[:predicted_confidence]
-        end
+        predicted_variables = models.collect{|m| m.predicted_variable(subjectid)}
+        predicted_confidences = models.collect{|m| m.predicted_confidence(subjectid)}
         prediction = Lib::OTPredictions.new( feature_type, test_dataset_uris, test_target_dataset_uris, prediction_feature, 
           prediction_dataset_uris, predicted_variables, predicted_confidences, subjectid )
           
@@ -224,9 +219,8 @@ module Validation
       dependentVariables = model.metadata[OT.dependentVariables]
       prediction_feature = self.prediction_feature ? nil : dependentVariables
       algorithm_uri = self.algorithm_uri ? nil : model.metadata[OT.algorithm]
-      predicted_variables = Lib::FeatureUtil.predicted_variables(model, prediction_dataset_uri, subjectid)
-      predicted_variable = predicted_variables[:predicted_variable]
-      predicted_confidence = predicted_variables[:predicted_confidence]
+      predicted_variable = model.predicted_variable(self.subjectid)
+      predicted_confidence = model.predicted_confidence(self.subjectid)
       compute_validation_stats( model.feature_type(self.subjectid), predicted_variable, predicted_confidence, 
         prediction_feature, algorithm_uri, dry_run, task )
     end

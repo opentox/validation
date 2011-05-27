@@ -124,15 +124,15 @@ class Reports::ValidationDB
     raise "cannot derive model depended props for merged validations" if Lib::MergeObjects.merged?(validation)
     model = OpenTox::Model::Generic.find(validation.model_uri, subjectid)
     raise OpenTox::NotFoundError.new "model not found '"+validation.model_uri+"'" unless model
-    Lib::FeatureUtil.predicted_variables(model, validation.prediction_dataset_uri, subjectid)[:predicted_variable]
+    model.predicted_variable(subjectid)
   end
   
   def predicted_confidence(validation, subjectid=nil)
     raise "cannot derive model depended props for merged validations" if Lib::MergeObjects.merged?(validation)
     model = OpenTox::Model::Generic.find(validation.model_uri, subjectid)
     raise OpenTox::NotFoundError.new "model not found '"+validation.model_uri+"'" unless model
-    Lib::FeatureUtil.predicted_variables(model, validation.prediction_dataset_uri, subjectid)[:predicted_confidence]
-  end  
+    model.predicted_confidence(subjectid)
+  end
   
 #  private
 #  def get_model(validation)

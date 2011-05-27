@@ -36,7 +36,7 @@ module Lib
       #puts "actual:     "+actual_values.inspect
       #puts "confidence: "+confidence_values.inspect
       
-      raise "unknown feature_type: "+@feature_type.to_s unless 
+      raise "unknown feature_type: '"+@feature_type.to_s+"'" unless 
         @feature_type=="classification" || @feature_type=="regression"
       raise "no predictions" if @predicted_values.size == 0
       num_info = "predicted:"+@predicted_values.size.to_s+

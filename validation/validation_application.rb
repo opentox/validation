@@ -4,7 +4,6 @@
 end
 
 require 'lib/dataset_cache.rb'
-require 'lib/feature_util.rb'
 require 'validation/validation_service.rb'
 
 get '/crossvalidation/?' do
