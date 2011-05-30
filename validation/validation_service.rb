@@ -129,7 +129,7 @@ module Validation
       params = { :dataset_uri => self.training_dataset_uri, :prediction_feature => self.prediction_feature }
       if (algorithm_params!=nil)
         algorithm_params.split(";").each do |alg_params|
-          alg_param = alg_params.split("=")
+          alg_param = alg_params.split("=",2)
           raise OpenTox::BadRequestError.new "invalid algorithm param: '"+alg_params.to_s+"'" unless alg_param.size==2 or alg_param[0].to_s.size<1 or alg_param[1].to_s.size<1
           LOGGER.warn "algorihtm param contains empty space, encode? "+alg_param[1].to_s if alg_param[1] =~ /\s/
           params[alg_param[0].to_sym] = alg_param[1]
