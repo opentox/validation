@@ -1202,11 +1202,14 @@ module ReachReports
 #    end
 #  end
 
-  [ QsarSoftware, QsarIdentifier, QmrfAuthor, ModelAuthor, Reference, QsarGeneralInformation, ModelEndpoint, QsarEndpoint, AlgorithmExplicit, 
-    AlgorithmsDescriptor, DescriptorsGenerationSoftware, QsarAlgorithm, AppDomainSoftware, QsarApplicabilityDomain, TrainingSetData, 
-    QsarRobustness, ValidationSetData, QsarPredictivity, QsarInterpretation, Bibliography, AttachmentTrainingData, AttachmentValidationData, 
-    AttachmentDocument, QsarMiscellaneous, QmrfSummary, QmrfReport ].each do |model|
-    model.auto_upgrade!
-    model.raise_on_save_failure = true
+  mysql_lite_retry do
+    [ QsarSoftware, QsarIdentifier, QmrfAuthor, ModelAuthor, Reference, QsarGeneralInformation, ModelEndpoint, QsarEndpoint, AlgorithmExplicit, 
+      AlgorithmsDescriptor, DescriptorsGenerationSoftware, QsarAlgorithm, AppDomainSoftware, QsarApplicabilityDomain, TrainingSetData, 
+      QsarRobustness, ValidationSetData, QsarPredictivity, QsarInterpretation, Bibliography, AttachmentTrainingData, AttachmentValidationData, 
+      AttachmentDocument, QsarMiscellaneous, QmrfSummary, QmrfReport ].each do |model|
+      model.auto_upgrade!
+      model.raise_on_save_failure = true
+    end
   end
+  
 end
