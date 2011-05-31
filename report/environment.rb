@@ -1,12 +1,10 @@
 
 ['rubygems', 'logger', 'fileutils', 'sinatra', 'sinatra/url_for', 'rest_client', 
-  'yaml', 'fileutils', 'mime/types', 'abbrev', 'rinruby',
+  'yaml', 'fileutils', 'mime/types', 'abbrev', 
   'rexml/document',  'ruby-plot', 'opentox-ruby' ].each do |g|
     require g
 end
 gem 'ruby-plot', "~>0.5.0"
-
-#R.quit
 
 module Reports
 end

@@ -48,6 +48,7 @@ class Reports::ReportContent
       @xml_report.add_table(section_test, test_attribute.to_s+", significance-level: "+level.to_s+", num results: "+
         test_matrix[:num_results].to_s, table, true, true)
     end
+    Reports::ReportStatisticalTest.quit_r
   end
   
   def add_predictions( validation_set, 
