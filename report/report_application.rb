@@ -7,7 +7,7 @@ end
 
 def get_docbook_resource(filepath)
   perform do |rs|
-    halt 404,"not found: "+filepath unless File.exist?(filepath)
+    raise OpenTox::NotFoundError.new"not found: "+filepath unless File.exist?(filepath)
     types = MIME::Types.type_for(filepath)
     content_type(types[0].content_type) if types and types.size>0 and types[0]
     result = body(File.new(filepath))

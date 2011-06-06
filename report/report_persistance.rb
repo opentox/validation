@@ -315,7 +315,7 @@ end
 #            unless prop_names.include?(key)
 #              err = "no attribute found: '"+k.to_s+"'"
 #              if $sinatra
-#                $sinatra.halt 400,err
+#                $sinatra.raise OpenTox::BadRequestError.newerr
 #              else
 #                raise err
 #              end

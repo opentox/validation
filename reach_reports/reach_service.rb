@@ -289,7 +289,7 @@ module ReachReports
 #    
 #    report_content = get_report(type, id).get_content
 #    keys.each do |k|
-#      $sinatra.halt 400, type+" unknown report property '#{key}'" unless report_content.is_a?(Hash) and report_content.has_key?(k)
+#      $sinatra.raise OpenTox::BadRequestError.new type+" unknown report property '#{key}'" unless report_content.is_a?(Hash) and report_content.has_key?(k)
 #      report_content = report_content[k]
 #    end
 #    report_content    

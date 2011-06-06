@@ -25,7 +25,7 @@ require 'reach_reports/reach_service.rb'
 require "lib/format_util.rb"
 
 def extract_type(params)
-  halt 400, "illegal type, neither QMRF nor QPRF: "+params[:type] unless params[:type] && params[:type] =~ /(?i)Q(M|P)RF/
+  raise OpenTox::BadRequestError.new "illegal type, neither QMRF nor QPRF: "+params[:type] unless params[:type] && params[:type] =~ /(?i)Q(M|P)RF/
   params.delete("type")
 end
 
@@ -96,7 +96,7 @@ get '/reach_report/:type/:id' do
 
   case request.env['HTTP_ACCEPT'].to_s
   when "application/rdf+xml"
-    halt 400, "application/rdf+xml not yet supported"
+    raise OpenTox::BadRequestError.new "application/rdf+xml not yet supported"
     owl = OpenTox::Owl.create(type+"Report",rep.report_uri)
     owl.set_data( rep.get_content.keys_to_rdf_format )
     owl.rdf
@@ -117,7 +117,7 @@ get '/reach_report/:type/:id' do
     content_type "application/x-yaml"
     rep.to_yaml
   else
-    halt 400, "MIME type '"+request.env['HTTP_ACCEPT'].to_s+"' not supported, valid Accept-Headers are \"application/rdf+xml\", \"application/x-yaml\", \"application/qmrf-xml\"."
+    raise OpenTox::BadRequestError.new "MIME type '"+request.env['HTTP_ACCEPT'].to_s+"' not supported, valid Accept-Headers are \"application/rdf+xml\", \"application/x-yaml\", \"application/qmrf-xml\"."
   end
 end
 
@@ -128,7 +128,7 @@ post '/reach_report/:type/:id' do
   rep = ReachReports.get_report(type, params[:id])
 
   input = request.env["rack.input"].read
-  halt 400, "no xml data specified" unless input && input.to_s.size>0
+  raise OpenTox::BadRequestError.new "no xml data specified" unless input && input.to_s.size>0
   LOGGER.debug "size of posted data: "+input.to_s.size.to_s
   
   ReachReports::QmrfReport.from_xml(rep,input)
