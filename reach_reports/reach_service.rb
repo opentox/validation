@@ -279,6 +279,7 @@ module ReachReports
       end
     end
     task.progress(90) if task
+
     mysql_lite_retry do 
       r.save
     end

@@ -78,7 +78,7 @@ module Reports
     def self.quit_r
       LIB::StatisticalTest.quit_r
     end
-    
+
   end
 
 end

@@ -18,7 +18,7 @@ def mysql_lite_retry( n_times=15 )
   end
   yield # try a last time
 end
-  
+
 require 'reach_reports/reach_persistance.rb'
 require 'reach_reports/reach_service.rb'
 
