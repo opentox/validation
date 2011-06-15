@@ -1,27 +1,33 @@
 #require "rubygems"
 #require "rinruby"
-#R.quit
 
 module LIB
   class StatisticalTest
   
-    @@r = RinRuby.new(true,false)
-    
     # -1 -> array1 < array2
     # 0 -> not difference
     # 1 -> array2 > array1
     #
     def self.pairedTTest(array1, array2, significance_level=0.95)
+    
+      @@r = RinRuby.new(true,false) unless defined?(@@r) and @@r
       @@r.assign "v1",array1
       @@r.assign "v2",array2
       @@r.eval "ttest = t.test(v1,v2,paired=T)"
       t = @@r.pull "ttest$statistic"
       p = @@r.pull "ttest$p.value"
-      #@@r.quit
       if (1-significance_level > p)
         t
       else
         0
+      end
+    end
+    
+    def self.quit_r
+      begin
+        @@r.quit
+        @@r = nil
+      rescue
       end
     end
   end
@@ -68,6 +74,11 @@ module Reports
       LOGGER.debug "paired-t-testing "+attribute.to_s+" "+array1.inspect+" vs "+array2.inspect
       LIB::StatisticalTest.pairedTTest(array1, array2, significance_level)
     end
+    
+    def self.quit_r
+      LIB::StatisticalTest.quit_r
+    end
+
   end
 
 end
