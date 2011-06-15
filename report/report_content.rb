@@ -43,7 +43,8 @@ class Reports::ReportContent
     
     section_test = @xml_report.add_section(@current_section, section_title)
     @xml_report.add_paragraph(section_test, section_text) if section_text
-    @xml_report.add_table(section_test, test_attribute.to_s+", significance-level: "+level.to_s, table, true, true)  
+    @xml_report.add_table(section_test, test_attribute.to_s+", significance-level: "+level.to_s, table, true, true)
+    Reports::ReportStatisticalTest.quit_r
   end
   
   def add_predictions( validation_set, 

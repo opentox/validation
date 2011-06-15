@@ -5,6 +5,20 @@ end
 
 QMRF_EDITOR_URI = "http://ortona.informatik.uni-freiburg.de/qmrfedit2/OT_QMRFEditor.jnlp"
 
+# hack for as long as mysql lite is used
+def mysql_lite_retry( n_times=15 )
+  n_times.times do 
+    begin
+      yield
+      return
+    rescue => ex
+      LOGGER.warn "datamapper error, wait and retry : "+ex.message
+      sleep(1+rand(3)) # wait 1-3 seconds
+    end
+  end
+  yield # try a last time
+end
+
 require 'reach_reports/reach_persistance.rb'
 require 'reach_reports/reach_service.rb'
 
