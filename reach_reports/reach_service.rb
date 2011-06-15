@@ -277,7 +277,9 @@ module ReachReports
     end
     task.progress(90) if task
     
-    r.save
+    mysql_lite_retry do 
+      r.save
+    end
     task.progress(100) if task
   end
   
@@ -292,14 +294,16 @@ module ReachReports
 #  end
   
   def self.get_report(type, id)
-    
-    case type
-    when /(?i)QMRF/
-      report = ReachReports::QmrfReport.get(id)
-    when /(?i)QPRF/
-      report = ReachReports::QprfReport.get(id)
+    report = nil
+    mysql_lite_retry(3) do
+      case type
+      when /(?i)QMRF/
+        report = ReachReports::QmrfReport.get(id)
+      when /(?i)QPRF/
+        report = ReachReports::QprfReport.get(id)
+      end
+      raise OpenTox::NotFoundError.new type+" report with id '#{id}' not found." unless report
     end
-    raise OpenTox::NotFoundError.new type+" report with id '#{id}' not found." unless report
     return report
   end
 
