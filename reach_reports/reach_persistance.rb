@@ -1210,6 +1210,7 @@ module ReachReports
       model.auto_upgrade!
       model.raise_on_save_failure = true
     end
+
   end
   
 end

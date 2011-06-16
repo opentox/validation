@@ -80,7 +80,7 @@ class Example
       task.progress(10)
       
       log "upload dataset"
-      halt 400,"File not found: "+@@file.path.to_s unless File.exist?(@@file.path)
+      raise OpenTox::BadRequestError.new"File not found: "+@@file.path.to_s unless File.exist?(@@file.path)
       #data = File.read(@@file.path)
       #data_uri = OpenTox::RestClientWrapper.post(CONFIG[:services]["opentox-dataset"],{:content_type => @@file_type},data).chomp("\n")
       dataset = OpenTox::Dataset.create_from_csv_file(@@file.path,nil)
