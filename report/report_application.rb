@@ -61,8 +61,17 @@ get '/report/:report_type' do
       description = 
         "A list of all "+params[:report_type]+" reports. To create a report, use the POST method."
       post_params = [[:validation_uris]]
+      
+      post_command = OpenTox::PostCommand.new request.url,"Create validation report"
+      val_uri_description = params[:report_type]=="algorithm_comparison" ? "Separate multiple uris with ','" : nil
+      # trick for easy report creation
+      # if searching for a report, ?validation="uri" or ?crossvalidaiton="uri" is given as search param
+      # use this (search param has equal name as report type) as default value for validation_uri 
+      post_command.attributes << OpenTox::PostAttribute.new("validation_uris",true,params[params[:report_type]],val_uri_description)
+      post_command.attributes << OpenTox::PostAttribute.new("identifier",true,nil,"Specifiy one identifier for each uri, separated with ','") if
+        params[:report_type]=="algorithm_comparison"
       content_type "text/html"
-      OpenTox.text_to_html rs.get_all_reports(params[:report_type], params),@subjectid,related_links,description,post_params
+      OpenTox.text_to_html rs.get_all_reports(params[:report_type], params),@subjectid,related_links,description,post_command
     else
       content_type "text/uri-list"
       rs.get_all_reports(params[:report_type], params)
@@ -116,6 +125,7 @@ delete '/report/:type/:id' do
 end
 
 post '/report/:type' do
+  raise OpenTox::BadRequestError.new "validation_uris missing" unless params[:validation_uris].to_s.size>0
   task = OpenTox::Task.create("Create report",url_for("/report/"+params[:type], :full)) do |task| #,params
     perform do |rs|
       rs.create_report(params[:type],params[:validation_uris]?params[:validation_uris].split(/\n|,/):nil,

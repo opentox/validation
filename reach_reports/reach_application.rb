@@ -54,18 +54,19 @@ get '/reach_report/:type' do
         "All REACH reporting types:      "+url_for("/reach_report",:full)
     description = 
         "A list of "+type+" reports."
-    post_params = ""
+    post_command = nil
     case type
     when /(?i)QMRF/
       related_links += "\n"+ 
         "OpenTox version of QMRF editor: "+QMRF_EDITOR_URI
       description += "\n"+
         "To create a QMRF report use the POST method."
-      post_params = [[[:model_uri]],[["Existing QMRF report, content-type application/qmrf-xml"]]]
+      post_command = OpenTox::PostCommand.new request.url,"Create QMRF report"
+      post_command.attributes << OpenTox::PostAttribute.new("model_uri")
     when /(?i)QPRF/
       #TODO
     end
-    OpenTox.text_to_html ReachReports.list_reports(type),@subjectid,related_links,description,post_params
+    OpenTox.text_to_html ReachReports.list_reports(type),@subjectid,related_links,description,post_command
   else
     content_type "text/uri-list"
     ReachReports.list_reports(type)
@@ -78,6 +79,9 @@ post '/reach_report/:type' do
   content_type "text/uri-list"
   
   LOGGER.info "creating "+type+" report "+params.inspect
+  raise OpenTox::BadRequestError.new "model_uri missing" if type=~/(?i)QMRF/ and 
+    params[:model_uri]!=nil and params[:model_uri].to_s.size==0  
+  
   #puts "creating "+type+" report "+params.inspect
   result_uri = ReachReports.create_report(type,params,@subjectid,request.env["rack.input"])
   
