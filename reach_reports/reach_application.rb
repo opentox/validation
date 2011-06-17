@@ -235,12 +235,14 @@ EOF
   jnlp.chomp!
   jnlp += File.join(url_for("/reach_report/QMRF",:full),params[:id])
 
-  jnlp += <<EOF 
+  if @subjectid.to_s.size>0
+    jnlp += <<EOF 
 </argument>
 <argument>--subjectid=
 EOF
-  jnlp.chomp!
-  jnlp += @subjectid.to_s
+    jnlp.chomp!
+    jnlp += @subjectid.to_s
+  end
 
   jnlp += <<EOF 
 </argument>
