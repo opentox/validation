@@ -106,6 +106,7 @@ module Reports
         attribute_values.each do |value|
           begin
             data << transform_roc_predictions(validation_set.filter({split_set_attribute => value}), class_value, false )
+            data[-1].name = split_set_attribute.to_s.nice_attr+" "+value.to_s
           rescue
             LOGGER.warn "could not create ROC plot for "+value.to_s
           end
@@ -133,7 +134,7 @@ module Reports
         attribute_values.each do |value|
           begin
             data = transform_confidence_predictions(validation_set.filter({split_set_attribute => value}), class_value, false)
-            names << value.to_s
+            names << split_set_attribute.to_s.nice_attr+" "+value.to_s
             confidence << data[:confidence][0]
             performance << data[:performance][0]
           rescue
@@ -298,7 +299,7 @@ module Reports
       tp_fp_rates[:youden].each do |point,confidence|
         labels << ["confidence: "+confidence.to_nice_s, point[0], point[1]]
       end if add_label
-      RubyPlot::LinePlotData.new(:name => "default", :x_values => tp_fp_rates[:fp_rate], :y_values => tp_fp_rates[:tp_rate], :labels => labels)
+      RubyPlot::LinePlotData.new(:name => "", :x_values => tp_fp_rates[:fp_rate], :y_values => tp_fp_rates[:tp_rate], :labels => labels)
     end
     
     
@@ -337,7 +338,7 @@ module Reports
       else
         confidence_values = validation_set.validations[0].get_predictions.get_prediction_values(class_value)
         pref_conf_rates = get_performance_confidence_rates(confidence_values, validation_set.unique_feature_type)
-        return { :names => ["default"], :performance => [pref_conf_rates[:performance]], :confidence => [pref_conf_rates[:confidence]] }
+        return { :names => [""], :performance => [pref_conf_rates[:performance]], :confidence => [pref_conf_rates[:confidence]] }
       end
     end    
     
