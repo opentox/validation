@@ -84,38 +84,45 @@ module Validation
       if (delete_all)
         to_delete = [:model_uri, :training_dataset_uri, :test_dataset_uri, :test_target_dataset_uri, :prediction_dataset_uri ]
         case self.validation_type
-        when /test_set_validation/
+        when "test_set_validation"
           to_delete -= [ :model_uri, :training_dataset_uri, :test_dataset_uri, :test_target_dataset_uri ]
-        when /bootstrapping/
+        when "bootstrapping"
           to_delete -= [ :test_target_dataset_uri ]
-        when /training_test_validation/
+        when "training_test_validation"
           to_delete -=  [ :training_dataset_uri, :test_dataset_uri, :test_target_dataset_uri ]
-        when /training_test_split/
+        when "training_test_split"
           to_delete -= [ :test_target_dataset_uri ]
-        when /validate_dataset/
+        when "validate_datasets"
           to_delete = []
-        when /crossvalidation/
+        when "crossvalidation"
           to_delete -= [ :test_target_dataset_uri ]
+        when "crossvalidation_statistics"
+          to_delete = []
         else
-          raise "unknown dataset type"
+          raise "unknown validation type '"+self.validation_type.to_s+"'"
         end
-        to_delete.each do |attr|
-          uri = self.send(attr)
-          LOGGER.debug "also deleting "+attr.to_s+" : "+uri.to_s if uri
-          begin
-            OpenTox::RestClientWrapper.delete(uri, :subjectid => subjectid) if uri
-          rescue => ex
-            LOGGER.warn "could not delete "+uri.to_s+" : "+ex.message.to_s
+        Thread.new do # do deleting in background to not cause a timeout
+          to_delete.each do |attr|
+            uri = self.send(attr)
+            LOGGER.debug "also deleting "+attr.to_s+" : "+uri.to_s if uri
+            begin
+              OpenTox::RestClientWrapper.delete(uri, :subjectid => subjectid) if uri
+              sleep 1 if AA_SERVER # wait a second to not stress the a&a service too much
+            rescue => ex
+              LOGGER.warn "could not delete "+uri.to_s+" : "+ex.message.to_s
+            end
           end
         end
       end
       self.delete
       if (subjectid)
-        begin
-          res = OpenTox::Authorization.delete_policies_from_uri(validation_uri, subjectid)
-          LOGGER.debug "Deleted validation policy: #{res}"
-        rescue
-          LOGGER.warn "Policy delete error for validation: #{validation_uri}"
+        Thread.new do
+          begin
+            res = OpenTox::Authorization.delete_policies_from_uri(validation_uri, subjectid)
+            LOGGER.debug "Deleted validation policy: #{res}"
+          rescue
+            LOGGER.warn "Policy delete error for validation: #{validation_uri}"
+          end
         end
       end
       "Successfully deleted validation "+self.id.to_s+"."
@@ -272,12 +279,18 @@ module Validation
     
     # deletes a crossvalidation, all validations are deleted as well
     def delete_crossvalidation
-        Validation.find(:crossvalidation_id => self.id).each do |v|
+      validations = Validation.find(:crossvalidation_id => self.id) 
+      Thread.new do # do deleting in background to not cause a timeout
+        validations.each do |v|
           v.subjectid = self.subjectid
+          LOGGER.debug "deleting cv-validation "+v.validation_uri.to_s
           v.delete_validation
+          sleep 1 if AA_SERVER # wait a second to not stress the a&a service too much
         end
-        self.delete
-        if (subjectid)
+      end
+      self.delete
+      if (subjectid)
+        Thread.new do
           begin
             res = OpenTox::Authorization.delete_policies_from_uri(crossvalidation_uri, subjectid)
             LOGGER.debug "Deleted crossvalidation policy: #{res}"
@@ -285,7 +298,8 @@ module Validation
             LOGGER.warn "Policy delete error for crossvalidation: #{crossvalidation_uri}"
           end
         end
-        "Successfully deleted crossvalidation "+self.id.to_s+"."
+      end
+      "Successfully deleted crossvalidation "+self.id.to_s+"."
     end
     
     # creates the cv folds

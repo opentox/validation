@@ -61,17 +61,14 @@ post '/crossvalidation/cleanup/?' do
   LOGGER.info "crossvalidation cleanup, starting..."
   content_type "text/uri-list"
   deleted = []
-  #Validation::Crossvalidation.find_like(params).each do |cv|
-  Validation::Crossvalidation.all( { :finished => false } ).each do |cv|
-    #num_vals = Validation::Validation.find( :all, :conditions => { :crossvalidation_id => cv.id } ).size
-    #num_vals = Validation::Validation.all( :crossvalidation_id => cv.id ).size
-    #if cv.num_folds != num_vals || !cv.finished
+  Validation::Crossvalidation.all.collect.delete_if{|cv| cv.finished}.each do |cv|
+    if OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"DELETE",@subjectid)
       LOGGER.debug "delete cv with id:"+cv.id.to_s+", finished is false"
       deleted << cv.crossvalidation_uri
-      #Validation::Crossvalidation.delete(cv.id)
       cv.subjectid = @subjectid
       cv.delete_crossvalidation
-    #end
+      sleep 1 if AA_SERVER
+    end
   end
   LOGGER.info "crossvalidation cleanup, deleted "+deleted.size.to_s+" cvs"
   deleted.join("\n")+"\n"
@@ -189,8 +186,8 @@ delete '/crossvalidation/:id/?' do
 #  Validation::Crossvalidation.delete(params[:id])
   
   cv = Validation::Crossvalidation.get(params[:id])
-  cv.subjectid = @subjectid
   raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found." unless cv
+  cv.subjectid = @subjectid
   cv.delete_crossvalidation
 end
 
@@ -474,13 +471,14 @@ post '/cleanup/?' do
   LOGGER.info "validation cleanup, starting..."
   content_type "text/uri-list"
   deleted = []
-  #Validation::Validation.find( :all, :conditions => { :prediction_dataset_uri => nil } ).each do |val|
-  Validation::Validation.all( :finished => false ).each do |val|
-    LOGGER.debug "delete val with id:"+val.id.to_s+", finished is false"
-    deleted << val.validation_uri
-    #Validation::Validation.delete(val.id)
-    val.subjectid = @subjectid
-    val.delete_validation
+  Validation::Validation.all.collect.delete_if{|val| val.finished}.each do |val|
+    if OpenTox::Authorization.authorized?(val.validation_uri,"DELETE",@subjectid)
+      LOGGER.debug "delete val with id:"+val.id.to_s+", finished is false"
+      deleted << val.validation_uri
+      val.subjectid = @subjectid
+      val.delete_validation
+      sleep 1 if AA_SERVER
+    end
   end
   LOGGER.info "validation cleanup, deleted "+deleted.size.to_s+" validations"
   deleted.join("\n")+"\n"
