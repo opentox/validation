@@ -484,6 +484,31 @@ post '/cleanup/?' do
   deleted.join("\n")+"\n"
 end
 
+post '/cleanup_datasets/?' do
+  LOGGER.info "dataset cleanup, starting..."
+  content_type "text/uri-list"
+  used_datasets = Set.new
+  Validation::Crossvalidation.all.each do |cv|
+    used_datasets << cv.dataset_uri
+  end
+  Validation::Validation.all.each do |val|
+    used_datasets << val.training_dataset_uri
+    used_datasets << val.test_target_dataset_uri
+    used_datasets << val.test_dataset_uri
+    used_datasets << val.prediction_dataset_uri
+  end
+  deleted = []
+  OpenTox::Dataset.all.each do |d|
+    if !used_datasets.include?(d.uri) and OpenTox::Authorization.authorized?(d.uri,"DELETE",@subjectid)
+      deleted << d.uri
+      d.delete(@subjectid)
+      sleep 1 if AA_SERVER
+    end
+  end
+  LOGGER.info "dataset cleanup, deleted "+deleted.size.to_s+" datasets"
+  deleted.join("\n")+"\n"
+end
+
 post '/plain_training_test_split' do
     LOGGER.info "creating pure training test split "+params.inspect
     raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri]
