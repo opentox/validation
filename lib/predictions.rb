@@ -78,6 +78,8 @@ module Lib
       @num_predicted = 0
       @num_unpredicted = 0
       
+      @mean_confidence = 0
+      
       case @feature_type
       when "classification"
         
@@ -111,6 +113,9 @@ module Lib
         @sum_multiply = 0
         @sum_squares_actual = 0
         @sum_squares_predicted = 0
+        
+        @sum_weighted_abs_error = 0
+        @sum_weighted_squared_error = 0
       end
     end
     
@@ -127,6 +132,7 @@ module Lib
           @num_predicted += 1
           
           @conf_provided |= confidence_value!=nil
+          @mean_confidence = (confidence_value + @mean_confidence*(@num_predicted-1)) / @num_predicted.to_f if @conf_provided
           
           case @feature_type
           when "classification"
@@ -140,7 +146,9 @@ module Lib
             delta = predicted_value - actual_value
             @sum_error += delta
             @sum_abs_error += delta.abs
+            @sum_weighted_abs_error += delta.abs*confidence_value
             @sum_squared_error += delta**2
+            @sum_weighted_squared_error += (delta**2)*confidence_value
             
             old_prediction_mean = @prediction_mean
             @prediction_mean = (@prediction_mean * (@num_predicted-1) + predicted_value) / @num_predicted.to_f
@@ -466,9 +474,21 @@ module Lib
       Math.sqrt(@sum_squared_error / (@num_with_actual_value - @num_unpredicted).to_f)
     end
     
+    def weighted_root_mean_squared_error
+      return 0 unless confidence_values_available?      
+      return 0 if (@num_with_actual_value - @num_unpredicted)==0
+      Math.sqrt(@sum_weighted_squared_error / ((@num_with_actual_value - @num_unpredicted).to_f * @mean_confidence ))
+    end    
+    
     def mean_absolute_error
       return 0 if (@num_with_actual_value - @num_unpredicted)==0
       @sum_abs_error / (@num_with_actual_value - @num_unpredicted).to_f
+    end
+    
+    def weighted_mean_absolute_error
+      return 0 unless confidence_values_available?      
+      return 0 if (@num_with_actual_value - @num_unpredicted)==0
+      @sum_weighted_abs_error / ((@num_with_actual_value - @num_unpredicted).to_f * @mean_confidence )
     end
     
     def sum_squared_error
@@ -486,6 +506,14 @@ module Lib
       ( r_2.infinite? || r_2.nan? ) ? 0 : r_2
     end
     
+    def weighted_r_square
+      return 0 unless confidence_values_available?      
+      ss_tot = weighted_total_sum_of_squares
+      return 0 if ss_tot==0
+      r_2 = 1 - weighted_residual_sum_of_squares / ss_tot
+      ( r_2.infinite? || r_2.nan? ) ? 0 : r_2
+    end
+    
     def sample_correlation_coefficient
       # formula see http://en.wikipedia.org/wiki/Correlation_and_dependence#Pearson.27s_product-moment_coefficient
       scc = ( @num_predicted * @sum_multiply - @sum_actual * @sum_predicted ) /
@@ -498,13 +526,26 @@ module Lib
       #return @variance_actual * ( @num_predicted - 1 )
       sum = 0
       @predicted_values.size.times do |i|
-        sum += (@actual_values[i]-@actual_mean)**2 if @predicted_values[i]!=nil
+        sum += (@actual_values[i]-@actual_mean)**2 if @actual_values[i]!=nil and @predicted_values[i]!=nil 
+      end
+      sum
+    end
+    
+    def weighted_total_sum_of_squares
+      return 0 unless confidence_values_available?
+      sum = 0
+      @predicted_values.size.times do |i|
+        sum += ((@actual_values[i]-@actual_mean)**2)*@confidence_values[i] if @actual_values[i]!=nil and @predicted_values[i]!=nil 
       end
       sum
     end
     
     def residual_sum_of_squares
       sum_squared_error
+    end
+    
+    def weighted_residual_sum_of_squares
+      @sum_weighted_squared_error
     end
     
     def target_variance_predicted
