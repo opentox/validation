@@ -15,6 +15,9 @@ VAL_ATTR_REGR = [ :num_instances, :num_unpredicted, :root_mean_squared_error,
 VAL_ATTR_BAR_PLOT_CLASS = [ :accuracy, :f_measure, :true_positive_rate, :true_negative_rate ]
 VAL_ATTR_BAR_PLOT_REGR = [ :root_mean_squared_error, :mean_absolute_error, :r_square ]
 
+VAL_ATTR_TTEST_REGR = [:r_square, :root_mean_squared_error]
+VAL_ATTR_TTEST_CLASS = [:percent_correct, :weighted_area_under_roc]
+
 
 # = Reports::ReportFactory 
 #
@@ -33,14 +36,14 @@ module Reports::ReportFactory
   # call-seq:
   #   self.create_report(type, validation_set) => Reports::ReportContent
   #
-  def self.create_report(type, validation_set, task=nil)
+  def self.create_report(type, validation_set, params={}, task=nil)
     case type
     when RT_VALIDATION
       create_report_validation(validation_set, task)
     when RT_CV
       create_report_crossvalidation(validation_set, task)
     when RT_ALG_COMP
-      create_report_compare_algorithms(validation_set, task)
+      create_report_compare_algorithms(validation_set, params, task)
     else
       raise "unknown report type "+type.to_s
     end
@@ -151,7 +154,7 @@ module Reports::ReportFactory
     report
   end
   
-  def self.create_report_compare_algorithms(validation_set, task=nil)
+  def self.create_report_compare_algorithms(validation_set, params={}, task=nil)
     
     #validation_set.to_array([:test_dataset_uri, :model_uri, :algorithm_uri], false).each{|a| puts a.inspect}
     raise OpenTox::BadRequestError.new("num validations is not >1") unless validation_set.size>1
@@ -165,13 +168,13 @@ module Reports::ReportFactory
     else
       raise OpenTox::BadRequestError.new("num different cross-validation-ids <2") if validation_set.num_different_values(:crossvalidation_id)<2
       validation_set.load_cv_attributes
-      compare_algorithms_crossvalidation(validation_set, task)
+      compare_algorithms_crossvalidation(validation_set, params, task)
     end
   end  
   
   # create Algorithm Comparison report
   # crossvalidations, 1-n datasets, 2-n algorithms
-  def self.compare_algorithms_crossvalidation(validation_set, task=nil)
+  def self.compare_algorithms_crossvalidation(validation_set, params={}, task=nil)
     
     # groups results into sets with equal dataset 
     if (validation_set.num_different_values(:dataset_uri)>1)
@@ -203,12 +206,20 @@ module Reports::ReportFactory
     case validation_set.unique_feature_type
     when "classification"
       result_attributes += VAL_ATTR_CLASS
-      ttest_attributes = [:percent_correct, :weighted_area_under_roc]
+      ttest_attributes = VAL_ATTR_TTEST_CLASS
       bar_plot_attributes = VAL_ATTR_BAR_PLOT_CLASS
     else 
       result_attributes += VAL_ATTR_REGR
-      ttest_attributes = [:r_square, :root_mean_squared_error]
+      ttest_attributes = VAL_ATTR_TTEST_REGR
       bar_plot_attributes = VAL_ATTR_BAR_PLOT_REGR
+    end
+    
+    if params[:ttest_attributes] and params[:ttest_attributes].chomp.size>0
+      ttest_attributes = params[:ttest_attributes].split(",").collect{|a| a.to_sym}
+    end
+    ttest_significance = 0.9
+    if params[:ttest_significance]
+      ttest_significance = params[:ttest_significance].to_f
     end
       
     dataset_grouping.each do |validations|
@@ -230,7 +241,7 @@ module Reports::ReportFactory
       report.add_result(merged,result_attributes,res_titel,res_titel,res_text)
       # pending: regression stats have different scales!!!
       report.add_bar_plot(merged, :identifier, bar_plot_attributes) if validation_set.unique_feature_type=="classification"
-      report.add_paired_ttest_tables(set, :identifier, ttest_attributes)
+      report.add_paired_ttest_tables(set, :identifier, ttest_attributes, ttest_significance) if ttest_significance>0
       report.end_section
     end
     task.progress(100) if task

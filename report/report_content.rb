@@ -25,28 +25,35 @@ class Reports::ReportContent
   def add_paired_ttest_tables( validation_set,
                        group_attribute, 
                        test_attributes,
+                       ttest_level = 0.9,
                        section_title = "Paired t-test",
                        section_text = nil)
 
+    raise "no test_attributes given: "+test_attributes.inspect unless test_attributes.is_a?(Array) and test_attributes.size>0
     section_test = @xml_report.add_section(@current_section, section_title)
     @xml_report.add_paragraph(section_test, section_text) if section_text
+        
+    test_attributes.each do |test_attribute|         
+      accept_values = validation_set.get_accept_values_for_attr(test_attribute)
+      accept_values = [nil] unless accept_values and accept_values.size>0
+      #puts "t-test for "+test_attribute.to_s+", class values: "+accept_values.to_s
       
-    test_attributes.each do |test_attribute|                    
-      level = 0.90                       
-      test_matrix = Reports::ReportStatisticalTest.test_matrix( validation_set.validations, 
-        group_attribute, test_attribute, "paired_ttest", level )
-      #puts test_matrix.inspect
-      titles = test_matrix[:titles]
-      matrix = test_matrix[:matrix]
-      table = []
-      #puts titles.inspect
-      table << [""] + titles
-      titles.size.times do |i|
-        table << [titles[i]] + matrix[i].collect{|v| (v==nil || v==0) ? "" : (v<0 ? "-" : "+") }
+      accept_values.each do |accept_value| 
+        test_matrix = Reports::ReportStatisticalTest.test_matrix( validation_set.validations, 
+          group_attribute, test_attribute, accept_value, "paired_ttest", ttest_level )
+        #puts test_matrix.inspect
+        titles = test_matrix[:titles]
+        matrix = test_matrix[:matrix]
+        table = []
+        #puts titles.inspect
+        table << [""] + titles
+        titles.size.times do |i|
+          table << [titles[i]] + matrix[i].collect{|v| (v==nil || v==0) ? "" : (v<0 ? "-" : "+") }
+        end
+        accept_value_str = accept_value!=nil ? " for class-value '"+accept_value.to_s+"'" : ""
+        @xml_report.add_table(section_test, test_attribute.to_s+accept_value_str+", significance-level: "+ttest_level.to_s+", num results: "+
+          test_matrix[:num_results].to_s, table, true, true)
       end
-      
-      @xml_report.add_table(section_test, test_attribute.to_s+", significance-level: "+level.to_s+", num results: "+
-        test_matrix[:num_results].to_s, table, true, true)
     end
     Reports::ReportStatisticalTest.quit_r
   end

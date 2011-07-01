@@ -1,8 +1,9 @@
 
 # the variance is computed when merging results for these attributes 
 VAL_ATTR_VARIANCE = [ :area_under_roc, :percent_correct, :root_mean_squared_error, :mean_absolute_error, 
-  :r_square, :accuracy, :weighted_area_under_roc, :weighted_accuracy  ]
-VAL_ATTR_RANKING = [ :area_under_roc, :percent_correct, :true_positive_rate, :true_negative_rate, :weighted_area_under_roc ] #:accuracy ]
+  :r_square, :accuracy, :weighted_area_under_roc, :weighted_accuracy, :weighted_root_mean_squared_error, :weighted_mean_absolute_error, 
+  :weighted_r_square  ]
+VAL_ATTR_RANKING = [ :area_under_roc, :percent_correct, :true_positive_rate, :true_negative_rate, :weighted_area_under_roc, :accuracy, :f_measure ]
 
 ATTR_NICE_NAME = {}
 
@@ -24,7 +25,7 @@ class Object
       if self==0
         return "0"
       elsif abs>0.1
-        return "%.2f" % self
+        return "%.3f" % self
       elsif abs>0.01
         return "%.3f" % self
       else
@@ -310,9 +311,9 @@ module Reports
     def to_table( attribute_col, attribute_row, attribute_val)
       
       row_values = get_values(attribute_row)
-      #puts row_values.inspect
+      #puts "row: "+row_values.inspect
       col_values = get_values(attribute_col)
-      #puts col_values.inspect
+      #puts "col: "+col_values.inspect
       
       # get domain for classification attribute, i.e. ["true","false"]
       accept_values = get_accept_values_for_attr(attribute_val)
@@ -326,7 +327,7 @@ module Reports
           val = nil
           @validations.each do |v|
             if v.send(attribute_row)==row and v.send(attribute_col)==col
-              raise "two validation have equal row and column values"if val!=nil
+              #raise "two validation have equal row and column values: "+val.to_s if val!=nil
               val = v.send(attribute_val)
               val = val[accept_values[0]] if first_value_elem
               val = val.to_nice_s
@@ -449,8 +450,18 @@ module Reports
       return new_set
     end
     
-    def sort(attribute, ascending=true)
-      @validations.sort!{ |a,b| a.send(attribute).to_s <=> b.send(attribute).to_s }
+    def sort(attributes, ascending=true)
+      attributes = [attributes] unless attributes.is_a?(Array)
+      @validations.sort! do |a,b|
+        val = 0
+        attributes.each do |attr|
+          if a.send(attr).to_s != b.send(attr).to_s
+            val = a.send(attr).to_s <=> b.send(attr).to_s
+            break
+          end
+        end
+        val
+      end
     end
     
     # creates a new validaiton set, that contains a ranking for __ranking_attribute__

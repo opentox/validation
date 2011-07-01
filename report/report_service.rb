@@ -60,8 +60,9 @@ module Reports
     # call-seq:
     #   create_report(type, validation_uris) => string
     # 
-    def create_report(type, validation_uris, identifier=nil, subjectid=nil, task=nil)
+    def create_report(type, validation_uris, identifier=nil, params={}, subjectid=nil, task=nil)
       
+      raise "params is no hash" unless params.is_a?(Hash)
       LOGGER.info "create report of type '"+type.to_s+"'"
       check_report_type(type)
       
@@ -77,7 +78,7 @@ module Reports
       task.progress(10) if task
       
       #step 2: create report of type
-      report_content = Reports::ReportFactory.create_report(type, validation_set, 
+      report_content = Reports::ReportFactory.create_report(type, validation_set, params,
         OpenTox::SubTask.create(task,10,90))
       LOGGER.debug "report created"
       
