@@ -107,7 +107,7 @@ module Reports::ReportFactory
       validation_set.unique_value(:num_folds).to_s+")") unless validation_set.unique_value(:num_folds).to_i==validation_set.size
     raise OpenTox::BadRequestError.new("num different folds is not equal to num validations") unless validation_set.num_different_values(:crossvalidation_fold)==validation_set.size
     raise OpenTox::BadRequestError.new("validations must have unique feature type, i.e. must be either all regression, "+
-      +"or all classification validations") unless validation_set.unique_feature_type  
+      "or all classification validations") unless validation_set.unique_feature_type  
     pre_load_predictions( validation_set, OpenTox::SubTask.create(task,0,80) )
     validation_set.validations.sort! do |x,y|
       x.crossvalidation_fold.to_f <=> y.crossvalidation_fold.to_f
@@ -159,7 +159,7 @@ module Reports::ReportFactory
     #validation_set.to_array([:test_dataset_uri, :model_uri, :algorithm_uri], false).each{|a| puts a.inspect}
     raise OpenTox::BadRequestError.new("num validations is not >1") unless validation_set.size>1
     raise OpenTox::BadRequestError.new("validations must have unique feature type, i.e. must be either all regression, "+
-      +"or all classification validations") unless validation_set.unique_feature_type
+      "or all classification validations") unless validation_set.unique_feature_type
     raise OpenTox::BadRequestError.new("number of different identifiers <2: "+
       validation_set.get_values(:identifier).inspect) if validation_set.num_different_values(:identifier)<2
       
