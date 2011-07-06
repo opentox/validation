@@ -146,9 +146,9 @@ module Lib
             delta = predicted_value - actual_value
             @sum_error += delta
             @sum_abs_error += delta.abs
-            @sum_weighted_abs_error += delta.abs*confidence_value
+            @sum_weighted_abs_error += delta.abs*confidence_value if @conf_provided
             @sum_squared_error += delta**2
-            @sum_weighted_squared_error += (delta**2)*confidence_value
+            @sum_weighted_squared_error += (delta**2)*confidence_value if @conf_provided
             
             old_prediction_mean = @prediction_mean
             @prediction_mean = (@prediction_mean * (@num_predicted-1) + predicted_value) / @num_predicted.to_f
