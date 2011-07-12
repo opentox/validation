@@ -68,10 +68,12 @@ module Reports
         # filter out nil-predictions and <=0 predictions if log-scale wanted
         valid_indices = []
         x_i.size.times do |i|
-          if x_i[i]!=nil and y_i[i]!=nil and (!logscale or (x_i[i]>0 and y_i[i]>0))
-            valid_indices << i 
-          else
-            omit_count += 1
+          if x_i[i]!=nil and y_i[i]!=nil
+            if !logscale or (x_i[i]>0 and y_i[i]>0)
+              valid_indices << i 
+            else
+              omit_count += 1
+            end
           end
         end
         if valid_indices.size < x_i.size
