@@ -141,31 +141,39 @@ class Reports::ReportContent
                             name_attribute,
                             section_title="Regression Plot",
                             section_text=nil,
-                            image_title=nil)
+                            image_title="Regression Plot")
                             
-    image_title = "Regression plot" unless image_title
     #section_regr = @xml_report.add_section(@current_section, section_title)
     section_regr = @current_section
     prediction_set = validation_set.collect{ |v| v.get_predictions }
         
     if prediction_set.size>0
       
-      section_text += "\nWARNING: regression plot information not available for all validation results" if prediction_set.size!=validation_set.size
-      @xml_report.add_paragraph(section_regr, section_text) if section_text
-      begin
-        plot_png = add_tmp_file("regr_plot", "png")
-        plot_svg = add_tmp_file("regr_plot", "svg")
-        Reports::PlotFactory.create_regression_plot( [plot_png[:path], plot_svg[:path]], prediction_set, name_attribute )
-        @xml_report.add_imagefigure(section_regr, image_title,  plot_png[:name], "PNG", 100, plot_svg[:name])
-      rescue Exception => ex
-        LOGGER.error("Could not create regression plot: "+ex.message)
-        rm_tmp_file(plot_png[:name])
-        rm_tmp_file(plot_svg[:name])
-        @xml_report.add_paragraph(section_regr, "could not create regression plot: "+ex.message)
-      end  
+      [true, false].each do |log|
+        scale_str = (log ? " (logarithmic scale)" : " (linear scale)")
+        image_title_2 = image_title + scale_str
+        section_title_2 = section_title + scale_str
+      
+        section_text += "\nWARNING: regression plot information not available for all validation results" if prediction_set.size!=validation_set.size
+        @xml_report.add_paragraph(section_regr, section_text) if section_text
+        begin
+          log_str = (log ? "_log" : "")
+          plot_png = add_tmp_file("regr_plot"+log_str, "png")
+          plot_svg = add_tmp_file("regr_plot"+log_str, "svg")
+          omit_count = Reports::PlotFactory.create_regression_plot( [plot_png[:path], plot_svg[:path]], prediction_set, name_attribute, log )
+          image_title_2 += " ("+omit_count.to_s+" datapoints omitted)" if omit_count>0
+          @xml_report.add_imagefigure(section_regr, image_title_2,  plot_png[:name], "PNG", 100, plot_svg[:name])
+        rescue Exception => ex
+          LOGGER.error("Could not create regression plot: "+ex.message)
+          rm_tmp_file(plot_png[:name])
+          rm_tmp_file(plot_svg[:name])
+          @xml_report.add_paragraph(section_regr, "could not create regression plot: "+ex.message)
+        end  
+      end
     else
       @xml_report.add_paragraph(section_regr, "No prediction info for regression available.")
     end
+    align_last_two_images section_title+" in logarithmic and linear scale (values <= 0 are omitted in logarithmic scale)"
   end
   
   def add_roc_plot( validation_set, 

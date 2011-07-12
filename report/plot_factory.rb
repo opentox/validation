@@ -52,11 +52,12 @@ module Reports
   
   module PlotFactory
     
-    def self.create_regression_plot( out_files, validation_set, name_attribute )
+    def self.create_regression_plot( out_files, validation_set, name_attribute, logscale=true )
       
       out_files = [out_files] unless out_files.is_a?(Array)
       LOGGER.debug "Creating regression plot, out-file:"+out_files.to_s
       
+      omit_count = 0
       names = []
       x = []
       y = []
@@ -64,25 +65,32 @@ module Reports
         x_i = v.get_predictions.predicted_values
         y_i = v.get_predictions.actual_values
         
-        # filter out nil-predictions
-        not_nil_indices = []
+        # filter out nil-predictions and <=0 predictions if log-scale wanted
+        valid_indices = []
         x_i.size.times do |i|
-          not_nil_indices << i if x_i[i]!=nil && y_i[i]!=nil
+          if x_i[i]!=nil and y_i[i]!=nil and (!logscale or (x_i[i]>0 and y_i[i]>0))
+            valid_indices << i 
+          else
+            omit_count += 1
+          end
         end
-        if not_nil_indices.size < x_i.size
-          x_i = not_nil_indices.collect{ |i| x_i[i] }
-          y_i = not_nil_indices.collect{ |i| y_i[i] }
+        if valid_indices.size < x_i.size
+          x_i = valid_indices.collect{ |i| x_i[i] }
+          y_i = valid_indices.collect{ |i| y_i[i] }
         end
 
         names << ( name_attribute==:crossvalidation_fold ? "fold " : "" ) + v.send(name_attribute).to_s
         x << x_i
         y << y_i
       end
-  
-      raise "no predictions performed" if x.size==0 || x[0].size==0
+      names = [""] if names.size==1 
+
+      omit_str = omit_count>0 ? " ("+omit_count.to_s+" predictions omitted)" : ""
+      raise "no predictions performed"+omit_str if x.size==0 || x[0].size==0
       out_files.each do |out_file|
-        RubyPlot::regression_point_plot(out_file, "Regression plot", "Predicted values", "Actual values", names, x, y )
+        RubyPlot::regression_point_plot(out_file, "Regression plot", "Predicted values", "Actual values", names, x, y, logscale)
       end
+      omit_count
     end
     
     
