@@ -59,7 +59,7 @@ module Lib
         raise "accept_values != nil while performing regression" if @accept_values
         { "predicted"=>@predicted_values, "actual"=>@actual_values }.each do |s,values|
           values.each{ |v| raise "illegal "+s+" regression-value ("+v.to_s+"),"+
-            "has to be either nil or number" unless v==nil or v.is_a?(Numeric)}
+            "has to be either nil or number (not NaN, not Infinite)" if v!=nil and (!v.is_a?(Numeric) or v.nan? or v.finite?)}
         end
       end
       
@@ -471,7 +471,9 @@ module Lib
     public
     def root_mean_squared_error
       return 0 if (@num_with_actual_value - @num_unpredicted)==0
-      Math.sqrt(@sum_squared_error / (@num_with_actual_value - @num_unpredicted).to_f)
+      mse = @sum_squared_error / (@num_with_actual_value - @num_unpredicted).to_f
+      return 0 if mse.nan?
+      Math.sqrt(mse)
     end
     
     def weighted_root_mean_squared_error
