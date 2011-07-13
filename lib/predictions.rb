@@ -55,11 +55,11 @@ module Lib
           values.each{ |v| raise "illegal "+s+" classification-value ("+v.to_s+"),"+
             "has to be either nil or index of predicted-values" if v!=nil and (!v.is_a?(Numeric) or v<0 or v>@num_classes)}
         end
-      when "regresssion"
+      when "regression"
         raise "accept_values != nil while performing regression" if @accept_values
         { "predicted"=>@predicted_values, "actual"=>@actual_values }.each do |s,values|
           values.each{ |v| raise "illegal "+s+" regression-value ("+v.to_s+"),"+
-            "has to be either nil or number (not NaN, not Infinite)" if v!=nil and (!v.is_a?(Numeric) or v.nan? or v.finite?)}
+            " has to be either nil or number (not NaN, not Infinite)" unless v==nil or (v.is_a?(Numeric) and !v.nan? and v.finite?)}
         end
       end
       
