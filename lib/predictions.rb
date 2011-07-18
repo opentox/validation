@@ -517,11 +517,13 @@ module Lib
     end
     
     def sample_correlation_coefficient
-      # formula see http://en.wikipedia.org/wiki/Correlation_and_dependence#Pearson.27s_product-moment_coefficient
-      scc = ( @num_predicted * @sum_multiply - @sum_actual * @sum_predicted ) /
-             ( Math.sqrt( [0, @num_predicted * @sum_squares_actual - @sum_actual**2].max ) *
-               Math.sqrt( [0, @num_predicted * @sum_squares_predicted - @sum_predicted**2].max ) )
-      ( scc.infinite? || scc.nan? ) ? 0 : scc
+      begin
+        # formula see http://en.wikipedia.org/wiki/Correlation_and_dependence#Pearson.27s_product-moment_coefficient
+        scc = ( @num_predicted * @sum_multiply - @sum_actual * @sum_predicted ) /
+          ( Math.sqrt( @num_predicted * @sum_squares_actual - @sum_actual**2 ) *
+            Math.sqrt( @num_predicted * @sum_squares_predicted - @sum_predicted**2 ) )
+        ( scc.infinite? || scc.nan? ) ? 0 : scc
+      rescue; 0; end
     end
     
     def total_sum_of_squares
