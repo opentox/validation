@@ -93,6 +93,33 @@ module Reports
       end
     end
     
+    def imagefigure( title, path, filetype, size_pct=100, altPath = nil )
+      figure = Reports::XMLReportUtil.attribute_element("figure", {"float" => 0})
+      figure << Reports::XMLReportUtil.text_element("title", title)
+      
+      #media = Element.new("mediaobject")
+      media = Element.new("inlinemediaobject")
+      image = Element.new("imageobject")
+      imagedata = Reports::XMLReportUtil.attribute_element("imagedata",
+         {"fileref" => path, "format"=>filetype, "contentwidth" => size_pct.to_s+"%",
+         #"contentdepth"=> "4in" 
+         })#"width" => "6in", "height" => "5in"}) #"contentwidth" => "100%"})
+      #imagedata = Reports::XMLReportUtil.attribute_element("imagedata",{"width" => "6in", "fileref" => path, "format"=>filetype})
+      @resource_path_elements[imagedata] = "fileref"
+      image << imagedata
+      media << image
+      #media << Reports::XMLReportUtil.text_element("caption", caption) if caption
+      #figure << media
+      
+      ulink = Element.new("ulink")
+      ulink.add_attributes({"url" => altPath ? altPath : path })
+      @resource_path_elements[ulink] = "url"
+      ulink << media
+      
+      figure << ulink
+      figure
+    end
+    
     # adds a new image to a REXML:Element, returns the figure as element
     # 
     # example: <tt>add_imagefigure( section2, "Nice graph", "/images/graph1.svg", "SVG", "This graph shows..." )</tt>
@@ -100,42 +127,54 @@ module Reports
     # call-seq:
     #   add_imagefigure( element, title, path, filetype, caption = nil ) => REXML::Element
     #
-    def add_imagefigure( element, title, path, filetype, size_pct=100, caption = nil )
-      
-      figure = Reports::XMLReportUtil.attribute_element("figure", {"float" => 0})
-      figure << Reports::XMLReportUtil.text_element("title", title)
-      media = Element.new("mediaobject")
-      image = Element.new("imageobject")
-      imagedata = Reports::XMLReportUtil.attribute_element("imagedata",
-        {"fileref" => path, "format"=>filetype, "contentwidth" => size_pct.to_s+"%",
-        #"contentdepth"=> "4in" 
-        })#"width" => "6in", "height" => "5in"}) #"contentwidth" => "100%"})
-      #imagedata = Reports::XMLReportUtil.attribute_element("imagedata",{"width" => "6in", "fileref" => path, "format"=>filetype})
-      @resource_path_elements[imagedata] = "fileref"
-      image << imagedata
-      
-      media << image
-      
-#      ulink = Element.new("ulink")
-#      ulink.add_attributes({"url" => "http://google.de"})
-#      ulink << image
-#      media << ulink
-      
-      media << Reports::XMLReportUtil.text_element("caption", caption) if caption
-      figure << media
+    def add_imagefigure( element, title, path, filetype, size_pct=100, altPath = nil )
+      figure = imagefigure( title, path, filetype, size_pct, altPath)
       element << figure
-      return figure    
+      return figure 
     end
     
-    def add_image( element, url )
+    # bit of a hack to algin the last two figures that have been added to element into one row
+    def align_last_two_images( element, title  )
+      imgs = []
+      element.elements.each do |e|
+        imgs[0] = imgs[1]
+        imgs[1] = e if e.name=="figure"
+      end
+      if (imgs[0] and imgs[1])
+        element.delete_element imgs[0]
+        element.delete_element imgs[1]
+        add_imagefigures_in_row( element, imgs, title )
+      end
+    end
+
+    def add_imagefigures_in_row( element, imagefigures, title )
+      params = {"frame" => "none", "colsep" => 0, "rowsep" => 0 }
+      table = Reports::XMLReportUtil.attribute_element("table",params)
+      table << Reports::XMLReportUtil.text_element("title", title)
+      tgroup = Reports::XMLReportUtil.attribute_element("tgroup",{"cols" => 2})
+      tbody = Element.new("tbody") 
+      row = Element.new("row")
+      imagefigures.each do |f|
+        entry = Element.new("entry")
+        entry << f
+        row << entry
+      end
+      tbody << row
+      tgroup << tbody 
+      table << tgroup
+      element << table
+      table
+    end
+    
+    def add_image( element, url ) #, scale=false )
       image = Element.new("imageobject")
-      imagedata = Reports::XMLReportUtil.attribute_element("imagedata",
-        {"fileref" => url, "format"=>"PNG", "contentwidth" => "2in" }) #PENDING: do not hardcode size
+      params = {"fileref" => url, "format"=>"PNG"}
+      #params["contentwidth"] = "2in"
+      imagedata = Reports::XMLReportUtil.attribute_element("imagedata",params) 
       image << imagedata
       element << image
       return image    
     end
-    
     
     # adds a table to a REXML:Element, _table_values_ should be a multi-dimensional-array, returns the table as element
     # 
@@ -144,7 +183,7 @@ module Reports
     #
     def add_table( element, title, table_values, first_row_header=true, first_col_header=false, transpose=false, auto_link_urls=true )
       
-      raise "table_values is not mulit-dimensional-array" unless table_values && table_values.is_a?(Array) && table_values[0].is_a?(Array) 
+      raise "table_values is not multi-dimensional-array" unless table_values && table_values.is_a?(Array) && table_values[0].is_a?(Array) 
       
       values = transpose ? table_values.transpose : table_values
       
@@ -184,12 +223,20 @@ module Reports
         row = Element.new("row")
         r.each do |v|
           entry = Element.new("entry")
-          if auto_link_urls && v.to_s =~ /depict/ || v.to_s =~ /image\/png$/ #PENDING 
+          if auto_link_urls && v.to_s =~ /depict/ || v.to_s =~ /png$/ #PENDING 
             add_image(entry, v.to_s)
           elsif auto_link_urls && v.to_s =~ /^http(s?):\/\//
-           add_url(entry, v.to_s, v.to_s)
-          else
-           entry.text = v.to_s
+           #add_url(entry, v.to_s, v.to_s)
+           v.to_s.split(" ").each do |vv|
+              add_url(entry, vv.to_s, vv.to_s)
+              space = Element.new("para")
+              space.text = " "
+              entry << space
+           end
+         else
+           text = v.to_s
+           text.gsub!(/\+\-/,"&plusmn;")
+           entry << Text.new(text, true, nil, true)
           end
           row << entry
         end
@@ -221,11 +268,15 @@ module Reports
       return list
     end
     
-    def add_url (element, url, description=url )
-      
+    def url_element( url, description=url )
       ulink = Element.new("ulink")
       ulink.add_attributes({"url" => url})
       ulink.text = description
+      ulink
+    end
+    
+    def add_url (element, url, description=url )
+      ulink = url_element(url, description)
       element << ulink
       return ulink
     end

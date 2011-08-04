@@ -35,8 +35,9 @@ module Validation
   VAL_CLASS_PROPS = VAL_CLASS_PROPS_SINGLE + VAL_CLASS_PROPS_PER_CLASS
 
   # :regression_statistics
-  VAL_REGR_PROPS = [ :root_mean_squared_error, :mean_absolute_error, :r_square, 
-    :target_variance_actual, :target_variance_predicted, :sum_squared_error, :sample_correlation_coefficient ]
+  VAL_REGR_PROPS = [ :root_mean_squared_error, :mean_absolute_error, :r_square, :weighted_r_square,
+    :target_variance_actual, :target_variance_predicted, :sum_squared_error, :sample_correlation_coefficient,
+    :weighted_mean_absolute_error, :weighted_root_mean_squared_error ]
   
   CROSS_VAL_PROPS = [:dataset_uri, :num_folds, :stratified, :random_seed]
   CROSS_VAL_PROPS_REDUNDANT = [:crossvalidation_uri, :algorithm_uri, :date] + CROSS_VAL_PROPS 
@@ -136,6 +137,7 @@ module Validation
     attribute :random_seed
     attribute :finished
     attribute :stratified
+    attribute :loo
     
     attr_accessor :subjectid
     
@@ -145,6 +147,7 @@ module Validation
     index :random_seed
     index :stratified
     index :finished
+    index :loo
 
     def self.create(params={})
       params[:date] = Time.new

@@ -83,7 +83,7 @@ module Validation
       end
       v = []
       #Validation.find( :all, :conditions => { :crossvalidation_id => self.id } ).each do |val|
-      Validation.find( :crossvalidation_id => self.id ).each do |val|
+      Validation.find( :crossvalidation_id => self.id, :validation_type => "crossvalidation" ).each do |val|
         v.push( val.validation_uri.to_s )
       end
       h[:validation_uris] = v

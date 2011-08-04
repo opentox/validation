@@ -7,7 +7,7 @@ end
 
 def get_docbook_resource(filepath)
   perform do |rs|
-    halt 404,"not found: "+filepath unless File.exist?(filepath)
+    raise OpenTox::NotFoundError.new"not found: "+filepath unless File.exist?(filepath)
     types = MIME::Types.type_for(filepath)
     content_type(types[0].content_type) if types and types.size>0 and types[0]
     result = body(File.new(filepath))
@@ -21,6 +21,10 @@ end
 
 get '/'+ENV['DOCBOOK_DIRECTORY']+'/:resource' do
   get_docbook_resource ENV['DOCBOOK_DIRECTORY']+"/"+request.env['REQUEST_URI'].split("/")[-1]
+end
+
+get '/resources/:resource' do
+  get_docbook_resource "resources/"+request.env['REQUEST_URI'].split("/")[-1]
 end
 
 get '/report/:type/css_style_sheet/?' do
@@ -57,8 +61,21 @@ get '/report/:report_type' do
       description = 
         "A list of all "+params[:report_type]+" reports. To create a report, use the POST method."
       post_params = [[:validation_uris]]
+      
+      post_command = OpenTox::PostCommand.new request.url,"Create validation report"
+      val_uri_description = params[:report_type]=="algorithm_comparison" ? "Separate multiple uris with ','" : nil
+      # trick for easy report creation
+      # if searching for a report, ?validation="uri" or ?crossvalidaiton="uri" is given as search param
+      # use this (search param has equal name as report type) as default value for validation_uri 
+      post_command.attributes << OpenTox::PostAttribute.new("validation_uris",true,params[params[:report_type]],val_uri_description)
+      if params[:report_type]=="algorithm_comparison"
+        post_command.attributes << OpenTox::PostAttribute.new("identifier",true,nil,"Specifiy one identifier for each uri, separated with ','")
+        post_command.attributes << OpenTox::PostAttribute.new("ttest_significance",false,"0.9","Significance level for t-tests (Set to '0' to disable t-test).")
+        post_command.attributes << OpenTox::PostAttribute.new("ttest_attributes",false,nil,"Attributes for t-test; default for classification: '"+
+          VAL_ATTR_TTEST_CLASS.join(",")+"', default for regression: '"+VAL_ATTR_TTEST_REGR.join(",")+"'")
+      end
       content_type "text/html"
-      OpenTox.text_to_html rs.get_all_reports(params[:report_type], params),@subjectid,related_links,description,post_params
+      OpenTox.text_to_html rs.get_all_reports(params[:report_type], params),@subjectid,related_links,description,post_command
     else
       content_type "text/uri-list"
       rs.get_all_reports(params[:report_type], params)
@@ -112,9 +129,11 @@ delete '/report/:type/:id' do
 end
 
 post '/report/:type' do
+  raise OpenTox::BadRequestError.new "validation_uris missing" unless params[:validation_uris].to_s.size>0
   task = OpenTox::Task.create("Create report",url_for("/report/"+params[:type], :full)) do |task| #,params
     perform do |rs|
-      rs.create_report(params[:type],params[:validation_uris]?params[:validation_uris].split(/\n|,/):nil,@subjectid,task)
+      rs.create_report(params[:type],params[:validation_uris]?params[:validation_uris].split(/\n|,/):nil,
+        params[:identifier]?params[:identifier].split(/\n|,/):nil,params,@subjectid,task)
     end
   end
   return_task(task)

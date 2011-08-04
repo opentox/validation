@@ -36,7 +36,7 @@ module Lib
       #puts "actual:     "+actual_values.inspect
       #puts "confidence: "+confidence_values.inspect
       
-      raise "unknown feature_type: "+@feature_type.to_s unless 
+      raise "unknown feature_type: '"+@feature_type.to_s+"'" unless 
         @feature_type=="classification" || @feature_type=="regression"
       raise "no predictions" if @predicted_values.size == 0
       num_info = "predicted:"+@predicted_values.size.to_s+
@@ -45,16 +45,6 @@ module Lib
       raise "illegal num confidence values "+num_info if  @confidence_values.size != @predicted_values.size
       
       @confidence_values.each{ |c| raise "illegal confidence value: '"+c.to_s+"'" unless c==nil or (c.is_a?(Numeric) and c>=0 and c<=1) }
-      ## check if there is more than one different conf value
-      ## DEPRECATED? not sure anymore what this was about, 
-      ##             I am pretty sure this was for r-plot of roc curves
-      ##             roc curvers are now plotted manually
-      #conf_val_tmp = {}
-      #@confidence_values.each{ |c| conf_val_tmp[c] = nil }
-      #if conf_val_tmp.keys.size<2
-      #  LOGGER.warn("prediction w/o confidence values");
-      #  @confidence_values=nil
-      #end
       
       case @feature_type
       when "classification"
@@ -65,26 +55,30 @@ module Lib
           values.each{ |v| raise "illegal "+s+" classification-value ("+v.to_s+"),"+
             "has to be either nil or index of predicted-values" if v!=nil and (!v.is_a?(Numeric) or v<0 or v>@num_classes)}
         end
-      when "regresssion"
+      when "regression"
         raise "accept_values != nil while performing regression" if @accept_values
         { "predicted"=>@predicted_values, "actual"=>@actual_values }.each do |s,values|
           values.each{ |v| raise "illegal "+s+" regression-value ("+v.to_s+"),"+
-            "has to be either nil or number" unless v==nil or v.is_a?(Numeric)}
+            " has to be either nil or number (not NaN, not Infinite)" unless v==nil or (v.is_a?(Numeric) and !v.nan? and v.finite?)}
         end
       end
       
       init_stats()
       (0..@predicted_values.size-1).each do |i|
-        update_stats( @predicted_values[i], @actual_values[i], (@confidence_values!=nil)?@confidence_values[i]:nil )
+        update_stats( @predicted_values[i], @actual_values[i], @confidence_values[i] )
       end
     end
     
     def init_stats
+      @conf_provided = false
+      
       @num_no_actual_value = 0
       @num_with_actual_value = 0 
       
       @num_predicted = 0
       @num_unpredicted = 0
+      
+      @mean_confidence = 0
       
       case @feature_type
       when "classification"
@@ -119,6 +113,9 @@ module Lib
         @sum_multiply = 0
         @sum_squares_actual = 0
         @sum_squares_predicted = 0
+        
+        @sum_weighted_abs_error = 0
+        @sum_weighted_squared_error = 0
       end
     end
     
@@ -134,6 +131,9 @@ module Lib
         else
           @num_predicted += 1
           
+          @conf_provided |= confidence_value!=nil
+          @mean_confidence = (confidence_value + @mean_confidence*(@num_predicted-1)) / @num_predicted.to_f if @conf_provided
+          
           case @feature_type
           when "classification"
             @confusion_matrix[actual_value][predicted_value] += 1
@@ -146,7 +146,9 @@ module Lib
             delta = predicted_value - actual_value
             @sum_error += delta
             @sum_abs_error += delta.abs
+            @sum_weighted_abs_error += delta.abs*confidence_value if @conf_provided
             @sum_squared_error += delta**2
+            @sum_weighted_squared_error += (delta**2)*confidence_value if @conf_provided
             
             old_prediction_mean = @prediction_mean
             @prediction_mean = (@prediction_mean * (@num_predicted-1) + predicted_value) / @num_predicted.to_f
@@ -170,8 +172,8 @@ module Lib
     
     def percent_correct
       raise "no classification" unless @feature_type=="classification"
-      return 0 if @num_with_actual_value==0
-      return 100 * @num_correct / (@num_with_actual_value - @num_unpredicted).to_f
+      pct = 100 * @num_correct / (@num_with_actual_value - @num_unpredicted).to_f
+      pct.nan? ? 0 : pct 
     end
     
     def percent_incorrect
@@ -181,10 +183,12 @@ module Lib
     end
     
     def accuracy
-      return percent_correct / 100.0
+      acc = percent_correct / 100.0
+      acc.nan? ? 0 : acc
     end
     
     def weighted_accuracy
+      return 0 unless confidence_values_available?      
       raise "no classification" unless @feature_type=="classification"
       total = 0
       correct = 0
@@ -250,10 +254,11 @@ module Lib
       return res
     end
     
+    # does only take the instances that are classified as <class-index> into account
     def area_under_roc(class_index=nil)
       return prediction_feature_value_map( lambda{ |i| area_under_roc(i) } ) if 
         class_index==nil
-      return 0.0 if @confidence_values==nil
+      return 0 unless confidence_values_available?
       
       LOGGER.warn("TODO: implement approx computiation of AUC,"+
         "so far Wilcoxon-Man-Whitney is used (exponential)") if 
@@ -427,8 +432,13 @@ module Lib
       return incorrect
     end
     
+    # Note:
+    # * (un-weighted) area under roc is computed with all __predicted__ isntances for a certain class
+    # * weighted weights each auc with the number of __acutal__ instances
+    # its like that, because its like that in weka   
     def weighted_area_under_roc
-      return weighted_measure( :area_under_roc )
+      w_auc = weighted_measure( :area_under_roc )
+      w_auc.nan? ? 0 : w_auc
     end
     
     def weighted_f_measure
@@ -436,6 +446,7 @@ module Lib
     end
     
     private
+    # the <measure> is weighted with the number of instances for each actual class value 
     def weighted_measure( measure )
       
       sum_instances = 0
@@ -460,12 +471,26 @@ module Lib
     public
     def root_mean_squared_error
       return 0 if (@num_with_actual_value - @num_unpredicted)==0
-      Math.sqrt(@sum_squared_error / (@num_with_actual_value - @num_unpredicted).to_f)
+      mse = @sum_squared_error / (@num_with_actual_value - @num_unpredicted).to_f
+      return 0 if mse.nan?
+      Math.sqrt(mse)
     end
+    
+    def weighted_root_mean_squared_error
+      return 0 unless confidence_values_available?      
+      return 0 if (@num_with_actual_value - @num_unpredicted)==0
+      Math.sqrt(@sum_weighted_squared_error / ((@num_with_actual_value - @num_unpredicted).to_f * @mean_confidence ))
+    end    
     
     def mean_absolute_error
       return 0 if (@num_with_actual_value - @num_unpredicted)==0
       @sum_abs_error / (@num_with_actual_value - @num_unpredicted).to_f
+    end
+    
+    def weighted_mean_absolute_error
+      return 0 unless confidence_values_available?      
+      return 0 if (@num_with_actual_value - @num_unpredicted)==0
+      @sum_weighted_abs_error / ((@num_with_actual_value - @num_unpredicted).to_f * @mean_confidence )
     end
     
     def sum_squared_error
@@ -473,18 +498,58 @@ module Lib
     end
     
     def r_square
-      return sample_correlation_coefficient ** 2
+      #return sample_correlation_coefficient ** 2
+      
+      # see http://en.wikipedia.org/wiki/Coefficient_of_determination#Definitions
+      # see http://web.maths.unsw.edu.au/~adelle/Garvan/Assays/GoodnessOfFit.html
+      ss_tot = total_sum_of_squares
+      return 0 if ss_tot==0
+      r_2 = 1 - residual_sum_of_squares / ss_tot
+      ( r_2.infinite? || r_2.nan? ) ? 0 : r_2
+    end
+    
+    def weighted_r_square
+      return 0 unless confidence_values_available?      
+      ss_tot = weighted_total_sum_of_squares
+      return 0 if ss_tot==0
+      r_2 = 1 - weighted_residual_sum_of_squares / ss_tot
+      ( r_2.infinite? || r_2.nan? ) ? 0 : r_2
     end
     
     def sample_correlation_coefficient
-      # formula see http://en.wikipedia.org/wiki/Correlation_and_dependence#Pearson.27s_product-moment_coefficient
-      return ( @num_predicted * @sum_multiply - @sum_actual * @sum_predicted ) /
-             ( Math.sqrt( [0, @num_predicted * @sum_squares_actual - @sum_actual**2].max ) *
-               Math.sqrt( [0, @num_predicted * @sum_squares_predicted - @sum_predicted**2].max ) )
+      begin
+        # formula see http://en.wikipedia.org/wiki/Correlation_and_dependence#Pearson.27s_product-moment_coefficient
+        scc = ( @num_predicted * @sum_multiply - @sum_actual * @sum_predicted ) /
+          ( Math.sqrt( @num_predicted * @sum_squares_actual - @sum_actual**2 ) *
+            Math.sqrt( @num_predicted * @sum_squares_predicted - @sum_predicted**2 ) )
+        ( scc.infinite? || scc.nan? ) ? 0 : scc
+      rescue; 0; end
     end
     
     def total_sum_of_squares
-      return @variance_actual * ( @num_predicted - 1 )
+      #return @variance_actual * ( @num_predicted - 1 )
+      sum = 0
+      @predicted_values.size.times do |i|
+        sum += (@actual_values[i]-@actual_mean)**2 if @actual_values[i]!=nil and @predicted_values[i]!=nil 
+      end
+      sum
+    end
+    
+    def weighted_total_sum_of_squares
+      return 0 unless confidence_values_available?
+      sum = 0
+      @predicted_values.size.times do |i|
+        sum += ((@actual_values[i]-@actual_mean)**2)*@confidence_values[i] if @actual_values[i]!=nil and @predicted_values[i]!=nil 
+      end
+      sum
+    end
+    
+    def residual_sum_of_squares
+      sum_squared_error
+    end
+    
+    def weighted_residual_sum_of_squares
+      @sum_weighted_squared_error
     end
     
     def target_variance_predicted
@@ -500,7 +565,7 @@ module Lib
     def get_prediction_values(class_value)
       
       #puts "get_roc_values for class_value: "+class_value.to_s
-      raise "no confidence values" if @confidence_values==nil
+      raise "no confidence values" unless confidence_values_available?
       #raise "no class-value specified" if class_value==nil
       
       class_index = @accept_values.index(class_value) if class_value!=nil
@@ -571,7 +636,7 @@ module Lib
     end
     
     def confidence_values_available?
-      return @confidence_values!=nil
+      @conf_provided
     end
     
     ###################################################################################################################

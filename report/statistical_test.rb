@@ -9,8 +9,8 @@ module LIB
     # 1 -> array2 > array1
     #
     def self.pairedTTest(array1, array2, significance_level=0.95)
-    
-      @@r = RinRuby.new(true,false) unless defined?(@@r) and @@r
+      
+      @@r = RinRuby.new(true,false) unless defined?(@@r) and @@r 
       @@r.assign "v1",array1
       @@r.assign "v2",array2
       @@r.eval "ttest = t.test(v1,v2,paired=T)"
@@ -38,7 +38,7 @@ module Reports
   class ReportStatisticalTest
     
     # __grouped_validations__ : array of validation arrays
-    def self.test_matrix( validations, group_attribute, test_attribute, test_method="paired_ttest", significance_level=0.95 )
+    def self.test_matrix( validations, group_attribute, test_attribute, class_value, test_method="paired_ttest", significance_level=0.95 )
       
       raise "statistical-test: '"+test_method+"' does not exist" unless ReportStatisticalTest.respond_to?(test_method)
       grouped_validations = Reports::Util.group(validations, [group_attribute])
@@ -60,17 +60,17 @@ module Reports
             validations2 = grouped_validations[j]
             title2 = validations2[0].send(group_attribute)
             matrix[i][j] = ReportStatisticalTest.send(test_method,validations1,validations2,
-              test_attribute, significance_level)
+              test_attribute, class_value, significance_level)
           end
         end
       end
-      {:titles => titles, :matrix => matrix}
+      {:titles => titles, :matrix => matrix, :num_results => grouped_validations[0].size}
     end
     
-    def self.paired_ttest( validations1, validations2, attribute, significance_level=0.95 )
+    def self.paired_ttest( validations1, validations2, attribute, class_value, significance_level=0.95 )
       
-      array1 = validations1.collect{ |v| v.send(attribute) }
-      array2 = validations2.collect{ |v| v.send(attribute) }
+      array1 = validations1.collect{ |v| (v.send(attribute).is_a?(Hash) ? v.send(attribute)[class_value] : v.send(attribute)) }
+      array2 = validations2.collect{ |v| (v.send(attribute).is_a?(Hash) ? v.send(attribute)[class_value] : v.send(attribute)) }
       LOGGER.debug "paired-t-testing "+attribute.to_s+" "+array1.inspect+" vs "+array2.inspect
       LIB::StatisticalTest.pairedTTest(array1, array2, significance_level)
     end
@@ -83,5 +83,12 @@ module Reports
 
 end
 
-#puts LIB::StatisticalTest.pairedTTest([1,2,3],[2,3,3])
+#t1 = Time.new
+#10.times do
+#  puts LIB::StatisticalTest.pairedTTest([1,2,3,4,5,12,4,2],[2,3,3,3,56,3,4,5])
+#end
+#LIB::StatisticalTest.quitR
+#t2 = Time.new
+#puts t2-t1
+
 

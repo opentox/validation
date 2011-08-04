@@ -4,6 +4,8 @@ ENV['JAVA_HOME'] = "/usr/bin" unless ENV['JAVA_HOME']
 ENV['PATH'] = ENV['JAVA_HOME']+":"+ENV['PATH'] unless ENV['PATH'].split(":").index(ENV['JAVA_HOME'])
 ENV['SAXON_JAR'] = "saxonhe9-2-0-3j/saxon9he.jar" unless ENV['SAXON_JAR']
 
+OT_STYLESHEET = File.join(CONFIG[:services]["opentox-validation"],"resources/simple_ot_stylesheet.css")
+
 # = Reports::ReportFormat
 # 
 # provides functions for converting reports from xml to other formats
@@ -60,7 +62,7 @@ module Reports::ReportFormat
   end
   
   def self.format_report_to_html(directory, xml_filename, html_filename, css_style_sheet)
-    css_style_sheet = "http://opentox.informatik.uni-freiburg.de/simple_ot_stylesheet.css" unless css_style_sheet
+    css_style_sheet = OT_STYLESHEET unless css_style_sheet
   
     css =  css_style_sheet ? "--stringparam html.stylesheet "+URI.encode(css_style_sheet.to_s) : nil
     cmd = "xsltproc "+css.to_s+" "+ENV['REPORT_XSL']+" "+File.join(directory,xml_filename.to_s)+" > "+File.join(directory,html_filename.to_s)

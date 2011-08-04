@@ -126,7 +126,7 @@ module Lib
           if value1==nil && value2==nil
             value = nil
           elsif value1.to_s != value2.to_s
-            value = value1.to_s + "/" + value2.to_s
+            value = value1.to_s + ";" + value2.to_s
           else
             value = value2.to_s
           end

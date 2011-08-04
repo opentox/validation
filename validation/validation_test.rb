@@ -8,7 +8,7 @@ before {
 
 require "uri"
 require "yaml"
-ENV['RACK_ENV'] = 'test'
+ENV['RACK_ENV'] = 'production'
 require 'application.rb'
 require 'test/unit'
 require 'rack/test'
@@ -20,10 +20,10 @@ LOGGER.datetime_format = "%Y-%m-%d %H:%M:%S "
 LOGGER.formatter = Logger::Formatter.new
 
 if AA_SERVER
-  TEST_USER = "mgtest"
-  TEST_PW = "mgpasswd"
-  #TEST_USER = "guest"
-  #TEST_PW = "guest"
+  #TEST_USER = "mgtest"
+  #TEST_PW = "mgpasswd"
+  TEST_USER = "guest"
+  TEST_PW = "guest"
   SUBJECTID = OpenTox::Authorization.authenticate(TEST_USER,TEST_PW)
   raise "could not log in" unless SUBJECTID
   puts "logged in: "+SUBJECTID.to_s
@@ -60,6 +60,189 @@ class ValidationTest < Test::Unit::TestCase
     begin
       $test_case = self
       
+#      post "/validate_datasets",{
+#        :test_dataset_uri=>"http://local-ot/dataset/6907",
+#        :prediction_dataset_uri=>"http://local-ot/dataset/6909",
+#        :test_target_dataset_uri=>"http://local-ot/dataset/6905",
+#        :prediction_feature=>"http://local-ot/dataset/6905/feature/Hamster%20Carcinogenicity",
+#        #:model_uri=>"http://local-ot/model/1078",
+#        :predicted_variable=>"http://local-ot/dataset/6909/feature/prediction/Hamster%20Carcinogenicity/value",
+#        :predicted_confidence=>"http://local-ot/dataset/6909/feature/prediction/Hamster%20Carcinogenicity/confidence",
+#        #:regression=>"true"}
+#        :classification=>"true"}
+#        
+#      puts last_response.body
+#      uri = last_response.body
+#      rep = wait_for_task(uri)
+#      puts rep
+      
+      #get 'crossvalidation/19/statistics'
+      #get 'crossvalidation/189/statistics'
+      #puts last_response.body
+#      run_test("1b")       
+
+      #get '/crossvalidation/79/predictions',nil,'HTTP_ACCEPT' => "application/x-yaml"
+      #puts last_response.body
+      
+      run_test("22f") #,:validation_uri=>"http://local-ot/validation/84" )
+    
+
+      #run_test("21b")
+      #run_test("21c")
+
+     # get '?media=text/uri-list'      
+
+      #post '/report/algorithm_comparison',{:validation_uris=>"http://local-ot/validation/crossvalidation/135,http://local-ot/validation/crossvalidation/134"}
+      #post '/report/algorithm_comparison',{:validation_uris=>"http://local-ot/validation/crossvalidation/174,http://local-ot/validation/crossvalidation/175"}
+      # 2 majority, 175 is real maj, 176 is random
+      
+#      post '/report/algorithm_comparison',{:validation_uris=>"http://local-ot/validation/crossvalidation/185,http://local-ot/validation/crossvalidation/193,http://local-ot/validation/crossvalidation/186,http://local-ot/validation/crossvalidation/194,http://local-ot/validation/crossvalidation/187,http://local-ot/validation/crossvalidation/195",
+#        :identifier=>"lazar,lazar,real_majority,real_majority,random_classification,random_classification"}
+#      uri = last_response.body
+#      rep = wait_for_task(uri)
+#      puts rep
+
+#      post '/report/algorithm_comparison',{:validation_uris=>"http://local-ot/validation/crossvalidation/199,http://local-ot/validation/crossvalidation/204,http://local-ot/validation/crossvalidation/203",
+#        :identifier=>"lazar,real_majority,random_classification"}
+#      uri = last_response.body
+#      rep = wait_for_task(uri)
+#      puts rep
+      # 205 206 207
+
+#      post '/report/algorithm_comparison',{:validation_uris=>"http://local-ot/validation/crossvalidation/149,http://local-ot/validation/crossvalidation/210",
+#        :identifier=>"bbrc,last"}
+#      uri = last_response.body
+#      rep = wait_for_task(uri)
+#      puts rep
+      
+      #run_test("1a", {:validation_uri=>"http://local-ot/validation/305"})
+#      puts "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+      #run_test("3a",{:validation_uri=>"http://local-ot/validation/crossvalidation/6"})
+      #puts "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+     #run_test("13a") #, {:validation_uri=>"http://local-ot/validation/406"})
+#      puts "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+      #run_test("14a") #,{:validation_uri=>"http://local-ot/validation/crossvalidation/148"})
+#      puts "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
+      #run_test("1a")
+      
+#      run_test("3d",{
+#        :dataset_uri => "http://local-ot/dataset/2897", 
+#        :prediction_feature => "http://local-ot/dataset/2897/feature/Hamster%20Carcinogenicity",
+#        :random_seed => 1
+#        })
+
+      #run_test("14",{
+      #  :dataset_uri => "http://local-ot/dataset/3877", 
+      #  :prediction_feature => "http://local-ot/dataset/3877/feature/LC50_mmol",
+      #  :random_seed => 2
+      #  })
+      #puts "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
+#      get "?model=http://local-ot/model/330"
+#      puts last_response.body
+#      puts "\n\n"
+#      get ""
+#      puts last_response.body
+
+      #get "report/validation?validation=http://local-ot/validation/167"
+      #puts last_response.body
+
+#      run_test("3a") #,:validation_uri=>"http://local-ot/validation/84" )
+      #get "report/crossvalidation?crossvalidation=http://local-ot/validation/crossvalidation/47"
+      #puts last_response.body
+      
+  
+    rescue => ex
+      rep = OpenTox::ErrorReport.create(ex, "")
+      puts rep.to_yaml
+    ensure
+      #OpenTox::Authorization.logout(SUBJECTID) if AA_SERVER
+    end
+  end
+
+  def app
+    Sinatra::Application
+  end
+  
+  def run_test(select=nil, overwrite={}, delete=false )
+    
+    if AA_SERVER && SUBJECTID && delete
+      policies_before = OpenTox::Authorization.list_policy_uris(SUBJECTID)
+    end
+    
+    puts ValidationExamples.list unless select
+    validationExamples = ValidationExamples.select(select)
+    validationExamples.each do |vv|
+      vv.each do |v| 
+        ex = v.new
+        ex.subjectid = SUBJECTID
+        
+        overwrite.each do |k,v|
+          ex.send(k.to_s+"=",v)
+        end
+        
+        unless ex.validation_uri
+          ex.upload_files
+          ex.check_requirements
+          ex.validate
+            
+          LOGGER.debug "validation done '"+ex.validation_uri.to_s+"'"
+        end
+        if !delete and ex.validation_uri
+          if SUBJECTID
+            puts ex.validation_uri+"?subjectid="+CGI.escape(SUBJECTID)
+          else
+            puts ex.validation_uri
+          end
+        end
+          
+        unless ex.report_uri
+          ex.report
+        end
+        if !delete and ex.report_uri
+          if SUBJECTID  
+            puts ex.report_uri+"?subjectid="+CGI.escape(SUBJECTID)
+          else
+            puts ex.report_uri
+          end
+        end
+        ##ex.verify_yaml
+        ##ex.compare_yaml_vs_rdf
+        ex.delete if delete
+      end
+    end
+    
+    if AA_SERVER && SUBJECTID && delete
+      policies_after= OpenTox::Authorization.list_policy_uris(SUBJECTID)
+      diff = policies_after.size - policies_before.size
+      if (diff != 0)
+        policies_before.each do |k,v|
+          policies_after.delete(k)
+        end
+        LOGGER.warn diff.to_s+" policies NOT deleted:\n"+policies_after.collect{|k,v| k.to_s+" => "+v.to_s}.join("\n")
+      else
+        LOGGER.debug "all policies deleted"
+      end
+    end      
+  end
+  
+  def prepare_examples
+    get '/prepare_examples'
+  end  
+  
+ def do_test_examples # USES CURL, DO NOT FORGET TO RESTART
+   post '/test_examples'
+ end
+ 
+  def do_test_examples_ortona 
+   post '/test_examples',:examples=>"http://ortona.informatik.uni-freiburg.de/validation/examples"
+ end
+  
+end
+
+
+
 #    prediction_feature = "https://ambit.uni-plovdiv.bg:8443/ambit2/feature/26221"
 #    puts OpenTox::Feature.find(prediction_feature).domain.inspect
 #      exit
@@ -137,6 +320,18 @@ class ValidationTest < Test::Unit::TestCase
   #      :regression=>"true"}
   #      #:classification=>"true"}
   #    puts last_response.body
+
+#      post "/validate_datasets",{
+#        :test_dataset_uri=>"http://apps.ideaconsult.net:8080/ambit2/dataset/9?max=10",
+#        :prediction_dataset_uri=>"http://apps.ideaconsult.net:8080/ambit2/dataset/9?max=10",
+#        #:test_target_dataset_uri=>"http://local-ot/dataset/202",
+#        :prediction_feature=>"http://apps.ideaconsult.net:8080/ambit2/feature/21573",
+#        :predicted_feature=>"http://apps.ideaconsult.net:8080/ambit2/feature/21573",
+#        #:regression=>"true"}
+#        :classification=>"true"}
+#      puts last_response.body
+
+     #run_test("1a") #,:validation_uri=>"http://local-ot/validation/84" )
   
   #     post "/validate_datasets",{
   #      :test_dataset_uri=>"http://local-ot/dataset/89",
@@ -251,13 +446,17 @@ class ValidationTest < Test::Unit::TestCase
       #puts ""
       #puts last_response.body 
       #exit
+
+#      run_test("20a")
       
 #      get "/error"
 #      puts last_response.body
 
       #delete "/1",:subjectid=>SUBJECTID
       
-      prepare_examples()
+      #prepare_examples()
+
+      #run_test("15b")
       
       #run_test("1a") #,{:validation_uri => "http://local-ot/validation/crossvalidation/1"})
       
@@ -276,91 +475,3 @@ class ValidationTest < Test::Unit::TestCase
       #prepare_examples
       #do_test_examples # USES CURL, DO NOT FORGET TO RESTART VALIDATION SERVICE
       #do_test_examples_ortona
-    
-    rescue => ex
-      rep = OpenTox::ErrorReport.create(ex, "")
-      puts rep.to_yaml
-    ensure
-      #OpenTox::Authorization.logout(SUBJECTID) if AA_SERVER
-    end
-  end
-
-  def app
-    Sinatra::Application
-  end
-  
-  def run_test(select=nil, overwrite={}, delete=false )
-    
-    if AA_SERVER && SUBJECTID && delete
-      policies_before = OpenTox::Authorization.list_policy_uris(SUBJECTID)
-    end
-    
-    puts ValidationExamples.list unless select
-    validationExamples = ValidationExamples.select(select)
-    validationExamples.each do |vv|
-      vv.each do |v| 
-        ex = v.new
-        ex.subjectid = SUBJECTID
-        
-        overwrite.each do |k,v|
-          ex.send(k.to_s+"=",v)
-        end
-        
-        unless ex.validation_uri
-          ex.upload_files
-          ex.check_requirements
-          ex.validate
-            
-          LOGGER.debug "validation done '"+ex.validation_uri.to_s+"'"
-        end
-        if !delete and ex.validation_uri
-          if SUBJECTID
-            puts ex.validation_uri+"?subjectid="+CGI.escape(SUBJECTID)
-          else
-            puts ex.validation_uri
-          end
-        end
-          
-        unless ex.report_uri
-          ex.report
-        end
-        if !delete and ex.report_uri
-          if SUBJECTID  
-            puts ex.report_uri+"?subjectid="+CGI.escape(SUBJECTID)
-          else
-            puts ex.report_uri
-          end
-        end
-        ##ex.verify_yaml
-        ##ex.compare_yaml_vs_rdf
-        ex.delete if delete
-      end
-    end
-    
-    if AA_SERVER && SUBJECTID && delete
-      policies_after= OpenTox::Authorization.list_policy_uris(SUBJECTID)
-      diff = policies_after.size - policies_before.size
-      if (diff != 0)
-        policies_before.each do |k,v|
-          policies_after.delete(k)
-        end
-        LOGGER.warn diff.to_s+" policies NOT deleted:\n"+policies_after.collect{|k,v| k.to_s+" => "+v.to_s}.join("\n")
-      else
-        LOGGER.debug "all policies deleted"
-      end
-    end      
-  end
-  
-  def prepare_examples
-    get '/prepare_examples'
-  end  
-  
- def do_test_examples # USES CURL, DO NOT FORGET TO RESTART
-   post '/test_examples'
- end
- 
-  def do_test_examples_ortona 
-   post '/test_examples',:examples=>"http://ortona.informatik.uni-freiburg.de/validation/examples"
- end
-  
-end

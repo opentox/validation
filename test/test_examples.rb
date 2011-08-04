@@ -74,9 +74,24 @@ module ValidationExamples
     end
   end
   
+  class LazarLastEPAFHMSplit < LazarEPAFHMSplit
+    def initialize
+      super
+      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/last")
+    end
+  end
+
+  
   class MajorityEPAFHMSplit < EPAFHMSplit
     def initialize
       @algorithm_uri = File.join(CONFIG[:services]["opentox-majority"],"/regr/algorithm")
+      super
+    end
+  end
+  
+    class MajorityRandomEPAFHMSplit < MajorityEPAFHMSplit
+    def initialize
+      @algorithm_params = "random=true"
       super
     end
   end
@@ -85,7 +100,7 @@ module ValidationExamples
   
     class EPAFHMCrossvalidation < CrossValidation
     def initialize
-      @dataset_file = File.new("data/EPAFHM.mini.csv","r")
+      @dataset_file = File.new("data/EPAFHM.csv","r")
       #@prediction_feature = "http://ot-dev.in-silico.ch/toxcreate/feature#IRIS%20unit%20risk"
       @num_folds = 10
     end
@@ -93,7 +108,16 @@ module ValidationExamples
   
   class MajorityEPAFHMCrossvalidation < EPAFHMCrossvalidation
     def initialize
+      #@dataset_uri = "http://local-ot/dataset/2366"
+      #@prediction_feature = "http://local-ot/dataset/2366/feature/LC50_mmol"
       @algorithm_uri = File.join(CONFIG[:services]["opentox-majority"],"/regr/algorithm")
+      super
+    end
+  end
+
+  class MajorityRandomEPAFHMCrossvalidation < MajorityEPAFHMCrossvalidation
+    def initialize
+      @algorithm_params = "random=true"
       super
     end
   end
@@ -125,10 +149,25 @@ module ValidationExamples
       super
     end
   end
+
+  class LazarLastHamsterSplit < LazarHamsterSplit
+    def initialize
+      super
+      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/last")
+    end
+  end
+
   
   class MajorityHamsterSplit < HamsterSplit
     def initialize
       @algorithm_uri = File.join(CONFIG[:services]["opentox-majority"],"/class/algorithm")
+      super
+    end
+  end
+  
+    class MajorityRandomHamsterSplit < MajorityHamsterSplit
+    def initialize
+      @algorithm_params = "random=true"
       super
     end
   end
@@ -212,6 +251,13 @@ module ValidationExamples
       super
     end
   end
+  
+    class MajorityRandomHamsterCrossvalidation < MajorityHamsterCrossvalidation
+    def initialize
+      @algorithm_params = "random=true"
+      super
+    end
+  end
 
   class LazarHamsterCrossvalidation < HamsterCrossvalidation
     def initialize
@@ -220,6 +266,45 @@ module ValidationExamples
       super
     end
   end
+  
+  class LazarLastHamsterCrossvalidation < LazarHamsterCrossvalidation
+    def initialize
+      super
+      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/last")
+    end
+  end
+  
+  ########################################################################################################
+  
+  class LazarHamsterMiniCrossvalidation < CrossValidation
+    def initialize
+      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+      @dataset_file = File.new("data/hamster_carcinogenicity.mini.csv","r")
+      @num_folds = 2
+    end
+  end  
+  
+  class ISSCANStratifiedCrossvalidation < CrossValidation
+    def initialize
+      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+      @dataset_file = File.new("data/ISSCAN_v3a_canc-red.csv","r")
+      @stratified = true
+      @num_folds = 10
+    end
+  end  
+  
+  class ISSCAN2StratifiedCrossvalidation < CrossValidation
+    def initialize
+      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+      @dataset_file = File.new("data/ISSCAN_v3a_sal.csv","r")
+      @stratified = true
+      @num_folds = 10
+    end
+  end  
+  
   
   ########################################################################################################  
 
@@ -368,6 +453,94 @@ module ValidationExamples
     end
   end
   
+  class NtuaModel2 < ModelValidation
+    def initialize
+      @model_uri = "http://opentox.ntua.gr:8080/model/11093fbc-3b8b-41e2-bfe3-d83f5f529efc"
+      @test_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/54"
+      @prediction_feature="http://apps.ideaconsult.net:8080/ambit2/feature/579820"
+    end
+  end
+  
+  class NtuaModel3 < ModelValidation
+    def initialize
+      @model_uri = "http://opentox.ntua.gr:8080/model/bbab3714-e90b-4990-bef9-8e7d3a30eece"
+      @test_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/R545"
+      #@prediction_feature="http://apps.ideaconsult.net:8080/ambit2/feature/579820"
+    end
+  end  
+  
+  ########################################################################################################
+  
+  class NtuaTrainingTest < TrainingTestValidation
+    def initialize
+      @algorithm_uri = "http://opentox.ntua.gr:8080/algorithm/mlr"
+      @training_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/R545"
+      @test_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/R545"
+      @prediction_feature="http://apps.ideaconsult.net:8080/ambit2/feature/22200"
+    end
+  end  
+
+  class NtuaTrainingTestSplit < SplitTestValidation
+    def initialize
+      @algorithm_uri = "http://opentox.ntua.gr:8080/algorithm/mlr"
+      @dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/R545"
+      @prediction_feature="http://apps.ideaconsult.net:8080/ambit2/feature/22200"
+    end
+  end  
+  
+    class NtuaCrossvalidation < CrossValidation
+    def initialize
+      @algorithm_uri = "http://opentox.ntua.gr:8080/algorithm/mlr"
+      @dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/R545"
+      @prediction_feature="http://apps.ideaconsult.net:8080/ambit2/feature/22200"
+    end
+  end  
+  
+  class AmbitVsNtuaTrainingTest < TrainingTestValidation
+    def initialize
+      @algorithm_uri = "http://apps.ideaconsult.net:8080/ambit2/algorithm/LR"
+      @training_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/R545"
+      @test_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/R545"
+      @prediction_feature="http://apps.ideaconsult.net:8080/ambit2/feature/22200"
+    end
+  end  
+  
+  class AnotherAmbitJ48TrainingTest < TrainingTestValidation
+    def initialize
+      @algorithm_uri = "http://apps.ideaconsult.net:8080/ambit2/algorithm/J48"
+      @training_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/585758"
+      @test_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/585758"
+      @prediction_feature= "http://apps.ideaconsult.net:8080/ambit2/feature/111148"
+    end
+  end    
+
+ class TumTrainingTest < TrainingTestValidation
+    def initialize
+      @algorithm_uri = "http://lxkramer34.informatik.tu-muenchen.de:8080/OpenTox-dev/algorithm/kNNclassification"
+      @training_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/585758"
+      @test_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/585758"
+      @prediction_feature= "http://apps.ideaconsult.net:8080/ambit2/feature/111148"
+    end
+  end    
+
+  
+ 
+  
+  class LazarVsNtuaCrossvalidation < CrossValidation
+    def initialize
+      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+      @dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/R545"
+      @prediction_feature="http://apps.ideaconsult.net:8080/ambit2/feature/22200"
+      @num_folds=3
+    end
+  end  
+
+
+#  loading prediciton via test-dataset:'http://apps.ideaconsult.net:8080/ambit2/dataset/R545', 
+#  test-target-datset:'', prediction-dataset:'http://apps.ideaconsult.net:8080/ambit2/dataset/584389', 
+#  prediction_feature: 'http://apps.ideaconsult.net:8080/ambit2/feature/22200' ', predicted_variable: 'http://apps.ideaconsult.net:8080/ambit2/feature/627667'           :: /ot_predictions.rb:21:in `initialize'
+#D, [2011-05-11T13:47:26.631628 #22952] DEBUG -- : validation         :: 
   ########################################################################################################
   
   class TumModel < ModelValidation
@@ -401,6 +574,23 @@ module ValidationExamples
       @prediction_feature = "http://apps.ideaconsult.net:8080/ambit2/feature/430905"
     end
   end  
+  
+  class AmbitXYModelValidation < ModelValidation
+    def initialize
+      @model_uri =  "http://apps.ideaconsult.net:8080/ambit2/model/237692"
+      @test_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/R736156"
+      @prediction_feature = "http://apps.ideaconsult.net:8080/ambit2/feature/430905"
+    end
+  end 
+  
+    class AmbitXYZModelValidation < ModelValidation
+    def initialize
+      @model_uri =  "http://apps.ideaconsult.net:8080/ambit2/model/238008"
+      @test_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/R736396"
+      #@prediction_feature = "http://apps.ideaconsult.net:8080/ambit2/feature/430905" ??
+    end
+  end 
+  
   
   class AmbitTrainingTest < TrainingTestValidation
     def initialize
@@ -528,20 +718,36 @@ module ValidationExamples
     end
   end  
   
+      ########################################################################################################
+  
+  class TumCrossValidation < CrossValidation
+    def initialize
+      @dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/124963"
+      @algorithm_uri = "http://opentox:8080/OpenTox/algorithm/kNNregression"
+      @prediction_feature = "http://apps.ideaconsult.net:8080/ambit2/feature/121905"
+      @num_folds=2
+      super
+    end
+  end
+  
    ########################################################################################################
   
   @@list = {
-      "1" => [ LazarHamsterSplit, MajorityHamsterSplit ],
+      "1" => [ LazarHamsterSplit, MajorityHamsterSplit, MajorityRandomHamsterSplit ],
       "1a" => [ LazarHamsterSplit ],
       "1b" => [ MajorityHamsterSplit ],
+      "1c" => [ MajorityRandomHamsterSplit ],
+      "1d" => [ LazarLastHamsterSplit ],
       
       "2" => [ LazarHamsterTrainingTest, MajorityHamsterTrainingTest ],
       "2a" => [ LazarHamsterTrainingTest ],
       "2b" => [ MajorityHamsterTrainingTest ],
       
-      "3" => [ LazarHamsterCrossvalidation, MajorityHamsterCrossvalidation ],
+      "3" => [ LazarHamsterCrossvalidation, MajorityHamsterCrossvalidation, MajorityRandomHamsterCrossvalidation ],
       "3a" => [ LazarHamsterCrossvalidation ],
       "3b" => [ MajorityHamsterCrossvalidation ],
+      "3c" => [ MajorityRandomHamsterCrossvalidation ],
+      "3d" => [ LazarLastHamsterCrossvalidation ],
       
       "4" => [ MajorityISTHamsterCrossvalidation, LazarISTHamsterCrossvalidation, ISTLazarISTHamsterCrossvalidation ],
       "4a" => [ MajorityISTHamsterCrossvalidation ],
@@ -574,11 +780,17 @@ module ValidationExamples
       
       "13a" =>  [ LazarEPAFHMSplit ],
       "13b" =>  [ MajorityEPAFHMSplit ],
+      "13c" =>  [ MajorityRandomEPAFHMSplit ],
+      "13d" =>  [ LazarLastEPAFHMSplit ],
       
+      "14" =>   [ LazarEPAFHMCrossvalidation, MajorityEPAFHMCrossvalidation, MajorityRandomEPAFHMCrossvalidation ],
       "14a" =>  [ LazarEPAFHMCrossvalidation ],
       "14b" =>  [ MajorityEPAFHMCrossvalidation ],
+      "14c" =>  [ MajorityRandomEPAFHMCrossvalidation ],
       
       "15a" =>  [ NtuaModel ],
+      "15b" =>  [ NtuaModel2 ],
+      "15c" =>  [ NtuaModel3 ],
       
       "16" => [ LazarRepdoseSplit, MajorityRepdoseSplit ],
       "16a" => [ LazarRepdoseSplit ],
@@ -599,7 +811,23 @@ module ValidationExamples
       "19g" => [ AmbitJ48TrainingTest ],
       "19h" => [ AmbitJ48TrainingTestSplit ],
       "19i" => [ AmbitAquaticModelValidation ],
+      "19j" => [ AmbitXYModelValidation ],
       
+      "20a" => [ TumCrossValidation ],
+      
+      "21a" => [ LazarHamsterMiniCrossvalidation ],
+      "21b" => [ ISSCANStratifiedCrossvalidation ],
+      "21c" => [ ISSCAN2StratifiedCrossvalidation ],
+      
+      "22a" =>  [ NtuaTrainingTest ],
+      "22b" =>  [ NtuaTrainingTestSplit ],
+      "22c" =>  [ NtuaCrossvalidation ],
+      "22d" =>  [ LazarVsNtuaCrossvalidation ],
+
+      #impt      
+      "22e" =>  [ AmbitVsNtuaTrainingTest ],
+      "22f" =>  [ AnotherAmbitJ48TrainingTest ],
+      "22g" =>  [ TumTrainingTest ],
       
     }
   

@@ -3,7 +3,7 @@
   require lib
 end
 
-QMRF_EDITOR_URI = "http://ortona.informatik.uni-freiburg.de/qmrfedit2/OT_QMRFEditor.jnlp"
+QMRF_EDITOR_URI = "http://ortona.informatik.uni-freiburg.de/qmrfedit/OT_QMRFEditor.jnlp"
 
 # hack for as long as mysql lite is used
 def mysql_lite_retry( n_times=15 )
@@ -25,7 +25,7 @@ require 'reach_reports/reach_service.rb'
 require "lib/format_util.rb"
 
 def extract_type(params)
-  halt 400, "illegal type, neither QMRF nor QPRF: "+params[:type] unless params[:type] && params[:type] =~ /(?i)Q(M|P)RF/
+  raise OpenTox::BadRequestError.new "illegal type, neither QMRF nor QPRF: "+params[:type] unless params[:type] && params[:type] =~ /(?i)Q(M|P)RF/
   params.delete("type")
 end
 
@@ -54,18 +54,19 @@ get '/reach_report/:type' do
         "All REACH reporting types:      "+url_for("/reach_report",:full)
     description = 
         "A list of "+type+" reports."
-    post_params = ""
+    post_command = nil
     case type
     when /(?i)QMRF/
       related_links += "\n"+ 
         "OpenTox version of QMRF editor: "+QMRF_EDITOR_URI
       description += "\n"+
         "To create a QMRF report use the POST method."
-      post_params = [[[:model_uri]],[["Existing QMRF report, content-type application/qmrf-xml"]]]
+      post_command = OpenTox::PostCommand.new request.url,"Create QMRF report"
+      post_command.attributes << OpenTox::PostAttribute.new("model_uri")
     when /(?i)QPRF/
       #TODO
     end
-    OpenTox.text_to_html ReachReports.list_reports(type),@subjectid,related_links,description,post_params
+    OpenTox.text_to_html ReachReports.list_reports(type),@subjectid,related_links,description,post_command
   else
     content_type "text/uri-list"
     ReachReports.list_reports(type)
@@ -78,6 +79,9 @@ post '/reach_report/:type' do
   content_type "text/uri-list"
   
   LOGGER.info "creating "+type+" report "+params.inspect
+  raise OpenTox::BadRequestError.new "model_uri missing" if type=~/(?i)QMRF/ and 
+    params[:model_uri]!=nil and params[:model_uri].to_s.size==0  
+  
   #puts "creating "+type+" report "+params.inspect
   result_uri = ReachReports.create_report(type,params,@subjectid,request.env["rack.input"])
   
@@ -96,7 +100,7 @@ get '/reach_report/:type/:id' do
 
   case request.env['HTTP_ACCEPT'].to_s
   when "application/rdf+xml"
-    halt 400, "application/rdf+xml not yet supported"
+    raise OpenTox::BadRequestError.new "application/rdf+xml not yet supported"
     owl = OpenTox::Owl.create(type+"Report",rep.report_uri)
     owl.set_data( rep.get_content.keys_to_rdf_format )
     owl.rdf
@@ -117,7 +121,7 @@ get '/reach_report/:type/:id' do
     content_type "application/x-yaml"
     rep.to_yaml
   else
-    halt 400, "MIME type '"+request.env['HTTP_ACCEPT'].to_s+"' not supported, valid Accept-Headers are \"application/rdf+xml\", \"application/x-yaml\", \"application/qmrf-xml\"."
+    raise OpenTox::BadRequestError.new "MIME type '"+request.env['HTTP_ACCEPT'].to_s+"' not supported, valid Accept-Headers are \"application/rdf+xml\", \"application/x-yaml\", \"application/qmrf-xml\"."
   end
 end
 
@@ -128,7 +132,7 @@ post '/reach_report/:type/:id' do
   rep = ReachReports.get_report(type, params[:id])
 
   input = request.env["rack.input"].read
-  halt 400, "no xml data specified" unless input && input.to_s.size>0
+  raise OpenTox::BadRequestError.new "no xml data specified" unless input && input.to_s.size>0
   LOGGER.debug "size of posted data: "+input.to_s.size.to_s
   
   ReachReports::QmrfReport.from_xml(rep,input)
@@ -165,63 +169,63 @@ get '/reach_report/:type/:id/editor' do
 
   jnlp = <<EOF
 <?xml version ="1.0" encoding="utf-8"?>                                                                                                                                                                     
-<jnlp spec="1.0+" codebase="http://opentox.informatik.uni-freiburg.de/" href="qmrfedit2/OT_QMRFEditor.jnlp" >                                                                                               
+<jnlp spec="1.0+" codebase="http://opentox.informatik.uni-freiburg.de/" href="qmrfedit/OT_QMRFEditor.jnlp" >                                                                                               
 <information>                                                                                                                                                                                               
 <title>QMRF Editor</title>                                                                                                                                                                                  
 <vendor>www.opentox.org</vendor>                                                                                                                                                                            
 <description>(Q)SAR Model Reporting Format Editor</description>
 <description kind="short">(Q)SAR Model Reporting Format Editor</description>
-<icon href="qmrfedit2/OTLogo.png" />
+<icon href="qmrfedit/OTLogo.png" />
 </information>
 <resources>
 <j2se version="1.6+" java-vm-args="-Xincgc"/>
 
-<jar href="qmrfedit2/OT_QMRFEditor.jar" download="eager" main="true"/>
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-applications.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-builder3d.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-charges.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-core.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-datadebug.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-data.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-experimental.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-extra.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-forcefield.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-interfaces.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-io.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-jchempaint.applet.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-jchempaint.application.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-jchempaint.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-libio-cml.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-libio-weka.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-nonotify.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-pdb-cml.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-pdb.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-qsar-cml.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-qsar.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/cdk-qsar-pdb.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/commons-cli-1.0.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/commons-io-1.1.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/commons-logging-1.0.4.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/commons-codec-1.3.jar" download="eager" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/fop.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/jai_codec.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/jai_core.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/jgrapht-0.6.0.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/jh.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/l2fprod-common-all.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/libfonts-0.1.4.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/log4j-1.2.8.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/log4j.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/mysql-connector-java-5.0.5-bin.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/naming-factory-dbcp.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/naming-factory.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/naming-resources.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/opsin-big-0.1.0.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/org.restlet.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/swing-layout-1.0.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/xmlgraphics-commons-1.1.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/xom-1.1b2.jar" download="lazy" />
-<jar href="qmrfedit2/OT_QMRFEditor_lib/xom-1.1.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor.jar" download="eager" main="true"/>
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-applications.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-builder3d.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-charges.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-core.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-datadebug.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-data.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-experimental.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-extra.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-forcefield.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-interfaces.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-io.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-jchempaint.applet.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-jchempaint.application.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-jchempaint.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-libio-cml.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-libio-weka.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-nonotify.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-pdb-cml.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-pdb.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-qsar-cml.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-qsar.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/cdk-qsar-pdb.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/commons-cli-1.0.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/commons-io-1.1.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/commons-logging-1.0.4.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/commons-codec-1.3.jar" download="eager" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/fop.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/jai_codec.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/jai_core.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/jgrapht-0.6.0.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/jh.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/l2fprod-common-all.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/libfonts-0.1.4.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/log4j-1.2.8.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/log4j.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/mysql-connector-java-5.0.5-bin.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/naming-factory-dbcp.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/naming-factory.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/naming-resources.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/opsin-big-0.1.0.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/org.restlet.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/swing-layout-1.0.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/xmlgraphics-commons-1.1.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/xom-1.1b2.jar" download="lazy" />
+<jar href="qmrfedit/OT_QMRFEditor_lib/xom-1.1.jar" download="lazy" />
 
 
 </resources>
@@ -231,17 +235,19 @@ EOF
   jnlp.chomp!
   jnlp += File.join(url_for("/reach_report/QMRF",:full),params[:id])
 
-  jnlp += <<EOF 
+  if @subjectid.to_s.size>0
+    jnlp += <<EOF 
 </argument>
 <argument>--subjectid=
 EOF
-  jnlp.chomp!
-  jnlp += @subjectid.to_s
+    jnlp.chomp!
+    jnlp += @subjectid.to_s
+  end
 
   jnlp += <<EOF 
 </argument>
-<argument>-d http://opentox.informatik.uni-freiburg.de/qmrfedit2/qmrf.dtd</argument>
-<argument>-t http://opentox.informatik.uni-freiburg.de/qmrfedit2/verdana.ttf</argument>
+<argument>-d http://opentox.informatik.uni-freiburg.de/qmrfedit/qmrf.dtd</argument>
+<argument>-t http://opentox.informatik.uni-freiburg.de/qmrfedit/verdana.ttf</argument>
 
 </application-desc> 
 <security>

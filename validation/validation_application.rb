@@ -3,23 +3,30 @@
   require lib
 end
 
-require 'lib/merge.rb'
-#require 'lib/active_record_setup.rb'
+require 'lib/dataset_cache.rb'
 require 'validation/validation_service.rb'
 
 get '/crossvalidation/?' do
   LOGGER.info "list all crossvalidations"
-  uri_list = Lib::OhmUtil.find( Validation::Crossvalidation, params ).collect{|v| v.crossvalidation_uri}.join("\n") + "\n"
+  uri_list = Lib::OhmUtil.find( Validation::Crossvalidation, params ).sort.collect{|v| v.crossvalidation_uri}.join("\n") + "\n"
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
-      "Single validations:      "+url_for("/",:full)+"\n"+
-      "Crossvalidation reports: "+url_for("/report/crossvalidation",:full)
+      "Single validations:             "+url_for("/",:full)+"\n"+
+      "Leave-one-out crossvalidations: "+url_for("/crossvalidation/loo",:full)+"\n"+
+      "Crossvalidation reports:        "+url_for("/report/crossvalidation",:full)
     description = 
       "A list of all crossvalidations.\n"+
       "Use the POST method to perform a crossvalidation."
-    post_params = [[:dataset_uri,:algorithm_uri,:prediction_feature,[:num_folds,10],[:random_seed,1],[:stratified,false],[:algorithm_params,""]]]
+    post_command = OpenTox::PostCommand.new request.url,"Perform crossvalidation"
+    post_command.attributes << OpenTox::PostAttribute.new("algorithm_uri")
+    post_command.attributes << OpenTox::PostAttribute.new("dataset_uri")
+    post_command.attributes << OpenTox::PostAttribute.new("prediction_feature")
+    post_command.attributes << OpenTox::PostAttribute.new("algorithm_params",false,nil,"Params used for model building, separate with ';', example: param1=v1;param2=v2")
+    post_command.attributes << OpenTox::PostAttribute.new("num_folds",false,"10")
+    post_command.attributes << OpenTox::PostAttribute.new("random_seed",false,"1","An equal random seed value ensures the excact same random dataset split.")
+    post_command.attributes << OpenTox::PostAttribute.new("stratified",false,"false","Stratification ensures an equal class-value spread in folds.")
     content_type "text/html"
-    OpenTox.text_to_html uri_list,@subjectid,related_links,description,post_params
+    OpenTox.text_to_html uri_list,@subjectid,related_links,description,post_command
   else
     content_type "text/uri-list"
     uri_list
@@ -27,20 +34,25 @@ get '/crossvalidation/?' do
 end
 
 post '/crossvalidation/?' do
-  task = OpenTox::Task.create( "Perform crossvalidation", url_for("/crossvalidation", :full) ) do |task| #, params
-    LOGGER.info "creating crossvalidation "+params.inspect
-    raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri]
-    raise OpenTox::BadRequestError.new "algorithm_uri missing" unless params[:algorithm_uri]
-    raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature]
-    raise OpenTox::BadRequestError.new "illegal param-value num_folds: '"+params[:num_folds].to_s+"', must be integer >1" unless params[:num_folds]==nil or 
-      params[:num_folds].to_i>1
+  LOGGER.info "creating crossvalidation "+params.inspect
+  raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri].to_s.size>0
+  raise OpenTox::BadRequestError.new "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
+  raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
+  raise OpenTox::BadRequestError.new "illegal param-value num_folds: '"+params[:num_folds].to_s+"', must be integer >1" unless params[:num_folds]==nil or 
+    params[:num_folds].to_i>1
     
+  task = OpenTox::Task.create( "Perform crossvalidation", url_for("/crossvalidation", :full) ) do |task| #, params
     cv_params = { :dataset_uri => params[:dataset_uri],  
-                  :algorithm_uri => params[:algorithm_uri] }
-    [ :num_folds, :random_seed, :stratified ].each{ |sym| cv_params[sym] = params[sym] if params[sym] }
+                  :algorithm_uri => params[:algorithm_uri],
+                  :loo => "false",
+                  :subjectid => params[:subjectid] }
+    [ :num_folds, :random_seed ].each{ |sym| cv_params[sym] = params[sym] if params[sym] }
+    cv_params[:stratified] = (params[:stratified].size>0 && params[:stratified]!="false" && params[:stratified]!="0") if params[:stratified]
     cv = Validation::Crossvalidation.create cv_params
     cv.subjectid = @subjectid
-    cv.perform_cv( params[:prediction_feature], params[:algorithm_params], task )
+    cv.perform_cv( params[:prediction_feature], params[:algorithm_params], OpenTox::SubTask.create(task,0,95))
+    # computation of stats is cheap as dataset are already loaded into the memory
+    Validation::Validation.from_cv_statistics( cv.id, @subjectid, OpenTox::SubTask.create(task,95,100) )
     cv.crossvalidation_uri
   end
   return_task(task)
@@ -50,28 +62,64 @@ post '/crossvalidation/cleanup/?' do
   LOGGER.info "crossvalidation cleanup, starting..."
   content_type "text/uri-list"
   deleted = []
-  #Validation::Crossvalidation.find_like(params).each do |cv|
-  Validation::Crossvalidation.all( { :finished => false } ).each do |cv|
-    #num_vals = Validation::Validation.find( :all, :conditions => { :crossvalidation_id => cv.id } ).size
-    #num_vals = Validation::Validation.all( :crossvalidation_id => cv.id ).size
-    #if cv.num_folds != num_vals || !cv.finished
+  Validation::Crossvalidation.all.collect.delete_if{|cv| cv.finished}.each do |cv|
+    if OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"DELETE",@subjectid)
       LOGGER.debug "delete cv with id:"+cv.id.to_s+", finished is false"
       deleted << cv.crossvalidation_uri
-      #Validation::Crossvalidation.delete(cv.id)
       cv.subjectid = @subjectid
       cv.delete_crossvalidation
-    #end
+      sleep 1 if AA_SERVER
+    end
   end
   LOGGER.info "crossvalidation cleanup, deleted "+deleted.size.to_s+" cvs"
   deleted.join("\n")+"\n"
 end
 
 post '/crossvalidation/loo/?' do
-  raise "not yet implemented"
+  LOGGER.info "creating loo-crossvalidation "+params.inspect
+  raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri].to_s.size>0
+  raise OpenTox::BadRequestError.new "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
+  raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
+  raise OpenTox::BadRequestError.new "illegal param: num_folds, stratified, random_seed not allowed for loo-crossvalidation" if params[:num_folds] or 
+    params[:stratifed] or params[:random_seed]
+  task = OpenTox::Task.create( "Perform loo-crossvalidation", url_for("/crossvalidation/loo", :full) ) do |task| #, params
+    cv_params = { :dataset_uri => params[:dataset_uri],  
+                  :algorithm_uri => params[:algorithm_uri],
+                  :loo => "true" }
+    cv = Validation::Crossvalidation.create cv_params
+    cv.subjectid = @subjectid
+    cv.perform_cv( params[:prediction_feature], params[:algorithm_params], OpenTox::SubTask.create(task,0,95))
+    # computation of stats is cheap as dataset are already loaded into the memory
+    Validation::Validation.from_cv_statistics( cv.id, @subjectid, OpenTox::SubTask.create(task,95,100) )
+    cv.crossvalidation_uri
+  end
+  return_task(task)
 end
 
 get '/crossvalidation/loo/?' do
-  raise OpenTox::BadRequestError.new "GET operation not supported, use POST for performing a loo-crossvalidation, see "+url_for("/crossvalidation", :full)+" for crossvalidation results"
+  LOGGER.info "list all crossvalidations"
+  params[:loo]="true"
+  uri_list = Lib::OhmUtil.find( Validation::Crossvalidation, params ).sort.collect{|v| v.crossvalidation_uri}.join("\n") + "\n"
+  if request.env['HTTP_ACCEPT'] =~ /text\/html/
+    related_links = 
+      "Single validations:      "+url_for("/",:full)+"\n"+
+      "All crossvalidations:    "+url_for("/crossvalidation",:full)+"\n"+
+      "Crossvalidation reports: "+url_for("/report/crossvalidation",:full)
+    description = 
+      "A list of all leave one out crossvalidations.\n"+
+      "Use the POST method to perform a crossvalidation."
+    post_command = OpenTox::PostCommand.new request.url,"Perform leave-one-out-crossvalidation"
+    post_command.attributes << OpenTox::PostAttribute.new("algorithm_uri")
+    post_command.attributes << OpenTox::PostAttribute.new("dataset_uri")
+    post_command.attributes << OpenTox::PostAttribute.new("prediction_feature")
+    post_command.attributes << OpenTox::PostAttribute.new("algorithm_params",false,nil,"Params used for model building, separate with ';', example: param1=v1;param2=v2")
+    content_type "text/html"
+    OpenTox.text_to_html uri_list,@subjectid,related_links,description,post_command
+  else
+    content_type "text/uri-list"
+    uri_list
+  end
+  
 end
 
 get '/crossvalidation/:id' do
@@ -108,33 +156,9 @@ get '/crossvalidation/:id' do
 end
 
 get '/crossvalidation/:id/statistics' do
-  LOGGER.info "get merged validation-result for crossvalidation with id "+params[:id].to_s
-#  begin
-    #crossvalidation = Validation::Crossvalidation.find(params[:id])
-#  rescue ActiveRecord::RecordNotFound => ex
-#    raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found."
-#  end
-  #crossvalidation = Validation::Crossvalidation.find(params[:id])
-  crossvalidation = Validation::Crossvalidation.get(params[:id])
   
-  raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found." unless crossvalidation
-  raise OpenTox::BadRequestError.new "Crossvalidation '"+params[:id].to_s+"' not finished" unless crossvalidation.finished
-  
-  Lib::MergeObjects.register_merge_attributes( Validation::Validation,
-    Validation::VAL_MERGE_AVG,Validation::VAL_MERGE_SUM,Validation::VAL_MERGE_GENERAL-[:date,:validation_uri,:crossvalidation_uri]) unless 
-      Lib::MergeObjects.merge_attributes_registered?(Validation::Validation)
-  
-  #v = Lib::MergeObjects.merge_array_objects( Validation::Validation.find( :all, :conditions => { :crossvalidation_id => params[:id] } ) )
-  # convert ohm:set into array, as ohm:set[0]=nil(!)
-  vals = Validation::Validation.find( :crossvalidation_id => params[:id] ).collect{|x| x}
-#  LOGGER.debug vals.collect{|v| v.validation_uri}.join("\n")
-#  LOGGER.debug vals.size
-#  LOGGER.debug vals.class
-  raise "could not load all validations for crossvalidation" if vals.include?(nil)
-  v = Lib::MergeObjects.merge_array_objects( vals )
-  v.date = nil
-  #v.id = nil
-  
+  LOGGER.info "get crossvalidation statistics for crossvalidation with id "+params[:id].to_s
+  v = Validation::Validation.from_cv_statistics( params[:id], @subjectid )
   case request.env['HTTP_ACCEPT'].to_s
   when /text\/html/
     related_links = 
@@ -143,6 +167,9 @@ get '/crossvalidation/:id/statistics' do
        "The averaged statistics for the crossvalidation."
     content_type "text/html"
     OpenTox.text_to_html v.to_yaml,@subjectid,related_links,description
+  when "application/rdf+xml"
+    content_type "application/rdf+xml"
+    v.to_rdf
   else
     content_type "application/x-yaml"
     v.to_yaml
@@ -160,8 +187,8 @@ delete '/crossvalidation/:id/?' do
 #  Validation::Crossvalidation.delete(params[:id])
   
   cv = Validation::Crossvalidation.get(params[:id])
-  cv.subjectid = @subjectid
   raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found." unless cv
+  cv.subjectid = @subjectid
   cv.delete_crossvalidation
 end
 
@@ -187,7 +214,7 @@ get '/crossvalidation/:id/predictions' do
   raise OpenTox::BadRequestError.new "Crossvalidation '"+params[:id].to_s+"' not finished" unless crossvalidation.finished
   
   content_type "application/x-yaml"
-  validations = Validation::Validation.find( :crossvalidation_id => params[:id] )
+  validations = Validation::Validation.find( :crossvalidation_id => params[:id], :validation_type => "crossvalidation" )
   p = Lib::OTPredictions.to_array( validations.collect{ |v| v.compute_validation_stats_with_model(nil, true) } ).to_yaml
   
   case request.env['HTTP_ACCEPT'].to_s
@@ -208,7 +235,7 @@ end
 get '/?' do
   
   LOGGER.info "list all validations, params: "+params.inspect
-  uri_list = Lib::OhmUtil.find( Validation::Validation, params ).collect{|v| v.validation_uri}.join("\n") + "\n"
+  uri_list = Lib::OhmUtil.find( Validation::Validation, params ).sort.collect{|v| v.validation_uri}.join("\n") + "\n"
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
       "To perform a validation:\n"+
@@ -237,7 +264,8 @@ end
 
 post '/test_set_validation' do
   LOGGER.info "creating test-set-validation "+params.inspect
-  if params[:model_uri] and params[:test_dataset_uri] and !params[:training_dataset_uri] and !params[:algorithm_uri]
+  if params[:model_uri].to_s.size>0 and params[:test_dataset_uri].to_s.size>0 and 
+    params[:training_dataset_uri].to_s.size==0 and params[:algorithm_uri].to_s.size==0
     task = OpenTox::Task.create( "Perform test-set-validation", url_for("/", :full) ) do |task| #, params
       v = Validation::Validation.create :validation_type => "test_set_validation", 
                        :model_uri => params[:model_uri], 
@@ -262,7 +290,7 @@ get '/test_set_validation' do
   #uri_list = Validation::Validation.all( :validation_type => "test_set_validation" ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #params[:validation_type] = "test_set_validation"
   #uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  uri_list = Validation::Validation.find(:validation_type => "test_set_validation").collect{|v| v.validation_uri}.join("\n") + "\n"
+  uri_list = Validation::Validation.find(:validation_type => "test_set_validation").sort.collect{|v| v.validation_uri}.join("\n") + "\n"
   
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
@@ -271,9 +299,13 @@ get '/test_set_validation' do
     description = 
         "A list of all test-set-validations.\n"+
         "To perform a test-set-validation use the POST method."
-    post_params = [[:model_uri, :test_dataset_uri, [:test_target_dataset_uri,"same-as-test_dataset_uri"], [:prediction_feature, "dependent-variable-of-model"]]]
+    post_command = OpenTox::PostCommand.new request.url,"Perform test-set-validation"
+    post_command.attributes << OpenTox::PostAttribute.new("model_uri")
+    post_command.attributes << OpenTox::PostAttribute.new("test_dataset_uri")
+    post_command.attributes << OpenTox::PostAttribute.new("test_target_dataset_uri",false,nil,"Specify if target endpoint values are not available in test dataset.")
+    post_command.attributes << OpenTox::PostAttribute.new("prediction_feature",false,nil,"Default is 'dependentVariables' of the model.")
     content_type "text/html"
-    OpenTox.text_to_html uri_list,@subjectid,related_links,description,post_params
+    OpenTox.text_to_html uri_list,@subjectid,related_links,description,post_command
   else
     content_type "text/uri-list"
     uri_list
@@ -282,7 +314,8 @@ end
 
 post '/training_test_validation/?' do
   LOGGER.info "creating training-test-validation "+params.inspect
-  if params[:algorithm_uri] and params[:training_dataset_uri] and params[:test_dataset_uri] and params[:prediction_feature] and !params[:model_uri]
+  if params[:algorithm_uri].to_s.size>0 and params[:training_dataset_uri].to_s.size>0 and 
+    params[:test_dataset_uri].to_s.size>0 and params[:prediction_feature].to_s.size>0 and params[:model_uri].to_s.size==0
     task = OpenTox::Task.create( "Perform training-test-validation", url_for("/", :full) ) do |task| #, params
       v = Validation::Validation.create :validation_type => "training_test_validation", 
                         :algorithm_uri => params[:algorithm_uri],
@@ -307,7 +340,7 @@ get '/training_test_validation' do
   #uri_list = Validation::Validation.all( :validation_type => "training_test_validation" ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #params[:validation_type] = "training_test_validation"
   #uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  uri_list = Validation::Validation.find(:validation_type => "training_test_validation").collect{|v| v.validation_uri}.join("\n") + "\n"
+  uri_list = Validation::Validation.find(:validation_type => "training_test_validation").sort.collect{|v| v.validation_uri}.join("\n") + "\n"
   
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
@@ -316,14 +349,15 @@ get '/training_test_validation' do
     description = 
         "A list of all training-test-validations.\n"+
         "To perform a training-test-validation use the POST method."
-    post_params = [[:algorithm_uri,
-                    :training_dataset_uri, 
-                    :test_dataset_uri, 
-                    [:test_target_dataset_uri,"same-as-test_dataset_uri"], 
-                    :prediction_feature, 
-                    [:algorithm_params, ""]]]
+    post_command = OpenTox::PostCommand.new request.url,"Perform training-test-validation"
+    post_command.attributes << OpenTox::PostAttribute.new("algorithm_uri")
+    post_command.attributes << OpenTox::PostAttribute.new("training_dataset_uri")
+    post_command.attributes << OpenTox::PostAttribute.new("test_dataset_uri")
+    post_command.attributes << OpenTox::PostAttribute.new("test_target_dataset_uri",false,nil,"Specify if target endpoint values are not available in test dataset.")
+    post_command.attributes << OpenTox::PostAttribute.new("prediction_feature")
+    post_command.attributes << OpenTox::PostAttribute.new("algorithm_params",false,nil,"Params used for model building, separate with ';', example: param1=v1;param2=v2")
     content_type "text/html"
-    OpenTox.text_to_html uri_list,@subjectid,related_links,description,post_params
+    OpenTox.text_to_html uri_list,@subjectid,related_links,description,post_command
   else
     content_type "text/uri-list"
     uri_list
@@ -331,19 +365,21 @@ get '/training_test_validation' do
 end
 
 post '/bootstrapping' do
+  LOGGER.info "performing bootstrapping validation "+params.inspect
+  raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri].to_s.size>0
+  raise OpenTox::BadRequestError.new "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
+  raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
   task = OpenTox::Task.create( "Perform bootstrapping validation", url_for("/bootstrapping", :full) ) do |task| #, params
-    LOGGER.info "performing bootstrapping validation "+params.inspect
-    raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri]
-    raise OpenTox::BadRequestError.new "algorithm_uri missing" unless params[:algorithm_uri]
-    raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature]
-    
     params.merge!( Validation::Util.bootstrapping( params[:dataset_uri], 
       params[:prediction_feature], @subjectid, 
       params[:random_seed], OpenTox::SubTask.create(task,0,33)) )
+    LOGGER.info "params after bootstrapping: "+params.inspect
     v = Validation::Validation.create :validation_type => "bootstrapping", 
                      :test_target_dataset_uri => params[:dataset_uri],
                      :prediction_feature => params[:prediction_feature],
-                     :algorithm_uri => params[:algorithm_uri]
+                     :algorithm_uri => params[:algorithm_uri],
+                     :training_dataset_uri => params[:training_dataset_uri], 
+                     :test_dataset_uri => params[:test_dataset_uri]
     v.subjectid = @subjectid
     v.validate_algorithm( params[:algorithm_params], OpenTox::SubTask.create(task,33,100))
     v.validation_uri
@@ -357,7 +393,7 @@ get '/bootstrapping' do
   #uri_list = Validation::Validation.all( :validation_type => "bootstrapping" ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #params[:validation_type] = "bootstrapping"
   #uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  uri_list = Validation::Validation.find(:validation_type => "bootstrapping").collect{|v| v.validation_uri}.join("\n") + "\n"
+  uri_list = Validation::Validation.find(:validation_type => "bootstrapping").sort.collect{|v| v.validation_uri}.join("\n") + "\n"
   
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
@@ -366,13 +402,14 @@ get '/bootstrapping' do
     description = 
         "A list of all bootstrapping-validations.\n"+
         "To perform a bootstrapping-validation use the POST method."
-    post_params = [[:algorithm_uri,
-                    :dataset_uri, 
-                    :prediction_feature, 
-                    [:algorithm_params, ""],
-                    [:random_seed, 1]]]
+    post_command = OpenTox::PostCommand.new request.url,"Perform bootstrapping-validation"
+    post_command.attributes << OpenTox::PostAttribute.new("algorithm_uri")
+    post_command.attributes << OpenTox::PostAttribute.new("dataset_uri")
+    post_command.attributes << OpenTox::PostAttribute.new("prediction_feature")
+    post_command.attributes << OpenTox::PostAttribute.new("algorithm_params",false,nil,"Params used for model building, separate with ';', example: param1=v1;param2=v2")
+    post_command.attributes << OpenTox::PostAttribute.new("random_seed",false,"1","An equal random seed value ensures the excact same random dataset split.")
     content_type "text/html"
-    OpenTox.text_to_html uri_list,@subjectid,related_links,description,post_params
+    OpenTox.text_to_html uri_list,@subjectid,related_links,description,post_command
   else
     content_type "text/uri-list"
     uri_list
@@ -380,13 +417,11 @@ get '/bootstrapping' do
 end
 
 post '/training_test_split' do
-  
+  LOGGER.info "creating training test split "+params.inspect
+  raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri].to_s.size>0
+  raise OpenTox::BadRequestError.new "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
+  raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
   task = OpenTox::Task.create( "Perform training test split validation", url_for("/training_test_split", :full) )  do |task| #, params
-    LOGGER.info "creating training test split "+params.inspect
-    raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri]
-    raise OpenTox::BadRequestError.new "algorithm_uri missing" unless params[:algorithm_uri]
-    raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature]
-    
     params.merge!( Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], 
       @subjectid, params[:split_ratio], params[:random_seed], OpenTox::SubTask.create(task,0,33)))
     v = Validation::Validation.create  :validation_type => "training_test_split", 
@@ -409,7 +444,7 @@ get '/training_test_split' do
   #uri_list = Validation::Validation.all( :validation_type => "training_test_split" ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #params[:validation_type] = "training_test_split"
   #uri_list = Lib::DataMapperUtil.all(Validation::Validation,params).collect{ |v| v.validation_uri }.join("\n")+"\n"
-  uri_list = Validation::Validation.find(:validation_type => "training_test_split").collect{|v| v.validation_uri}.join("\n") + "\n"
+  uri_list = Validation::Validation.find(:validation_type => "training_test_split").sort.collect{|v| v.validation_uri}.join("\n") + "\n"
   
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
@@ -418,14 +453,15 @@ get '/training_test_split' do
     description = 
         "A list of all training-test-split-validations.\n"+
         "To perform a training-test-split-validation use the POST method."
-    post_params = [[:algorithm_uri,
-                    :dataset_uri, 
-                    :prediction_feature, 
-                    [:algorithm_params, ""],
-                    [:random_seed, 1],
-                    [:split_ratio, 0.66]]]
+    post_command = OpenTox::PostCommand.new request.url,"Perform training-test-split-validation"
+    post_command.attributes << OpenTox::PostAttribute.new("algorithm_uri")
+    post_command.attributes << OpenTox::PostAttribute.new("dataset_uri")
+    post_command.attributes << OpenTox::PostAttribute.new("prediction_feature")
+    post_command.attributes << OpenTox::PostAttribute.new("algorithm_params",false,nil,"Params used for model building, separate with ';', example: param1=v1;param2=v2")
+    post_command.attributes << OpenTox::PostAttribute.new("random_seed",false,"1","An equal random seed value ensures the excact same random dataset split.")
+    post_command.attributes << OpenTox::PostAttribute.new("split_ratio",false,"0.66","A split ratio of 0.66 implies that two thirds of the compounds are used for training.")
     content_type "text/html"
-    OpenTox.text_to_html uri_list,@subjectid,related_links,description,post_params
+    OpenTox.text_to_html uri_list,@subjectid,related_links,description,post_command
   else
     content_type "text/uri-list"
     uri_list
@@ -436,15 +472,41 @@ post '/cleanup/?' do
   LOGGER.info "validation cleanup, starting..."
   content_type "text/uri-list"
   deleted = []
-  #Validation::Validation.find( :all, :conditions => { :prediction_dataset_uri => nil } ).each do |val|
-  Validation::Validation.all( :finished => false ).each do |val|
-    LOGGER.debug "delete val with id:"+val.id.to_s+", finished is false"
-    deleted << val.validation_uri
-    #Validation::Validation.delete(val.id)
-    val.subjectid = @subjectid
-    val.delete_validation
+  Validation::Validation.all.collect.delete_if{|val| val.finished}.each do |val|
+    if OpenTox::Authorization.authorized?(val.validation_uri,"DELETE",@subjectid)
+      LOGGER.debug "delete val with id:"+val.id.to_s+", finished is false"
+      deleted << val.validation_uri
+      val.subjectid = @subjectid
+      val.delete_validation
+      sleep 1 if AA_SERVER
+    end
   end
   LOGGER.info "validation cleanup, deleted "+deleted.size.to_s+" validations"
+  deleted.join("\n")+"\n"
+end
+
+post '/cleanup_datasets/?' do
+  LOGGER.info "dataset cleanup, starting..."
+  content_type "text/uri-list"
+  used_datasets = Set.new
+  Validation::Crossvalidation.all.each do |cv|
+    used_datasets << cv.dataset_uri
+  end
+  Validation::Validation.all.each do |val|
+    used_datasets << val.training_dataset_uri
+    used_datasets << val.test_target_dataset_uri
+    used_datasets << val.test_dataset_uri
+    used_datasets << val.prediction_dataset_uri
+  end
+  deleted = []
+  OpenTox::Dataset.all.each do |d|
+    if !used_datasets.include?(d.uri) and OpenTox::Authorization.authorized?(d.uri,"DELETE",@subjectid)
+      deleted << d.uri
+      d.delete(@subjectid)
+      sleep 1 if AA_SERVER
+    end
+  end
+  LOGGER.info "dataset cleanup, deleted "+deleted.size.to_s+" datasets"
   deleted.join("\n")+"\n"
 end
 
@@ -465,21 +527,22 @@ post '/validate_datasets' do
     params[:validation_type] = "validate_datasets" 
     
     if params[:model_uri]
+      raise OpenTox::BadRequestError.new "please specify 'model_uri' or set either 'classification' or 'regression' flag" if params[:classification] or params[:regression]
       v = Validation::Validation.create params
       v.subjectid = @subjectid
       v.compute_validation_stats_with_model(nil,false,task)
     else
       raise OpenTox::BadRequestError.new "please specify 'model_uri' or 'prediction_feature'" unless params[:prediction_feature]
-      raise OpenTox::BadRequestError.new "please specify 'model_uri' or 'predicted_feature'" unless params[:predicted_feature]
+      raise OpenTox::BadRequestError.new "please specify 'model_uri' or 'predicted_variable'" unless params[:predicted_variable]
       raise OpenTox::BadRequestError.new "please specify 'model_uri' or set either 'classification' or 'regression' flag" unless 
             params[:classification] or params[:regression]
-      
-      predicted_feature = params.delete("predicted_feature")
+      predicted_variable = params.delete("predicted_variable")
+      predicted_confidence = params.delete("predicted_confidence")
       feature_type = "classification" if params.delete("classification")!=nil
       feature_type = "regression" if params.delete("regression")!=nil
       v = Validation::Validation.create params  
       v.subjectid = @subjectid
-      v.compute_validation_stats(feature_type,predicted_feature,nil,nil,false,task)
+      v.compute_validation_stats(feature_type,predicted_variable,predicted_confidence,nil,nil,false,task)
     end
     v.validation_uri
   end

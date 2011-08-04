@@ -52,10 +52,12 @@ module Reports
   
   module PlotFactory
     
-    def self.create_regression_plot( out_file, validation_set, name_attribute )
+    def self.create_regression_plot( out_files, validation_set, name_attribute, logscale=true )
       
-      LOGGER.debug "Creating regression plot, out-file:"+out_file.to_s
+      out_files = [out_files] unless out_files.is_a?(Array)
+      LOGGER.debug "Creating regression plot, out-file:"+out_files.to_s
       
+      omit_count = 0
       names = []
       x = []
       y = []
@@ -63,23 +65,34 @@ module Reports
         x_i = v.get_predictions.predicted_values
         y_i = v.get_predictions.actual_values
         
-        # filter out nil-predictions
-        not_nil_indices = []
+        # filter out nil-predictions and <=0 predictions if log-scale wanted
+        valid_indices = []
         x_i.size.times do |i|
-          not_nil_indices << i if x_i[i]!=nil && y_i[i]!=nil
+          if x_i[i]!=nil and y_i[i]!=nil
+            if !logscale or (x_i[i]>0 and y_i[i]>0)
+              valid_indices << i 
+            else
+              omit_count += 1
+            end
+          end
         end
-        if not_nil_indices.size < x_i.size
-          x_i = not_nil_indices.collect{ |i| x_i[i] }
-          y_i = not_nil_indices.collect{ |i| y_i[i] }
+        if valid_indices.size < x_i.size
+          x_i = valid_indices.collect{ |i| x_i[i] }
+          y_i = valid_indices.collect{ |i| y_i[i] }
         end
 
         names << ( name_attribute==:crossvalidation_fold ? "fold " : "" ) + v.send(name_attribute).to_s
         x << x_i
         y << y_i
       end
-  
-      raise "no predictions performed" if x.size==0 || x[0].size==0
-      RubyPlot::regression_point_plot(out_file, "Regression plot", "Predicted values", "Actual values", names, x, y )
+      names = [""] if names.size==1 
+
+      omit_str = omit_count>0 ? " ("+omit_count.to_s+" predictions omitted)" : ""
+      raise "no predictions performed"+omit_str if x.size==0 || x[0].size==0
+      out_files.each do |out_file|
+        RubyPlot::regression_point_plot(out_file, "Regression plot", "Predicted values", "Actual values", names, x, y, logscale)
+      end
+      omit_count
     end
     
     
@@ -91,36 +104,37 @@ module Reports
     #   * the validation set is splitted into sets of validation_sets with equal attribute values
     #   * each of theses validation sets is plotted as a roc-curve  
     #
-    def self.create_roc_plot( out_file, validation_set, class_value, split_set_attribute=nil, show_single_curves=false )
+    def self.create_roc_plot( out_files, validation_set, class_value, split_set_attribute=nil,
+        x_label="False positive rate", y_label="True Positive Rate" )
       
-      LOGGER.debug "creating roc plot for '"+validation_set.size.to_s+"' validations, out-file:"+out_file.to_s
+      out_files = [out_files] unless out_files.is_a?(Array)
+      LOGGER.debug "creating roc plot for '"+validation_set.size.to_s+"' validations, out-files:"+out_files.inspect
       
+      data = []
       if split_set_attribute
         attribute_values = validation_set.get_values(split_set_attribute)
-        names = []
-        fp_rates = []
-        tp_rates = []
         attribute_values.each do |value|
           begin
-            data = transform_roc_predictions(validation_set.filter({split_set_attribute => value}), class_value, false)
-            names << value.to_s
-            fp_rates << data[:fp_rate][0]
-            tp_rates << data[:tp_rate][0]
+            data << transform_roc_predictions(validation_set.filter({split_set_attribute => value}), class_value, false )
+            data[-1].name = split_set_attribute.to_s.nice_attr+" "+value.to_s
           rescue
             LOGGER.warn "could not create ROC plot for "+value.to_s
           end
         end
-        RubyPlot::plot_lines(out_file, "ROC-Plot", "False positive rate", "True Positive Rate", names, fp_rates, tp_rates )
       else
-        data = transform_roc_predictions(validation_set, class_value, show_single_curves)
-        RubyPlot::plot_lines(out_file, "ROC-Plot", "False positive rate", "True Positive Rate", data[:names], data[:fp_rate], data[:tp_rate], data[:faint] )
+        data << transform_roc_predictions(validation_set, class_value )
       end  
+      
+      out_files.each do |out_file|
+        RubyPlot::plot_lines(out_file, "ROC-Plot", x_label, y_label, data )
+      end
     end
     
     
-    def self.create_confidence_plot( out_file, validation_set, class_value, split_set_attribute=nil, show_single_curves=false )
+    def self.create_confidence_plot( out_files, validation_set, class_value, split_set_attribute=nil, show_single_curves=false )
       
-      LOGGER.debug "creating confidence plot for '"+validation_set.size.to_s+"' validations, out-file:"+out_file.to_s
+      out_files = [out_files] unless out_files.is_a?(Array)
+      LOGGER.debug "creating confidence plot for '"+validation_set.size.to_s+"' validations, out-file:"+out_files.inspect
       
       if split_set_attribute
         attribute_values = validation_set.get_values(split_set_attribute)
@@ -130,7 +144,7 @@ module Reports
         attribute_values.each do |value|
           begin
             data = transform_confidence_predictions(validation_set.filter({split_set_attribute => value}), class_value, false)
-            names << value.to_s
+            names << split_set_attribute.to_s.nice_attr+" "+value.to_s
             confidence << data[:confidence][0]
             performance << data[:performance][0]
           rescue
@@ -138,27 +152,32 @@ module Reports
           end
         end
         #RubyPlot::plot_lines(out_file, "Percent Correct vs Confidence Plot", "Confidence", "Percent Correct", names, fp_rates, tp_rates )
-        case validation_set.unique_feature_type
-        when "classification"
-          RubyPlot::accuracy_confidence_plot(out_file, "Percent Correct vs Confidence Plot", "Confidence", "Percent Correct", names, confidence, performance)
-        when "regression"
-          RubyPlot::accuracy_confidence_plot(out_file, "RMSE vs Confidence Plot", "Confidence", "RMSE", names, confidence, performance, true)
+        out_files.each do |out_file|
+          case validation_set.unique_feature_type
+          when "classification"
+            RubyPlot::accuracy_confidence_plot(out_file, "Percent Correct vs Confidence Plot", "Confidence", "Percent Correct", names, confidence, performance)
+          when "regression"
+            RubyPlot::accuracy_confidence_plot(out_file, "RMSE vs Confidence Plot", "Confidence", "RMSE", names, confidence, performance, true)
+          end
         end
       else
         data = transform_confidence_predictions(validation_set, class_value, show_single_curves)
-        case validation_set.unique_feature_type
-        when "classification"
-          RubyPlot::accuracy_confidence_plot(out_file, "Percent Correct vs Confidence Plot", "Confidence", "Percent Correct", data[:names], data[:confidence], data[:performance])
-        when "regression"
-          RubyPlot::accuracy_confidence_plot(out_file, "RMSE vs Confidence Plot", "Confidence", "RMSE", data[:names], data[:confidence], data[:performance], true)
+        out_files.each do |out_file|
+          case validation_set.unique_feature_type
+          when "classification"
+            RubyPlot::accuracy_confidence_plot(out_file, "Percent Correct vs Confidence Plot", "Confidence", "Percent Correct", data[:names], data[:confidence], data[:performance])
+          when "regression"
+            RubyPlot::accuracy_confidence_plot(out_file, "RMSE vs Confidence Plot", "Confidence", "RMSE", data[:names], data[:confidence], data[:performance], true)
+          end
         end
       end  
     end
     
     
-    def self.create_bar_plot( out_file, validation_set, title_attribute, value_attributes )
+    def self.create_bar_plot( out_files, validation_set, title_attribute, value_attributes )
   
-      LOGGER.debug "creating bar plot, out-file:"+out_file.to_s
+      out_files = [out_files] unless out_files.is_a?(Array)
+      LOGGER.debug "creating bar plot, out-files:"+out_files.inspect
       
       data = []
       titles = []
@@ -167,25 +186,35 @@ module Reports
       validation_set.validations.each do |v|
         values = []
         value_attributes.each do |a|
-          validation_set.get_accept_values_for_attr(a).each do |class_value|
-            value = v.send(a)
-            if value.is_a?(Hash)
-              if class_value==nil
-                avg_value = 0
-                value.values.each{ |val| avg_value+=val }
-                value = avg_value/value.values.size.to_f
-              else
-                raise "bar plot value is hash, but no entry for class-value ("+class_value.to_s+"); value for "+a.to_s+" -> "+value.inspect unless value.key?(class_value)
-                value = value[class_value]
+          
+          accept = validation_set.get_accept_values_for_attr(a)
+          if accept and accept.size>0
+            accept.each do |class_value|
+              value = v.send(a)
+              if value.is_a?(Hash)
+                if class_value==nil
+                  avg_value = 0
+                  value.values.each{ |val| avg_value+=val }
+                  value = avg_value/value.values.size.to_f
+                else
+                  raise "bar plot value is hash, but no entry for class-value ("+class_value.to_s+"); value for "+a.to_s+" -> "+value.inspect unless value.key?(class_value)
+                  value = value[class_value]
+                end
               end
+              raise "value is nil\nattribute: "+a.to_s+"\nvalidation: "+v.inspect if value==nil
+              values.push(value)
+              labels.push(a.to_s.gsub("_","-") + ( class_value==nil ? "" : "("+class_value.to_s+")" ))
             end
-            raise "value is nil\nattribute: "+a.to_s+"\nvalidation: "+v.inspect if value==nil
+          else
+            value = v.send(a)
             values.push(value)
-            labels.push(a.to_s.gsub("_","-") + ( class_value==nil ? "" : "("+class_value.to_s+")" ))
+            labels.push(a.to_s.gsub("_","-"))
           end
+          
         end
         
         titles << v.send(title_attribute).to_s
+        raise "no title for '"+title_attribute.to_s+"' in validation: "+v.to_yaml if titles[-1].to_s.size==0
         data << values
       end
       
@@ -197,7 +226,9 @@ module Reports
       LOGGER.debug "bar plot labels: "+labels.inspect 
       LOGGER.debug "bar plot data: "+data.inspect
       
-      RubyPlot::plot_bars('Bar plot', labels, data, out_file)
+      out_files.each do |out_file|
+        RubyPlot::plot_bars('Bar plot', labels, data, out_file)
+      end
     end
     
     
@@ -261,42 +292,26 @@ module Reports
     end
     
     private
-    def self.transform_roc_predictions(validation_set, class_value, add_single_folds=false)
-      
+    def self.transform_roc_predictions(validation_set, class_value, add_label=true )
       if (validation_set.size > 1)
-        
-        names = []; fp_rate = []; tp_rate = []; faint = []
-        sum_roc_values = { :predicted_values => [], :actual_values => [], :confidence_values => []}
-        
+        values = { :predicted_values => [], :actual_values => [], :confidence_values => []}
         (0..validation_set.size-1).each do |i|
           roc_values = validation_set.get(i).get_predictions.get_prediction_values(class_value)
-          sum_roc_values[:predicted_values] += roc_values[:predicted_values]
-          sum_roc_values[:confidence_values] += roc_values[:confidence_values]
-          sum_roc_values[:actual_values] += roc_values[:actual_values]
-          if add_single_folds
-            begin
-              tp_fp_rates = get_tp_fp_rates(roc_values)
-              names << "fold "+i.to_s
-              fp_rate << tp_fp_rates[:fp_rate]
-              tp_rate << tp_fp_rates[:tp_rate]
-              faint << true
-            rescue
-              LOGGER.warn "could not get ROC vals for fold "+i.to_s
-            end
-          end
+          values[:predicted_values] += roc_values[:predicted_values]
+          values[:confidence_values] += roc_values[:confidence_values]
+          values[:actual_values] += roc_values[:actual_values]
         end
-        tp_fp_rates = get_tp_fp_rates(sum_roc_values)
-        names << nil # "all"
-        fp_rate << tp_fp_rates[:fp_rate]
-        tp_rate << tp_fp_rates[:tp_rate]
-        faint << false
-        return { :names => names, :fp_rate => fp_rate, :tp_rate => tp_rate, :faint => faint }
       else
-        roc_values = validation_set.validations[0].get_predictions.get_prediction_values(class_value)
-        tp_fp_rates = get_tp_fp_rates(roc_values)
-        return { :names => ["default"], :fp_rate => [tp_fp_rates[:fp_rate]], :tp_rate => [tp_fp_rates[:tp_rate]] }
+        values = validation_set.validations[0].get_predictions.get_prediction_values(class_value)
       end
+      tp_fp_rates = get_tp_fp_rates(values)
+      labels = []
+      tp_fp_rates[:youden].each do |point,confidence|
+        labels << ["confidence: "+confidence.to_nice_s, point[0], point[1]]
+      end if add_label
+      RubyPlot::LinePlotData.new(:name => "", :x_values => tp_fp_rates[:fp_rate], :y_values => tp_fp_rates[:tp_rate], :labels => labels)
     end
+    
     
     def self.transform_confidence_predictions(validation_set, class_value, add_single_folds=false)
       
@@ -333,20 +348,29 @@ module Reports
       else
         confidence_values = validation_set.validations[0].get_predictions.get_prediction_values(class_value)
         pref_conf_rates = get_performance_confidence_rates(confidence_values, validation_set.unique_feature_type)
-        return { :names => ["default"], :performance => [pref_conf_rates[:performance]], :confidence => [pref_conf_rates[:confidence]] }
+        return { :names => [""], :performance => [pref_conf_rates[:performance]], :confidence => [pref_conf_rates[:confidence]] }
       end
     end    
     
-    def self.demo_rock_plot
-      roc_values = {:confidence_values => [0.1, 0.9, 0.5, 0.6, 0.6, 0.6], 
-                    :predicted_values =>  [1, 0, 0, 1, 0, 1],
-                    :actual_values =>     [0, 1, 0, 0, 1, 1]}
+    def self.demo_roc_plot
+#      roc_values = {:confidence_values => [0.1, 0.9, 0.5, 0.6, 0.6, 0.6], 
+#                    :predicted_values =>  [1, 0, 0, 1, 0, 1],
+#                    :actual_values =>     [0, 1, 0, 0, 1, 1]}
+      roc_values = {:confidence_values => [0.9, 0.8, 0.7, 0.6, 0.5, 0.4], 
+                    :predicted_values =>  [1, 1, 1, 1, 1, 1],
+                    :actual_values =>     [1, 0, 1, 0, 1, 0]}
       tp_fp_rates = get_tp_fp_rates(roc_values)
-      data = { :names => ["default"], :fp_rate => [tp_fp_rates[:fp_rate]], :tp_rate => [tp_fp_rates[:tp_rate]] }                    
+      labels = []
+      tp_fp_rates[:youden].each do |point,confidence|
+        labels << ["confidence: "+confidence.to_s, point[0], point[1]]
+      end
+
+      plot_data = []
+      plot_data << RubyPlot::LinePlotData.new(:name => "testname", :x_values => tp_fp_rates[:fp_rate], :y_values => tp_fp_rates[:tp_rate], :labels => labels)
       RubyPlot::plot_lines("/tmp/plot.png",
         "ROC-Plot", 
         "False positive rate", 
-        "True Positive Rate", data[:names], data[:fp_rate], data[:tp_rate], data[:faint] )
+        "True Positive Rate", plot_data )
     end
     
     def self.get_performance_confidence_rates(roc_values, feature_type)
@@ -354,7 +378,7 @@ module Reports
       c = roc_values[:confidence_values]
       p = roc_values[:predicted_values]
       a = roc_values[:actual_values]
-      raise "no prediction values for roc-plot" if p.size==0
+      raise "no prediction values for confidence plot" if p.size==0
      
       (0..p.size-2).each do |i|
         ((i+1)..p.size-1).each do |j|
@@ -462,21 +486,43 @@ module Reports
       w = w.compress_sum(c2)
       #puts tp_rate.inspect+"\n"+fp_rate.inspect+"\n"+w.inspect+"\n\n"
       
+      youden = []
+      (0..tp_rate.size-1).each do |i|
+        tpr = tp_rate[i]/tp_rate[-1].to_f
+        fpr = fp_rate[i]/fp_rate[-1].to_f
+        youden << tpr + (1 - fpr)
+        #puts youden[-1].to_s+" ("+tpr.to_s+" "+fpr.to_s+")"
+      end
+      max = youden.max
+      youden_hash = {}
+      (0..tp_rate.size-1).each do |i|
+        if youden[i]==max and i>0
+          youden_hash[i] = c2[i]
+        end
+      end
+      #puts youden.inspect+"\n"+youden_hash.inspect+"\n\n"
+      
       (0..tp_rate.size-1).each do |i|
         tp_rate[i] = tp_rate[-1]>0 ? tp_rate[i]/tp_rate[-1].to_f*100 : 100
         fp_rate[i] = fp_rate[-1]>0 ? fp_rate[i]/fp_rate[-1].to_f*100 : 100
       end
       #puts tp_rate.inspect+"\n"+fp_rate.inspect+"\n\n"
       
-      return {:tp_rate => tp_rate,:fp_rate => fp_rate}
+      youden_coordinates_hash = {}
+      youden_hash.each do |i,c|
+        youden_coordinates_hash[[fp_rate[i],tp_rate[i]]] = c
+      end
+      #puts youden_coordinates_hash.inspect+"\n\n"
+      
+      return {:tp_rate => tp_rate,:fp_rate => fp_rate,:youden => youden_coordinates_hash}
     end
   end
 end
 
 #require "rubygems"
 #require "ruby-plot"
-#Reports::PlotFactory::demo_ranking_plot
-#Reports::PlotFactory::demo_rock_plot
+##Reports::PlotFactory::demo_ranking_plot
+#Reports::PlotFactory::demo_roc_plot
 
 #a = [1,    0,  1,  2,  3,  0, 2]
 #puts a.compress_sum([100, 90, 70, 70, 30, 10, 0]).inspect

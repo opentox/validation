@@ -1,12 +1,10 @@
 
 ['rubygems', 'logger', 'fileutils', 'sinatra', 'sinatra/url_for', 'rest_client', 
-  'yaml', 'fileutils', 'mime/types', 'abbrev', 'rinruby',
+  'yaml', 'fileutils', 'mime/types', 'abbrev', 
   'rexml/document',  'ruby-plot', 'opentox-ruby' ].each do |g|
     require g
 end
-gem 'ruby-plot', "~>0.4.0"
-
-#R.quit
+gem 'ruby-plot', "~>0.5.0"
 
 module Reports
 end
@@ -27,6 +25,8 @@ require "report/validation_data.rb"
 require "report/util.rb"
 require "report/statistical_test.rb"
 
+ICON_ERROR = File.join(CONFIG[:services]["opentox-validation"],"resources/error.png")
+ICON_OK = File.join(CONFIG[:services]["opentox-validation"],"resources/ok.png")
 
 
 

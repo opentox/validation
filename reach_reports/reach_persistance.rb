@@ -1209,6 +1209,8 @@ module ReachReports
       AttachmentDocument, QsarMiscellaneous, QmrfSummary, QmrfReport ].each do |model|
       model.auto_upgrade!
       model.raise_on_save_failure = true
-    end    
+    end
+
   end
+  
 end

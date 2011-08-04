@@ -162,33 +162,36 @@ module ReachReports
           next if cvs.size==0
           lmo << "crossvalidation/s on "+desc
           cvs.each do |cv|
-            lmo << "crossvalidation: "+cv.crossvalidation_uri
-            lmo << "dataset (see 9.3 Validation data): "+cv.dataset_uri
-            val_datasets << cv.dataset_uri
-            lmo << "settings: num-folds="+cv.num_folds.to_s+", random-seed="+cv.random_seed.to_s+", stratified:"+cv.stratified.to_s
-
-            val  = YAML.load( OpenTox::RestClientWrapper.get(File.join(cv.crossvalidation_uri,"statistics"),{:subjectid => r.subjectid}) )
-            case feature_type
-            when "classification"
-              lmo << "percent_correct: "+val[OT.classificationStatistics][OT.percentCorrect].to_s
-              lmo << "weighted AUC: "+val[OT.classificationStatistics][OT.weightedAreaUnderRoc].to_s
-            when "regression"
-              lmo << "root_mean_squared_error: "+val[OT.regressionStatistics][OT.rootMeanSquaredError].to_s
-              lmo << "r_square "+val[OT.regressionStatistics][OT.rSquare].to_s
-            end
-            reports = OpenTox::RestClientWrapper.get(File.join(CONFIG[:services]["opentox-validation"],
-              "report/crossvalidation?crossvalidation_uris="+cv.crossvalidation_uri),{:subjectid => r.subjectid})
-            if reports and reports.chomp.size>0
-              lmo << "for more info see report: "+reports.split("\n")[0]
-            else
-              lmo << "for more info see report: not yet created for '"+cv.crossvalidation_uri+"'"
+            begin
+              lmo << "crossvalidation: "+cv.crossvalidation_uri
+              lmo << "dataset (see 9.3 Validation data): "+cv.dataset_uri
+              val_datasets << cv.dataset_uri
+              lmo << "settings: num-folds="+cv.num_folds.to_s+", random-seed="+cv.random_seed.to_s+", stratified:"+cv.stratified.to_s
+  
+              val  = YAML.load( OpenTox::RestClientWrapper.get(File.join(cv.crossvalidation_uri,"statistics"),{:subjectid => r.subjectid}) )
+              case feature_type
+              when "classification"
+                lmo << "percent_correct: "+val[OT.classificationStatistics][OT.percentCorrect].to_s
+                lmo << "weighted AUC: "+val[OT.classificationStatistics][OT.weightedAreaUnderRoc].to_s
+              when "regression"
+                lmo << "root_mean_squared_error: "+val[OT.regressionStatistics][OT.rootMeanSquaredError].to_s
+                lmo << "r_square "+val[OT.regressionStatistics][OT.rSquare].to_s
+              end
+              reports = OpenTox::RestClientWrapper.get(File.join(CONFIG[:services]["opentox-validation"],
+                "report/crossvalidation?crossvalidation_uris="+cv.crossvalidation_uri),{:subjectid => r.subjectid})
+              if reports and reports.chomp.size>0
+                lmo << "for more info see report: "+reports.split("\n")[0]
+              else
+                lmo << "for more info see report: not yet created for '"+cv.crossvalidation_uri+"'"
+              end
+            rescue => ex
+              LOGGER.warn "could not add cv "+cv.crossvalidation_uri+" : "+ex.message            
             end
           end
           lmo << ""
         end
       end
-      
-    else
+   else
       lmo = [ "no prediction algortihm for model found, crossvalidation not possible" ]
     end
     r.qsar_robustness.lmo = lmo.to_html
@@ -276,7 +279,7 @@ module ReachReports
       end
     end
     task.progress(90) if task
-    
+
     mysql_lite_retry do 
       r.save
     end
@@ -287,7 +290,7 @@ module ReachReports
 #    
 #    report_content = get_report(type, id).get_content
 #    keys.each do |k|
-#      $sinatra.halt 400, type+" unknown report property '#{key}'" unless report_content.is_a?(Hash) and report_content.has_key?(k)
+#      $sinatra.raise OpenTox::BadRequestError.new type+" unknown report property '#{key}'" unless report_content.is_a?(Hash) and report_content.has_key?(k)
 #      report_content = report_content[k]
 #    end
 #    report_content    
