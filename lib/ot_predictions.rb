@@ -23,12 +23,12 @@ module Lib
         prediction_dataset_uris = [prediction_dataset_uris] unless prediction_dataset_uris.is_a?(Array)
         predicted_variables = [predicted_variables] unless predicted_variables.is_a?(Array)
         predicted_confidences = [predicted_confidences] unless predicted_confidences.is_a?(Array)
-        LOGGER.debug "loading prediciton -- test-dataset:       "+test_dataset_uris.inspect
-        LOGGER.debug "loading prediciton -- test-target-datset: "+test_target_dataset_uris.inspect
-        LOGGER.debug "loading prediciton -- prediction-dataset: "+prediction_dataset_uris.inspect
-        LOGGER.debug "loading prediciton -- predicted_variable: "+predicted_variables.inspect
-        LOGGER.debug "loading prediciton -- predicted_confidence: "+predicted_confidences.inspect
-        LOGGER.debug "loading prediciton -- prediction_feature: "+prediction_feature.to_s
+        LOGGER.debug "loading prediction -- test-dataset:       "+test_dataset_uris.inspect
+        LOGGER.debug "loading prediction -- test-target-datset: "+test_target_dataset_uris.inspect
+        LOGGER.debug "loading prediction -- prediction-dataset: "+prediction_dataset_uris.inspect
+        LOGGER.debug "loading prediction -- predicted_variable: "+predicted_variables.inspect
+        LOGGER.debug "loading prediction -- predicted_confidence: "+predicted_confidences.inspect
+        LOGGER.debug "loading prediction -- prediction_feature: "+prediction_feature.to_s
         raise "prediction_feature missing" unless prediction_feature
         
         @compounds = []
@@ -104,14 +104,16 @@ module Lib
         
           prediction_dataset = Lib::DatasetCache.find prediction_dataset_uri,subjectid
           raise "prediction dataset not found: '"+prediction_dataset_uri.to_s+"'" unless prediction_dataset
+          
+          # allow missing prediction feature if there are no compounds in the prediction dataset
           raise "predicted_variable not found in prediction_dataset\n"+
-                  "predicted_variable '"+predicted_variable.to_s+"'\n"+
-                  "prediction_dataset: '"+prediction_dataset_uri.to_s+"'\n"+
-                  "available features are: "+prediction_dataset.features.inspect if prediction_dataset.features.keys.index(predicted_variable)==nil
+              "predicted_variable '"+predicted_variable.to_s+"'\n"+
+              "prediction_dataset: '"+prediction_dataset_uri.to_s+"'\n"+
+              "available features are: "+prediction_dataset.features.inspect if prediction_dataset.features.keys.index(predicted_variable)==nil and prediction_dataset.compounds.size>0
           raise "predicted_confidence not found in prediction_dataset\n"+
                   "predicted_confidence '"+predicted_confidence.to_s+"'\n"+
                   "prediction_dataset: '"+prediction_dataset_uri.to_s+"'\n"+
-                  "available features are: "+prediction_dataset.features.inspect if predicted_confidence and prediction_dataset.features.keys.index(predicted_confidence)==nil
+                  "available features are: "+prediction_dataset.features.inspect if predicted_confidence and prediction_dataset.features.keys.index(predicted_confidence)==nil and prediction_dataset.compounds.size>0
 
           raise "more predicted than test compounds, #test: "+compounds.size.to_s+" < #prediction: "+
             prediction_dataset.compounds.size.to_s+", test-dataset: "+test_dataset_uri.to_s+", prediction-dataset: "+
