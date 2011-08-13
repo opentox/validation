@@ -400,7 +400,14 @@ get '/bootstrapping' do
       "All validations:    "+url_for("/",:full)+"\n"+
       "Validation reports: "+url_for("/report/validation",:full)
     description = 
-        "A list of all bootstrapping-validations.\n"+
+        "A list of all bootstrapping-validations.\n\n"+
+        "Bootstrapping performs sampling with replacement to create a training dataset and test dataset from the orignial dataset.\n"+
+        "Subsequently, a model is built with the training dataset and validated on the test-dataset.\n\n"+
+        "Quote from R Kohavi - A study of cross-validation and bootstrap for accuracy estimation and model selection,\n"+
+        "International joint Conference on artificial intelligence, 1995:\n"+
+        "'Given a dataset of size n, a bootstrap sample is created by sampling n instances uniformly from the data (with replacement).\n"+
+        " Since the dataset is sampled with replacement, the probability of any given instance not being chosen after n samples is (1 - 1/n)^n = e^-1 = 0.368;\n"+
+        " the expected number of distinct instances from the original dataset appearing in the test set is thus 0.632n.'\n\n"+
         "To perform a bootstrapping-validation use the POST method."
     post_command = OpenTox::PostCommand.new request.url,"Perform bootstrapping-validation"
     post_command.attributes << OpenTox::PostAttribute.new("algorithm_uri")
