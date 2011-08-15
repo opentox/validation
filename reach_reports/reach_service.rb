@@ -12,10 +12,12 @@ end
   
 module ReachReports
   
-  def self.list_reports(type)
+  def self.list_reports(type, model_uri=nil)
     case type
     when /(?i)QMRF/
-      ReachReports::QmrfReport.all.collect{ |r| r.report_uri }.join("\n")+"\n"
+      params = {}
+      params[:model_uri]=model_uri if model_uri
+      ReachReports::QmrfReport.all(params).collect{ |r| r.report_uri }.join("\n")+"\n"
     when /(?i)QPRF/
       ReachReports::QprfReport.all.collect{ |r| r.report_uri }.join("\n")+"\n"
     end

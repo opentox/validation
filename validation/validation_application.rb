@@ -8,6 +8,12 @@ require 'validation/validation_service.rb'
 
 get '/crossvalidation/?' do
   LOGGER.info "list all crossvalidations"
+  model_uri = params.delete("model") || params.delete("model_uri")
+  if model_uri
+    model = OpenTox::Model::Generic.find(model_uri)
+    params[:algorithm] = model.metadata[OT.algorithm]
+    params[:dataset] = model.metadata[OT.trainingDataset]
+  end
   uri_list = Lib::OhmUtil.find( Validation::Crossvalidation, params ).sort.collect{|v| v.crossvalidation_uri}.join("\n") + "\n"
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
