@@ -6,7 +6,7 @@ VAL_ATTR_CV = [ :algorithm_uri, :dataset_uri, :num_folds, :crossvalidation_fold 
 
 # selected attributes of interest when performing classification
 VAL_ATTR_CLASS = [ :num_instances, :num_unpredicted, :accuracy, :weighted_accuracy, :average_area_under_roc,
-  :area_under_roc, :f_measure, :true_positive_rate, :true_negative_rate ]
+  :area_under_roc, :f_measure, :true_positive_rate, :true_negative_rate, :positive_predictive_value, :negative_predictive_value ]
 VAL_ATTR_REGR = [ :num_instances, :num_unpredicted, :root_mean_squared_error, 
   :weighted_root_mean_squared_error, :mean_absolute_error, :weighted_mean_absolute_error, :r_square, :weighted_r_square,
   :sample_correlation_coefficient ]

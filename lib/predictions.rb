@@ -300,13 +300,34 @@ module Lib
     end
     
     def precision(class_index=nil)
-      return prediction_feature_value_map( lambda{ |i| precision(i) } ) if class_index==nil
+      return positive_predictive_value(class_index)
+    end
+    
+    def positive_predictive_value(class_index=nil)
+      return prediction_feature_value_map( lambda{ |i| positive_predictive_value(i) } ) if class_index==nil
       
       correct = 0 # all instances with prediction class_index that are correctly classified 
       total = 0 # all instances with prediciton class_index
       (0..@num_classes-1).each do |i|
          correct += @confusion_matrix[i][class_index] if i == class_index
          total += @confusion_matrix[i][class_index]
+      end
+      return 0 if total==0
+      return correct/total.to_f
+    end
+    
+    def negative_predictive_value(class_index=nil)
+      return prediction_feature_value_map( lambda{ |i| negative_predictive_value(i) } ) if class_index==nil
+      
+      correct = 0 # all instances with prediction class_index that are correctly classified 
+      total = 0 # all instances with prediciton class_index
+      (0..@num_classes-1).each do |i|
+        if i != class_index
+          (0..@num_classes-1).each do |j|
+            correct += @confusion_matrix[j][i] if j != class_index
+            total += @confusion_matrix[j][i]
+          end
+        end
       end
       return 0 if total==0
       return correct/total.to_f
