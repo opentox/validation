@@ -50,6 +50,10 @@ get '/report/?' do
   end
 end
 
+def wrap(s, width=78)
+  s.gsub(/(.{1,#{width}})(\s+|\Z)/, "\\1\n")
+end
+
 get '/report/:report_type' do
   perform do |rs|
     case request.env['HTTP_ACCEPT'].to_s
@@ -60,8 +64,15 @@ get '/report/:report_type' do
         "Crossvalidations:       "+url_for("/crossvalidation",:full)
       description = 
         "A list of all "+params[:report_type]+" reports. To create a report, use the POST method."
+      if params[:report_type]=="algorithm_comparison"
+        description += "\n\nThis report can be used to compare the validation results of different algorithms that have been validated on the same dataset."
+        description += "\nThe following attributes can be compared with the t-test:"
+        description += "\n\n* All validation types:\n"+wrap((Validation::VAL_PROPS_SUM+Validation::VAL_PROPS_AVG).join(", "),120)
+        description += "\n* Classification validations:\n"+wrap(Validation::VAL_CLASS_PROPS.join(", "),120)
+        description += "\n* Regresssion validations:\n"+wrap(Validation::VAL_REGR_PROPS.join(", "),120)
+      end
+        
       post_params = [[:validation_uris]]
-      
       post_command = OpenTox::PostCommand.new request.url,"Create validation report"
       val_uri_description = params[:report_type]=="algorithm_comparison" ? "Separate multiple uris with ','" : nil
       # trick for easy report creation
