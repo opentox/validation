@@ -5,19 +5,19 @@ VAL_ATTR_TRAIN_TEST = [ :model_uri, :training_dataset_uri, :test_dataset_uri, :p
 VAL_ATTR_CV = [ :algorithm_uri, :dataset_uri, :num_folds, :crossvalidation_fold ]
 
 # selected attributes of interest when performing classification
-VAL_ATTR_CLASS = [ :num_instances, :num_unpredicted, :accuracy, :weighted_accuracy, :weighted_area_under_roc,
+VAL_ATTR_CLASS = [ :num_instances, :num_unpredicted, :accuracy, :weighted_accuracy, :average_area_under_roc,
   :area_under_roc, :f_measure, :true_positive_rate, :true_negative_rate ]
 VAL_ATTR_REGR = [ :num_instances, :num_unpredicted, :root_mean_squared_error, 
   :weighted_root_mean_squared_error, :mean_absolute_error, :weighted_mean_absolute_error, :r_square, :weighted_r_square,
   :sample_correlation_coefficient ]
 
-#VAL_ATTR_BAR_PLOT_CLASS = [ :accuracy, :weighted_area_under_roc, 
+#VAL_ATTR_BAR_PLOT_CLASS = [ :accuracy, :average_area_under_roc, 
 #  :area_under_roc, :f_measure, :true_positive_rate, :true_negative_rate ]
 VAL_ATTR_BAR_PLOT_CLASS = [ :accuracy, :f_measure, :true_positive_rate, :true_negative_rate ]
 VAL_ATTR_BAR_PLOT_REGR = [ :root_mean_squared_error, :mean_absolute_error, :r_square ]
 
 VAL_ATTR_TTEST_REGR = [:r_square, :root_mean_squared_error]
-VAL_ATTR_TTEST_CLASS = [:percent_correct, :weighted_area_under_roc]
+VAL_ATTR_TTEST_CLASS = [:percent_correct, :average_area_under_roc]
 
 
 # = Reports::ReportFactory 
@@ -76,11 +76,13 @@ module Reports::ReportFactory
       report.add_result(validation_set, [:validation_uri] + VAL_ATTR_TRAIN_TEST + VAL_ATTR_CLASS, "Results", "Results")
       report.add_confusion_matrix(val)
       report.add_section("Plots")
-      ([nil] + validation_set.get_accept_values).each do |accept_value|
-        report.add_roc_plot(validation_set, accept_value)
-        report.add_confidence_plot(validation_set, accept_value)
-        title = accept_value ? "Plots for predicted class-value '"+accept_value.to_s+"'" : "Plots for all predictions"
-        report.align_last_two_images title
+      report.add_confidence_plot(validation_set)
+      if (validation_set.get_accept_values.size == 2)
+         report.add_roc_plot(validation_set, validation_set.get_accept_values[0])
+      else
+        validation_set.get_accept_values.each do |accept_value|
+          report.add_roc_plot(validation_set, accept_value)
+        end
       end
       report.end_section
     when "regression"
@@ -127,12 +129,14 @@ module Reports::ReportFactory
       report.add_confusion_matrix(cv_set.validations[0])
       report.add_section("Plots")
       [nil, :crossvalidation_fold].each do |split_attribute|
-        ([nil] + validation_set.get_accept_values).each do |accept_value|
-          report.add_roc_plot(validation_set, accept_value, split_attribute)
-          report.add_confidence_plot(validation_set, accept_value, split_attribute)
-          title = accept_value ? "Plots for predicted class-value '"+accept_value.to_s+"'" : "Plots for all predictions"
-          title += split_attribute ? ", separated by crossvalidation fold" : " (accumulated over all folds)"
-          report.align_last_two_images title
+        
+        report.add_confidence_plot(validation_set,nil,split_attribute)
+        if (validation_set.get_accept_values.size == 2)
+           report.add_roc_plot(validation_set, validation_set.get_accept_values[0], split_attribute)
+        else
+          validation_set.get_accept_values.each do |accept_value|
+            report.add_roc_plot(validation_set, accept_value, split_attribute)
+          end
         end
       end
       report.end_section
@@ -199,8 +203,8 @@ module Reports::ReportFactory
     if (validation_set.num_different_values(:dataset_uri)>1)
       all_merged = validation_set.merge([:algorithm_uri, :dataset_uri, :crossvalidation_id, :crossvalidation_uri])
       report.add_ranking_plots(all_merged, :algorithm_uri, :dataset_uri,
-        [:percent_correct, :weighted_area_under_roc, :true_positive_rate, :true_negative_rate] )
-      report.add_result_overview(all_merged, :algorithm_uri, :dataset_uri, [:percent_correct, :weighted_area_under_roc, :true_positive_rate, :true_negative_rate])
+        [:percent_correct, :average_area_under_roc, :true_positive_rate, :true_negative_rate] )
+      report.add_result_overview(all_merged, :algorithm_uri, :dataset_uri, [:percent_correct, :average_area_under_roc, :true_positive_rate, :true_negative_rate])
     end
       
     result_attributes = [:identifier,:crossvalidation_uri,:crossvalidation_report_uri]+VAL_ATTR_CV-[:crossvalidation_fold,:num_folds,:dataset_uri]

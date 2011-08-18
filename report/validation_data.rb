@@ -1,9 +1,9 @@
 
 # the variance is computed when merging results for these attributes 
 VAL_ATTR_VARIANCE = [ :area_under_roc, :percent_correct, :root_mean_squared_error, :mean_absolute_error, 
-  :r_square, :accuracy, :weighted_area_under_roc, :weighted_accuracy, :weighted_root_mean_squared_error, :weighted_mean_absolute_error, 
+  :r_square, :accuracy, :average_area_under_roc, :weighted_accuracy, :weighted_root_mean_squared_error, :weighted_mean_absolute_error, 
   :weighted_r_square  ]
-VAL_ATTR_RANKING = [ :area_under_roc, :percent_correct, :true_positive_rate, :true_negative_rate, :weighted_area_under_roc, :accuracy, :f_measure ]
+VAL_ATTR_RANKING = [ :area_under_roc, :percent_correct, :true_positive_rate, :true_negative_rate, :average_area_under_roc, :accuracy, :f_measure ]
 
 ATTR_NICE_NAME = {}
 

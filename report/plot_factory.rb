@@ -294,15 +294,14 @@ module Reports
     private
     def self.transform_roc_predictions(validation_set, class_value, add_label=true )
       if (validation_set.size > 1)
-        values = { :predicted_values => [], :actual_values => [], :confidence_values => []}
+        values = { :true_positives  => [], :confidence_values => []}
         (0..validation_set.size-1).each do |i|
-          roc_values = validation_set.get(i).get_predictions.get_prediction_values(class_value)
-          values[:predicted_values] += roc_values[:predicted_values]
+          roc_values = validation_set.get(i).get_predictions.get_roc_prediction_values(class_value)
+          values[:true_positives ] += roc_values[:true_positives ]
           values[:confidence_values] += roc_values[:confidence_values]
-          values[:actual_values] += roc_values[:actual_values]
         end
       else
-        values = validation_set.validations[0].get_predictions.get_prediction_values(class_value)
+        values = validation_set.validations[0].get_predictions.get_roc_prediction_values(class_value)
       end
       tp_fp_rates = get_tp_fp_rates(values)
       labels = []
@@ -357,8 +356,7 @@ module Reports
 #                    :predicted_values =>  [1, 0, 0, 1, 0, 1],
 #                    :actual_values =>     [0, 1, 0, 0, 1, 1]}
       roc_values = {:confidence_values => [0.9, 0.8, 0.7, 0.6, 0.5, 0.4], 
-                    :predicted_values =>  [1, 1, 1, 1, 1, 1],
-                    :actual_values =>     [1, 0, 1, 0, 1, 0]}
+                    :true_positives =>    [1, 1, 1, 0, 1, 0]}
       tp_fp_rates = get_tp_fp_rates(roc_values)
       labels = []
       tp_fp_rates[:youden].each do |point,confidence|
@@ -431,16 +429,15 @@ module Reports
     def self.get_tp_fp_rates(roc_values)
       
       c = roc_values[:confidence_values]
-      p = roc_values[:predicted_values]
-      a = roc_values[:actual_values]
-      raise "no prediction values for roc-plot" if p.size==0
+      tp = roc_values[:true_positives]
+      raise "no prediction values for roc-plot" if tp.size==0
       
       # hack for painting perfect/worst roc curve, otherwhise fp/tp-rate will always be 100%
       # determine if perfect/worst roc curve
       fp_found = false
       tp_found = false
-      (0..p.size-1).each do |i|
-        if a[i]!=p[i]
+      (0..tp.size-1).each do |i|
+        if tp[i]==0
           fp_found |= true
         else
           tp_found |=true
@@ -448,28 +445,26 @@ module Reports
         break if tp_found and fp_found
       end
       unless fp_found and tp_found #if perfect/worst add wrong/right instance with lowest confidence
-        a << (tp_found ? 0 : 1)
-        p << 1
+        tp << (tp_found ? 0 : 1)
         c << -Float::MAX
       end
       
-      (0..p.size-2).each do |i|
-        ((i+1)..p.size-1).each do |j|
+      (0..tp.size-2).each do |i|
+        ((i+1)..tp.size-1).each do |j|
           if c[i]<c[j]
             c.swap!(i,j)
-            a.swap!(i,j)
-            p.swap!(i,j)
+            tp.swap!(i,j)
           end
         end
       end
-      #puts c.inspect+"\n"+a.inspect+"\n"+p.inspect+"\n\n"
+      #puts c.inspect+"\n"+tp.inspect+"\n\n"
       
       tp_rate = [0]
       fp_rate = [0]
       w = [1]
       c2 = [Float::MAX]
-      (0..p.size-1).each do |i|
-        if a[i]==p[i]
+      (0..tp.size-1).each do |i|
+        if tp[i]==1
           tp_rate << tp_rate[-1]+1
           fp_rate << fp_rate[-1]
         else

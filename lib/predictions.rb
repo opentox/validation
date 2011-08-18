@@ -254,7 +254,6 @@ module Lib
       return res
     end
     
-    # does only take the instances that are classified as <class-index> into account
     def area_under_roc(class_index=nil)
       return prediction_feature_value_map( lambda{ |i| area_under_roc(i) } ) if 
         class_index==nil
@@ -268,15 +267,16 @@ module Lib
       tp_conf = []
       fp_conf = []
       (0..@predicted_values.size-1).each do |i|
-        if @predicted_values[i]==class_index
-          if @actual_values[i]==@predicted_values[i]
-            tp_conf.push(@confidence_values[i])
+        if @predicted_values[i]!=nil
+          c = @confidence_values[i] * (@predicted_values[i]==class_index ? 1 : -1)
+          if @actual_values[i]==class_index
+            tp_conf << c
           else
-            fp_conf.push(@confidence_values[i])
+            fp_conf << c
           end
         end
       end
-      #puts tp_conf.inspect+"\n"+fp_conf.inspect+"\n\n"
+      puts tp_conf.inspect+"\n"+fp_conf.inspect+"\n\n"
       
       return 0.0 if tp_conf.size == 0
       return 1.0 if fp_conf.size == 0
@@ -432,22 +432,18 @@ module Lib
       return incorrect
     end
     
-    # Note:
-    # * (un-weighted) area under roc is computed with all __predicted__ isntances for a certain class
-    # * weighted weights each auc with the number of __acutal__ instances
-    # its like that, because its like that in weka   
-    def weighted_area_under_roc
-      w_auc = weighted_measure( :area_under_roc )
+    def average_area_under_roc
+      w_auc = average_measure( :area_under_roc )
       w_auc.nan? ? 0 : w_auc
     end
     
-    def weighted_f_measure
-      return weighted_measure( :f_measure )
+    def average_f_measure
+      return average_measure( :f_measure )
     end
     
     private
-    # the <measure> is weighted with the number of instances for each actual class value 
-    def weighted_measure( measure )
+    # the <measure> is averaged over the number of instances for each actual class value 
+    def average_measure( measure )
       
       sum_instances = 0
       num_instances_per_class = Array.new(@num_classes, 0)
@@ -561,6 +557,35 @@ module Lib
     end
 
     # data for (roc-)plots ###################################################################################
+    
+     def get_roc_prediction_values(class_value)
+      
+      #puts "get_roc_values for class_value: "+class_value.to_s
+      raise "no confidence values" unless confidence_values_available?
+      raise "no class-value specified" if class_value==nil
+      
+      class_index = @accept_values.index(class_value) if class_value!=nil
+      raise "class not found "+class_value.to_s if (class_value!=nil && class_index==nil)
+      
+      c = []; tp = []
+      (0..@predicted_values.size-1).each do |i|
+        if @predicted_values[i]!=nil
+          c << @confidence_values[i] * (@predicted_values[i]==class_index ? 1 : -1)
+          if (@actual_values[i]==class_index)
+            tp << 1
+          else
+            tp << 0
+          end
+        end
+      end
+      
+      # DO NOT raise exception here, maybe different validations are concated
+      #raise "no instance predicted as '"+class_value+"'" if p.size == 0
+      
+      h = {:true_positives => tp, :confidence_values => c}
+      #puts h.inspect
+      return h
+    end
     
     def get_prediction_values(class_value)
       
