@@ -263,6 +263,18 @@ module Reports
       return unique_value("get_accept_values")
     end
     
+    def get_true_accept_value()
+      accept_values = get_accept_values()
+      if accept_values.size==2
+        if (accept_values[0] =~ TRUE_REGEXP and !(accept_values[1] =~ TRUE_REGEXP))
+          return accept_values[0]
+        elsif (accept_values[1] =~ TRUE_REGEXP and !(accept_values[0] =~ TRUE_REGEXP))
+          return accept_values[1]
+        end 
+      end
+      nil
+    end
+    
     def get_accept_values_for_attr( attribute )
       if !Validation::Validation.classification_property?(attribute)
         []
@@ -270,9 +282,8 @@ module Reports
         accept_values = get_accept_values()
         if !Validation::Validation.depends_on_class_value?(attribute)
           [ nil ]
-        elsif accept_values.size==2 and 
-            Validation::Validation.complement_exists?(attribute)
-          [ accept_values[0] ]
+        elsif accept_values.size==2 and get_true_accept_value()!=nil and Validation::Validation.complement_exists?(attribute)
+          [ get_true_accept_value() ]
         else
           accept_values
         end

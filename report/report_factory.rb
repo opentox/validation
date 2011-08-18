@@ -78,10 +78,11 @@ module Reports::ReportFactory
       report.add_section("Plots")
       report.add_confidence_plot(validation_set)
       if (validation_set.get_accept_values.size == 2)
-         report.add_roc_plot(validation_set, validation_set.get_accept_values[0])
-      else
-        validation_set.get_accept_values.each do |accept_value|
-          report.add_roc_plot(validation_set, accept_value)
+        if validation_set.get_true_accept_value!=nil
+          report.add_roc_plot(validation_set, validation_set.get_true_accept_value)
+        else
+          report.add_roc_plot(validation_set, validation_set.get_accept_values[0])
+          report.add_roc_plot(validation_set, validation_set.get_accept_values[1])
         end
       end
       report.end_section
@@ -132,10 +133,11 @@ module Reports::ReportFactory
         
         report.add_confidence_plot(validation_set,nil,split_attribute)
         if (validation_set.get_accept_values.size == 2)
-           report.add_roc_plot(validation_set, validation_set.get_accept_values[0], split_attribute)
-        else
-          validation_set.get_accept_values.each do |accept_value|
-            report.add_roc_plot(validation_set, accept_value, split_attribute)
+          if validation_set.get_true_accept_value!=nil
+            report.add_roc_plot(validation_set, validation_set.get_true_accept_value,split_attribute)
+          else
+            report.add_roc_plot(validation_set, validation_set.get_accept_values[0],split_attribute)
+            report.add_roc_plot(validation_set, validation_set.get_accept_values[1],split_attribute)
           end
         end
       end
