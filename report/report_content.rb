@@ -213,9 +213,10 @@ class Reports::ReportContent
   end
   
   def add_confidence_plot( validation_set,
-                            accept_value = nil,
+                            actual_accept_value = nil,
+                            predicted_accept_value = nil,
                             split_set_attribute = nil,
-                            image_title = "Percent Correct vs Confidence Plot",
+                            image_title = "Confidence Plot",
                             section_text="")
                             
     #section_conf = @xml_report.add_section(@current_section, section_title)
@@ -233,7 +234,7 @@ class Reports::ReportContent
       begin
         plot_png = add_tmp_file("conf_plot", "png")
         plot_svg = add_tmp_file("conf_plot", "svg")
-        Reports::PlotFactory.create_confidence_plot( [plot_png[:path], plot_svg[:path]], prediction_set, accept_value, split_set_attribute, false )
+        Reports::PlotFactory.create_confidence_plot( [plot_png[:path], plot_svg[:path]], prediction_set, actual_accept_value, predicted_accept_value, split_set_attribute, false )
         @xml_report.add_imagefigure(section_conf, image_title, plot_png[:name], "PNG", 100, plot_svg[:name])
       rescue Exception => ex
         msg = "WARNING could not create confidence plot: "+ex.message

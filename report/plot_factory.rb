@@ -130,8 +130,43 @@ module Reports
       end
     end
     
+    def self.confidence_plot_class_performance( validation_set, actual_accept_value, predicted_accept_value )
+      true_class = nil
+      if actual_accept_value==nil and predicted_accept_value==nil
+        perf = "Accuracy"
+      elsif actual_accept_value!=nil
+        if validation_set.get_true_accept_value==actual_accept_value
+          perf = "True Positive Rate"
+          true_class = actual_accept_value
+        elsif validation_set.get_accept_values.size==2 and validation_set.get_true_accept_value==(validation_set.get_accept_values-[actual_accept_value])[0]
+          perf = "True Negative Rate"
+          true_class = validation_set.get_true_accept_value
+        else
+          perf = "True Positive Rate"
+          true_class = actual_accept_value
+        end
+      elsif predicted_accept_value!=nil
+         if validation_set.get_true_accept_value==predicted_accept_value
+          perf = "Positive Predictive Value"
+          true_class = predicted_accept_value
+        elsif validation_set.get_accept_values.size==2 and validation_set.get_true_accept_value==(validation_set.get_accept_values-[predicted_accept_value])[0]
+          perf = "Negative Predictive Value"
+          true_class = validation_set.get_true_accept_value
+        else
+          perf = "Positive Predictive Value"
+          true_class = predicted_accept_value
+        end
+      end
+      title = perf+" vs Confidence Plot"
+      title += " (with True-Class: '"+true_class.to_s+"')" if true_class!=nil 
+      {:title =>title, :performance => perf}
+    end
     
-    def self.create_confidence_plot( out_files, validation_set, class_value, split_set_attribute=nil, show_single_curves=false )
+    
+    def self.create_confidence_plot( out_files, validation_set, actual_accept_value = nil,
+                            predicted_accept_value = nil, split_set_attribute=nil, show_single_curves=false )
+                            
+      raise "param combination not supported" if actual_accept_value!=nil and predicted_accept_value!=nil
       
       out_files = [out_files] unless out_files.is_a?(Array)
       LOGGER.debug "creating confidence plot for '"+validation_set.size.to_s+"' validations, out-file:"+out_files.inspect
@@ -143,7 +178,7 @@ module Reports
         performance = []
         attribute_values.each do |value|
           begin
-            data = transform_confidence_predictions(validation_set.filter({split_set_attribute => value}), class_value, false)
+            data = transform_confidence_predictions(validation_set.filter({split_set_attribute => value}), actual_accept_value, predicted_accept_value, false)
             names << split_set_attribute.to_s.nice_attr+" "+value.to_s
             confidence << data[:confidence][0]
             performance << data[:performance][0]
@@ -155,17 +190,19 @@ module Reports
         out_files.each do |out_file|
           case validation_set.unique_feature_type
           when "classification"
-            RubyPlot::accuracy_confidence_plot(out_file, "Percent Correct vs Confidence Plot", "Confidence", "Percent Correct", names, confidence, performance)
+            info = confidence_plot_class_performance( validation_set, actual_accept_value, predicted_accept_value )
+            RubyPlot::accuracy_confidence_plot(out_file, info[:title], "Confidence", info[:performance], names, confidence, performance)
           when "regression"
             RubyPlot::accuracy_confidence_plot(out_file, "RMSE vs Confidence Plot", "Confidence", "RMSE", names, confidence, performance, true)
           end
         end
       else
-        data = transform_confidence_predictions(validation_set, class_value, show_single_curves)
+        data = transform_confidence_predictions(validation_set, actual_accept_value, predicted_accept_value, show_single_curves)
         out_files.each do |out_file|
           case validation_set.unique_feature_type
           when "classification"
-            RubyPlot::accuracy_confidence_plot(out_file, "Percent Correct vs Confidence Plot", "Confidence", "Percent Correct", data[:names], data[:confidence], data[:performance])
+            info = confidence_plot_class_performance( validation_set, actual_accept_value, predicted_accept_value )
+            RubyPlot::accuracy_confidence_plot(out_file, info[:title], "Confidence", info[:performance], data[:names], data[:confidence], data[:performance])
           when "regression"
             RubyPlot::accuracy_confidence_plot(out_file, "RMSE vs Confidence Plot", "Confidence", "RMSE", data[:names], data[:confidence], data[:performance], true)
           end
@@ -312,7 +349,7 @@ module Reports
     end
     
     
-    def self.transform_confidence_predictions(validation_set, class_value, add_single_folds=false)
+    def self.transform_confidence_predictions(validation_set, actual_accept_value, predicted_accept_value, add_single_folds=false)
       
       if (validation_set.size > 1)
         
@@ -320,7 +357,7 @@ module Reports
         sum_confidence_values = { :predicted_values => [], :actual_values => [], :confidence_values => []}
         
         (0..validation_set.size-1).each do |i|
-          confidence_values = validation_set.get(i).get_predictions.get_prediction_values(class_value)
+          confidence_values = validation_set.get(i).get_predictions.get_prediction_values(actual_accept_value, predicted_accept_value)
           sum_confidence_values[:predicted_values] += confidence_values[:predicted_values]
           sum_confidence_values[:confidence_values] += confidence_values[:confidence_values]
           sum_confidence_values[:actual_values] += confidence_values[:actual_values]
@@ -345,7 +382,7 @@ module Reports
         return { :names => names, :performance => performance, :confidence => confidence, :faint => faint }
         
       else
-        confidence_values = validation_set.validations[0].get_predictions.get_prediction_values(class_value)
+        confidence_values = validation_set.validations[0].get_predictions.get_prediction_values(actual_accept_value, predicted_accept_value)
         pref_conf_rates = get_performance_confidence_rates(confidence_values, validation_set.unique_feature_type)
         return { :names => [""], :performance => [pref_conf_rates[:performance]], :confidence => [pref_conf_rates[:confidence]] }
       end

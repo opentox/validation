@@ -76,14 +76,20 @@ module Reports::ReportFactory
       report.add_result(validation_set, [:validation_uri] + VAL_ATTR_TRAIN_TEST + VAL_ATTR_CLASS, "Results", "Results")
       report.add_confusion_matrix(val)
       report.add_section("Plots")
-      report.add_confidence_plot(validation_set)
       if (validation_set.get_accept_values.size == 2)
         if validation_set.get_true_accept_value!=nil
           report.add_roc_plot(validation_set, validation_set.get_true_accept_value)
         else
           report.add_roc_plot(validation_set, validation_set.get_accept_values[0])
           report.add_roc_plot(validation_set, validation_set.get_accept_values[1])
+          report.align_last_two_images "ROC Plots"
         end
+      end
+      report.add_confidence_plot(validation_set)
+      validation_set.get_accept_values.each do |accept_value|
+        report.add_confidence_plot(validation_set, accept_value, nil)
+        report.add_confidence_plot(validation_set, nil, accept_value)
+        report.align_last_two_images "Confidence Plots"
       end
       report.end_section
     when "regression"
@@ -131,14 +137,20 @@ module Reports::ReportFactory
       report.add_section("Plots")
       [nil, :crossvalidation_fold].each do |split_attribute|
         
-        report.add_confidence_plot(validation_set,nil,split_attribute)
         if (validation_set.get_accept_values.size == 2)
           if validation_set.get_true_accept_value!=nil
             report.add_roc_plot(validation_set, validation_set.get_true_accept_value,split_attribute)
           else
             report.add_roc_plot(validation_set, validation_set.get_accept_values[0],split_attribute)
             report.add_roc_plot(validation_set, validation_set.get_accept_values[1],split_attribute)
+            report.align_last_two_images "ROC Plots"
           end
+        end
+        report.add_confidence_plot(validation_set,nil,nil,split_attribute)
+        validation_set.get_accept_values.each do |accept_value|
+          report.add_confidence_plot(validation_set, accept_value, nil,split_attribute)
+          report.add_confidence_plot(validation_set, nil, accept_value,split_attribute)
+          report.align_last_two_images "Confidence Plots"
         end
       end
       report.end_section

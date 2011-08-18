@@ -587,19 +587,24 @@ module Lib
       return h
     end
     
-    def get_prediction_values(class_value)
+    def get_prediction_values(actual_accept_value, predicted_accept_value)
       
       #puts "get_roc_values for class_value: "+class_value.to_s
       raise "no confidence values" unless confidence_values_available?
       #raise "no class-value specified" if class_value==nil
       
-      class_index = @accept_values.index(class_value) if class_value!=nil
-      raise "class not found "+class_value.to_s if (class_value!=nil && class_index==nil)
+      actual_class_index = @accept_values.index(actual_accept_value) if actual_accept_value!=nil
+      raise "class not found '"+actual_accept_value.to_s+"' in "+@accept_values.inspect if (actual_accept_value!=nil && actual_class_index==nil)
+      
+      predicted_class_index = @accept_values.index(predicted_accept_value) if predicted_accept_value!=nil
+      raise "class not found "+predicted_accept_value.to_s+" in "+@accept_values.inspect if (predicted_accept_value!=nil && predicted_class_index==nil)
       
       c = []; p = []; a = []
       (0..@predicted_values.size-1).each do |i|
         # NOTE: not predicted instances are ignored here
-        if @predicted_values[i]!=nil and (class_index==nil || @predicted_values[i]==class_index)
+        if @predicted_values[i]!=nil and 
+            (predicted_class_index==nil || @predicted_values[i]==predicted_class_index) and
+            (actual_class_index==nil || @actual_values[i]==actual_class_index)
           c << @confidence_values[i]
           p << @predicted_values[i]
           a << @actual_values[i]
