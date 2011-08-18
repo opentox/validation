@@ -110,8 +110,8 @@ module ReachReports
     # TODO app_domain_description, app_domain_method, app_domain_software, applicability_limits
 
     #training_dataset = model.trainingDataset ? OpenTox::Dataset.find(model.trainingDataset+"/metadata") : nil
-    if ( OpenTox::Dataset.exist?(model.metadata[OT.trainingDataset]) )
-      training_dataset = OpenTox::Dataset.new( model.metadata[OT.trainingDataset] )
+    if ( OpenTox::Dataset.exist?(model.metadata[OT.trainingDataset], r.subjectid) )
+      training_dataset = OpenTox::Dataset.new( model.metadata[OT.trainingDataset], r.subjectid )
       training_dataset.load_metadata( r.subjectid )
     else
       training_dataset = nil
@@ -272,7 +272,7 @@ module ReachReports
         
     val_datasets.each do |data_uri|
       if OpenTox::Dataset.exist?(data_uri, r.subjectid)
-        d = OpenTox::Dataset.new(data_uri)
+        d = OpenTox::Dataset.new(data_uri, r.subjectid)
         d.load_metadata( r.subjectid)
         r.qsar_miscellaneous.attachment_validation_data << AttachmentValidationData.new( 
           { :description => d.title, 
