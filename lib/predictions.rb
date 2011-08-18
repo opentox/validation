@@ -276,7 +276,7 @@ module Lib
           end
         end
       end
-      puts tp_conf.inspect+"\n"+fp_conf.inspect+"\n\n"
+      #puts tp_conf.inspect+"\n"+fp_conf.inspect+"\n\n"
       
       return 0.0 if tp_conf.size == 0
       return 1.0 if fp_conf.size == 0

@@ -13,11 +13,11 @@ VAL_ATTR_REGR = [ :num_instances, :num_unpredicted, :root_mean_squared_error,
 
 #VAL_ATTR_BAR_PLOT_CLASS = [ :accuracy, :average_area_under_roc, 
 #  :area_under_roc, :f_measure, :true_positive_rate, :true_negative_rate ]
-VAL_ATTR_BAR_PLOT_CLASS = [ :accuracy, :f_measure, :true_positive_rate, :true_negative_rate ]
+VAL_ATTR_BAR_PLOT_CLASS = [ :accuracy, :f_measure, :true_positive_rate, :true_negative_rate, :positive_predictive_value, :negative_predictive_value ]
 VAL_ATTR_BAR_PLOT_REGR = [ :root_mean_squared_error, :mean_absolute_error, :r_square ]
 
-VAL_ATTR_TTEST_REGR = [:r_square, :root_mean_squared_error]
-VAL_ATTR_TTEST_CLASS = [:percent_correct, :average_area_under_roc]
+VAL_ATTR_TTEST_REGR = [ :r_square, :root_mean_squared_error ]
+VAL_ATTR_TTEST_CLASS = [ :accuracy, :average_area_under_roc ]
 
 
 # = Reports::ReportFactory 
@@ -240,6 +240,12 @@ module Reports::ReportFactory
     if params[:ttest_significance]
       ttest_significance = params[:ttest_significance].to_f
     end
+    
+    bar_plot_attributes += ttest_attributes
+    bar_plot_attributes.uniq!
+    
+    result_attributes += ttest_attributes
+    result_attributes.uniq!
       
     dataset_grouping.each do |validations|
     
