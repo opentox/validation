@@ -18,7 +18,7 @@ module Validation
   # :classification_statistics
   VAL_CLASS_PROPS_SINGLE_SUM = [ :num_correct, :num_incorrect, :confusion_matrix  ]
   VAL_CLASS_PROPS_SINGLE_AVG = [ :percent_correct, :percent_incorrect, 
-    :weighted_area_under_roc, :accuracy, :weighted_accuracy ] 
+    :average_area_under_roc, :accuracy, :weighted_accuracy ] 
   VAL_CLASS_PROPS_SINGLE = VAL_CLASS_PROPS_SINGLE_SUM + VAL_CLASS_PROPS_SINGLE_AVG
   
   # :class_value_statistics
@@ -30,7 +30,7 @@ module Validation
   VAL_CLASS_PROPS_PER_CLASS = VAL_CLASS_PROPS_PER_CLASS_SUM + VAL_CLASS_PROPS_PER_CLASS_AVG
   VAL_CLASS_PROPS_PER_CLASS_COMPLEMENT_EXISTS = [ :num_false_positives, :num_false_negatives, 
                                 :num_true_positives, :num_true_negatives, :false_negative_rate, :false_positive_rate,
-                                :true_negative_rate, :true_positive_rate ] #:precision, :recall, 
+                                :true_negative_rate, :true_positive_rate, :area_under_roc ] #:precision, :recall, 
                                 
   VAL_CLASS_PROPS = VAL_CLASS_PROPS_SINGLE + VAL_CLASS_PROPS_PER_CLASS
 

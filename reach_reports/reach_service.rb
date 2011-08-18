@@ -229,7 +229,7 @@ module ReachReports
         case feature_type
         when "classification"
           v << "percent_correct: "+validation.classification_statistics[:percent_correct].to_s
-          v << "weighted AUC: "+validation.classification_statistics[:weighted_area_under_roc].to_s
+          v << "average AUC: "+validation.classification_statistics[:average_area_under_roc].to_s
         when "regression"
           v << "root_mean_squared_error: "+validation.regression_statistics[:root_mean_squared_error].to_s
           v << "r_square "+validation.regression_statistics[:r_square].to_s

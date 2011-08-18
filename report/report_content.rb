@@ -179,13 +179,14 @@ class Reports::ReportContent
   def add_roc_plot( validation_set, 
                     accept_value, 
                     split_set_attribute=nil, 
-                    image_title = "ROC Plot", 
+                    image_title = nil, 
                     section_text="")
                             
     #section_roc = @xml_report.add_section(@current_section, section_title)
     section_roc = @current_section
     prediction_set = validation_set.collect{ |v| v.get_predictions && v.get_predictions.confidence_values_available? }
-        
+    image_title = "ROC Plot (true class is '"+accept_value.to_s+"')" unless image_title
+    
     if prediction_set.size>0
       if prediction_set.size!=validation_set.size
         section_text += "\nWARNING: roc plot information not available for all validation results"
