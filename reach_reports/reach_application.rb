@@ -48,6 +48,7 @@ end
 get '/reach_report/:type' do
   type = extract_type(params)
   LOGGER.info "list all "+type+" reports"
+  uris = ReachReports.list_reports(type,params[:model] || params[:model_uri])
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     content_type "text/html"
     related_links = 
@@ -66,10 +67,10 @@ get '/reach_report/:type' do
     when /(?i)QPRF/
       #TODO
     end
-    OpenTox.text_to_html ReachReports.list_reports(type),@subjectid,related_links,description,post_command
+    OpenTox.text_to_html uris,@subjectid,related_links,description,post_command
   else
     content_type "text/uri-list"
-    ReachReports.list_reports(type)
+    uris
   end
 end
 
@@ -181,6 +182,12 @@ get '/reach_report/:type/:id/editor' do
 <j2se version="1.6+" java-vm-args="-Xincgc"/>
 
 <jar href="qmrfedit/OT_QMRFEditor.jar" download="eager" main="true"/>
+<jar href="qmrfedit/OT_QMRFEditor_lib/xercesImpl.jar" download="eager"/>
+<jar href="qmrfedit/OT_QMRFEditor_lib/itext-1.4.5.jar" download="lazy"/>
+<jar href="qmrfedit/OT_QMRFEditor_lib/poi-3.0.jar" download="lazy"/>
+<jar href="qmrfedit/OT_QMRFEditor_lib/poi-contrib.jar" download="lazy"/>
+<jar href="qmrfedit/OT_QMRFEditor_lib/poi-scratchpad.jar" download="lazy"/>
+<jar href="qmrfedit/OT_QMRFEditor_lib/commons-lang-2.3.jar" download="lazy"/>
 <jar href="qmrfedit/OT_QMRFEditor_lib/cdk-applications.jar" download="lazy" />
 <jar href="qmrfedit/OT_QMRFEditor_lib/cdk-builder3d.jar" download="lazy" />
 <jar href="qmrfedit/OT_QMRFEditor_lib/cdk-charges.jar" download="lazy" />

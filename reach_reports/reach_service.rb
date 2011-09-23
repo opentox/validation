@@ -12,10 +12,12 @@ end
   
 module ReachReports
   
-  def self.list_reports(type)
+  def self.list_reports(type, model_uri=nil)
     case type
     when /(?i)QMRF/
-      ReachReports::QmrfReport.all.collect{ |r| r.report_uri }.join("\n")+"\n"
+      params = {}
+      params[:model_uri]=model_uri if model_uri
+      ReachReports::QmrfReport.all(params).collect{ |r| r.report_uri }.join("\n")+"\n"
     when /(?i)QPRF/
       ReachReports::QprfReport.all.collect{ |r| r.report_uri }.join("\n")+"\n"
     end
@@ -108,8 +110,8 @@ module ReachReports
     # TODO app_domain_description, app_domain_method, app_domain_software, applicability_limits
 
     #training_dataset = model.trainingDataset ? OpenTox::Dataset.find(model.trainingDataset+"/metadata") : nil
-    if ( OpenTox::Dataset.exist?(model.metadata[OT.trainingDataset]) )
-      training_dataset = OpenTox::Dataset.new( model.metadata[OT.trainingDataset] )
+    if ( OpenTox::Dataset.exist?(model.metadata[OT.trainingDataset], r.subjectid) )
+      training_dataset = OpenTox::Dataset.new( model.metadata[OT.trainingDataset], r.subjectid )
       training_dataset.load_metadata( r.subjectid )
     else
       training_dataset = nil
@@ -227,7 +229,7 @@ module ReachReports
         case feature_type
         when "classification"
           v << "percent_correct: "+validation.classification_statistics[:percent_correct].to_s
-          v << "weighted AUC: "+validation.classification_statistics[:weighted_area_under_roc].to_s
+          v << "average AUC: "+validation.classification_statistics[:average_area_under_roc].to_s
         when "regression"
           v << "root_mean_squared_error: "+validation.regression_statistics[:root_mean_squared_error].to_s
           v << "r_square "+validation.regression_statistics[:r_square].to_s
@@ -270,7 +272,7 @@ module ReachReports
         
     val_datasets.each do |data_uri|
       if OpenTox::Dataset.exist?(data_uri, r.subjectid)
-        d = OpenTox::Dataset.new(data_uri)
+        d = OpenTox::Dataset.new(data_uri, r.subjectid)
         d.load_metadata( r.subjectid)
         r.qsar_miscellaneous.attachment_validation_data << AttachmentValidationData.new( 
           { :description => d.title, 

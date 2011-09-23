@@ -179,13 +179,14 @@ class Reports::ReportContent
   def add_roc_plot( validation_set, 
                     accept_value, 
                     split_set_attribute=nil, 
-                    image_title = "ROC Plot", 
+                    image_title = nil, 
                     section_text="")
                             
     #section_roc = @xml_report.add_section(@current_section, section_title)
     section_roc = @current_section
     prediction_set = validation_set.collect{ |v| v.get_predictions && v.get_predictions.confidence_values_available? }
-        
+    image_title = "ROC Plot (true class is '"+accept_value.to_s+"')" unless image_title
+    
     if prediction_set.size>0
       if prediction_set.size!=validation_set.size
         section_text += "\nWARNING: roc plot information not available for all validation results"
@@ -212,9 +213,10 @@ class Reports::ReportContent
   end
   
   def add_confidence_plot( validation_set,
-                            accept_value = nil,
+                            actual_accept_value = nil,
+                            predicted_accept_value = nil,
                             split_set_attribute = nil,
-                            image_title = "Percent Correct vs Confidence Plot",
+                            image_title = "Confidence Plot",
                             section_text="")
                             
     #section_conf = @xml_report.add_section(@current_section, section_title)
@@ -232,7 +234,7 @@ class Reports::ReportContent
       begin
         plot_png = add_tmp_file("conf_plot", "png")
         plot_svg = add_tmp_file("conf_plot", "svg")
-        Reports::PlotFactory.create_confidence_plot( [plot_png[:path], plot_svg[:path]], prediction_set, accept_value, split_set_attribute, false )
+        Reports::PlotFactory.create_confidence_plot( [plot_png[:path], plot_svg[:path]], prediction_set, actual_accept_value, predicted_accept_value, split_set_attribute, false )
         @xml_report.add_imagefigure(section_conf, image_title, plot_png[:name], "PNG", 100, plot_svg[:name])
       rescue Exception => ex
         msg = "WARNING could not create confidence plot: "+ex.message
