@@ -148,7 +148,7 @@ module Reports
     # loads all crossvalidation attributes, of the corresponding cv into this object 
     def load_cv_attributes
       raise "crossvalidation-id not set" unless @crossvalidation_id
-      Reports.validation_access.init_cv(self)
+      Reports.validation_access.init_cv(self, @subjectid)
       # load cv report
       ids = Reports.persistance.list_reports("crossvalidation",{:crossvalidation=>self.crossvalidation_uri.to_s })
       @crossvalidation_report_uri = ReportService.instance.get_uri("crossvalidation",ids[-1]) if ids and ids.size>0
