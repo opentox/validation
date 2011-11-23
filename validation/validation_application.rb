@@ -152,7 +152,7 @@ get '/crossvalidation/:id' do
     description = 
         "A crossvalidation resource."
     content_type "text/html"
-    OpenTox.text_to_html crossvalidation.to_yaml,@subjectid,related_links,description
+    OpenTox.text_to_html crossvalidation.to_rdf_yaml,@subjectid,related_links,description
   when "application/serialize"
     content_type "application/serialize"
     crossvalidation.get_content_as_hash # to load all the stuff
@@ -666,7 +666,7 @@ get '/:id' do
       "Get validation predictions:      "+url_for("/"+params[:id]+"/predictions",:full)+"\n"+
       "All validations:                 "+url_for("/",:full)+"\n"+
       "All validation reports:          "+url_for("/report/validation",:full)
-    OpenTox.text_to_html validation.to_yaml,@subjectid,related_links,description
+    OpenTox.text_to_html validation.to_rdf_yaml,@subjectid,related_links,description
   when "application/serialize"
     content_type "application/serialize"
     validation.get_content_as_hash # to load all the stuff
