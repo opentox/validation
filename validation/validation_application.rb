@@ -155,7 +155,7 @@ get '/crossvalidation/:id' do
     OpenTox.text_to_html crossvalidation.to_rdf_yaml,@subjectid,related_links,description
   when "application/serialize"
     content_type "application/serialize"
-    crossvalidation.get_content_as_hash # to load all the stuff
+    crossvalidation.inspect # to load all the stuff
     crossvalidation.to_yaml
   when /application\/x-yaml|\*\/\*/
     content_type "application/x-yaml"
@@ -182,7 +182,7 @@ get '/crossvalidation/:id/statistics' do
     v.to_rdf
   when "application/serialize"
     content_type "application/serialize"
-    v.get_content_as_hash # to load all the stuff
+    v.inspect # to load all the stuff
     v.to_yaml    
   else
     content_type "application/x-yaml"
@@ -669,7 +669,7 @@ get '/:id' do
     OpenTox.text_to_html validation.to_rdf_yaml,@subjectid,related_links,description
   when "application/serialize"
     content_type "application/serialize"
-    validation.get_content_as_hash # to load all the stuff
+    validation.inspect # to load all the stuff
     validation.to_yaml
   else #default is yaml 
     content_type "application/x-yaml"
