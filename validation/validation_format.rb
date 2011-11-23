@@ -67,7 +67,7 @@ module Validation
       s.to_rdfxml
     end
     
-    def to_yaml
+    def to_rdf_yaml
       get_content_as_hash.keys_to_rdf_format.keys_to_owl_uris.to_yaml
     end
     
@@ -96,7 +96,7 @@ module Validation
       s.to_rdfxml
     end
     
-    def to_yaml
+    def to_rdf_yaml
       get_content_as_hash.keys_to_rdf_format.keys_to_owl_uris.to_yaml
     end
   end

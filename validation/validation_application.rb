@@ -153,9 +153,13 @@ get '/crossvalidation/:id' do
         "A crossvalidation resource."
     content_type "text/html"
     OpenTox.text_to_html crossvalidation.to_yaml,@subjectid,related_links,description
+  when "application/serialize"
+    content_type "application/serialize"
+    crossvalidation.get_content_as_hash # to load all the stuff
+    crossvalidation.to_yaml
   when /application\/x-yaml|\*\/\*/
     content_type "application/x-yaml"
-    crossvalidation.to_yaml
+    crossvalidation.to_rdf_yaml
   else
     raise OpenTox::BadRequestError.new "MIME type '"+request.env['HTTP_ACCEPT'].to_s+"' not supported, valid Accept-Headers: \"application/rdf+xml\", \"application/x-yaml\", \"text/html\"."
   end
@@ -172,13 +176,17 @@ get '/crossvalidation/:id/statistics' do
     description = 
        "The averaged statistics for the crossvalidation."
     content_type "text/html"
-    OpenTox.text_to_html v.to_yaml,@subjectid,related_links,description
+    OpenTox.text_to_html v.to_rdf_yaml,@subjectid,related_links,description
   when "application/rdf+xml"
     content_type "application/rdf+xml"
     v.to_rdf
+  when "application/serialize"
+    content_type "application/serialize"
+    v.get_content_as_hash # to load all the stuff
+    v.to_yaml    
   else
     content_type "application/x-yaml"
-    v.to_yaml
+    v.to_rdf_yaml
   end
 end
 
@@ -562,6 +570,38 @@ post '/validate_datasets' do
   return_task(task)
 end
 
+get '/:id/verify_r_square' do
+
+  #PENDING: this is debug code, move to test-suite
+  
+  validation = Validation::Validation.get(params[:id])
+  p = validation.compute_validation_stats_with_model(nil, true)
+  
+  puts "actual                               "+p.actual_values.inspect
+  puts "predicted                            "+p.predicted_values.inspect
+  puts ""
+  
+  puts "ot r-square                          "+p.r_square.to_s
+  puts "ot sample_correlation_coefficient    "+p.sample_correlation_coefficient.to_s
+  puts "ot sample_correlation_coefficient**2 "+(p.sample_correlation_coefficient**2).to_s
+  puts ""
+  
+  @@r = RinRuby.new(true,false) unless defined?(@@r) and @@r 
+  @@r.assign "v1",p.actual_values
+  @@r.assign "v2",p.predicted_values
+  puts "r cor                                "+@@r.pull("cor(v1,v2)").to_s
+    #  @@r.eval "ttest = t.test(v1,v2,paired=T)"
+     # t = @@r.pull "ttest$statistic"
+  @@r.eval "fit <- lm(v1 ~ v2)"
+  @@r.eval "sum <- summary(fit)"
+  puts "r r-square                           "+@@r.pull("sum$r.squared").to_s
+  puts "r adjusted-r-square                  "+@@r.pull("sum$adj.r.squared").to_s
+
+  @@r.quit
+  @@r = nil
+  
+end
+
 get '/:id/predictions' do
   LOGGER.info "get validation predictions "+params.inspect
   begin
@@ -627,9 +667,13 @@ get '/:id' do
       "All validations:                 "+url_for("/",:full)+"\n"+
       "All validation reports:          "+url_for("/report/validation",:full)
     OpenTox.text_to_html validation.to_yaml,@subjectid,related_links,description
+  when "application/serialize"
+    content_type "application/serialize"
+    validation.get_content_as_hash # to load all the stuff
+    validation.to_yaml
   else #default is yaml 
     content_type "application/x-yaml"
-    validation.to_yaml
+    validation.to_rdf_yaml
   end
 end
 
