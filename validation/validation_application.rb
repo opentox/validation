@@ -570,38 +570,6 @@ post '/validate_datasets' do
   return_task(task)
 end
 
-get '/:id/verify_r_square' do
-
-  #PENDING: this is debug code, move to test-suite
-  
-  validation = Validation::Validation.get(params[:id])
-  p = validation.compute_validation_stats_with_model(nil, true)
-  
-  puts "actual                               "+p.actual_values.inspect
-  puts "predicted                            "+p.predicted_values.inspect
-  puts ""
-  
-  puts "ot r-square                          "+p.r_square.to_s
-  puts "ot sample_correlation_coefficient    "+p.sample_correlation_coefficient.to_s
-  puts "ot sample_correlation_coefficient**2 "+(p.sample_correlation_coefficient**2).to_s
-  puts ""
-  
-  @@r = RinRuby.new(true,false) unless defined?(@@r) and @@r 
-  @@r.assign "v1",p.actual_values
-  @@r.assign "v2",p.predicted_values
-  puts "r cor                                "+@@r.pull("cor(v1,v2)").to_s
-    #  @@r.eval "ttest = t.test(v1,v2,paired=T)"
-     # t = @@r.pull "ttest$statistic"
-  @@r.eval "fit <- lm(v1 ~ v2)"
-  @@r.eval "sum <- summary(fit)"
-  puts "r r-square                           "+@@r.pull("sum$r.squared").to_s
-  puts "r adjusted-r-square                  "+@@r.pull("sum$adj.r.squared").to_s
-
-  @@r.quit
-  @@r = nil
-  
-end
-
 get '/:id/predictions' do
   LOGGER.info "get validation predictions "+params.inspect
   begin

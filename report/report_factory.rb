@@ -85,10 +85,10 @@ module Reports::ReportFactory
           report.align_last_two_images "ROC Plots"
         end
       end
-      report.add_confidence_plot(validation_set)
+      report.add_confidence_plot(validation_set, :accuracy, nil)
       validation_set.get_accept_values.each do |accept_value|
-        report.add_confidence_plot(validation_set, accept_value, nil)
-        report.add_confidence_plot(validation_set, nil, accept_value)
+        report.add_confidence_plot(validation_set, :true_positive_rate, accept_value)
+        report.add_confidence_plot(validation_set, :positive_predictive_value, accept_value)
         report.align_last_two_images "Confidence Plots"
       end
       report.end_section
@@ -96,7 +96,9 @@ module Reports::ReportFactory
       report.add_result(validation_set, [:validation_uri] + VAL_ATTR_TRAIN_TEST + VAL_ATTR_REGR, "Results", "Results")
       report.add_section("Plots")
       report.add_regression_plot(validation_set, :model_uri)
-      report.add_confidence_plot(validation_set)
+      report.add_confidence_plot(validation_set, :root_mean_squared_error, nil)
+      report.add_confidence_plot(validation_set, :r_square, nil)
+      report.align_last_two_images "Confidence Plots"
       report.end_section
     end
     task.progress(90) if task
@@ -146,10 +148,10 @@ module Reports::ReportFactory
             report.align_last_two_images "ROC Plots"
           end
         end
-        report.add_confidence_plot(validation_set,nil,nil,split_attribute)
+        report.add_confidence_plot(validation_set,:accuracy,nil,split_attribute)
         validation_set.get_accept_values.each do |accept_value|
-          report.add_confidence_plot(validation_set, accept_value, nil,split_attribute)
-          report.add_confidence_plot(validation_set, nil, accept_value,split_attribute)
+          report.add_confidence_plot(validation_set, :true_positive_rate, accept_value, split_attribute)
+          report.add_confidence_plot(validation_set, :positive_predictive_value, accept_value, split_attribute)
           report.align_last_two_images "Confidence Plots"
         end
       end
@@ -160,8 +162,12 @@ module Reports::ReportFactory
       report.add_result(cv_set, [:crossvalidation_uri]+VAL_ATTR_CV+VAL_ATTR_REGR-[:crossvalidation_fold],res_titel, res_titel, res_text)
       report.add_section("Plots")
       report.add_regression_plot(validation_set, :crossvalidation_fold)
-      report.add_confidence_plot(validation_set)
-      report.add_confidence_plot(validation_set, nil, :crossvalidation_fold)
+      report.add_confidence_plot(validation_set, :root_mean_squared_error, nil)
+      report.add_confidence_plot(validation_set, :r_square, nil)
+      report.align_last_two_images "Confidence Plots"
+      report.add_confidence_plot(validation_set, :root_mean_squared_error, nil, :crossvalidation_fold)
+      report.add_confidence_plot(validation_set, :r_square, nil, :crossvalidation_fold)
+      report.align_last_two_images "Confidence Plots Across Folds"
       report.end_section
       report.add_result(validation_set, [:validation_uri, :validation_report_uri]+VAL_ATTR_CV+VAL_ATTR_REGR-[:num_folds, :dataset_uri, :algorithm_uri], "Results","Results")
     end

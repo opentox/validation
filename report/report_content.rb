@@ -156,6 +156,7 @@ class Reports::ReportContent
       
         section_text += "\nWARNING: regression plot information not available for all validation results" if prediction_set.size!=validation_set.size
         @xml_report.add_paragraph(section_regr, section_text) if section_text
+        
         begin
           log_str = (log ? "_log" : "")
           plot_png = add_tmp_file("regr_plot"+log_str, "png")
@@ -213,8 +214,8 @@ class Reports::ReportContent
   end
   
   def add_confidence_plot( validation_set,
-                            actual_accept_value = nil,
-                            predicted_accept_value = nil,
+                            performance_attribute,
+                            performance_accept_value,
                             split_set_attribute = nil,
                             image_title = "Confidence Plot",
                             section_text="")
@@ -234,7 +235,8 @@ class Reports::ReportContent
       begin
         plot_png = add_tmp_file("conf_plot", "png")
         plot_svg = add_tmp_file("conf_plot", "svg")
-        Reports::PlotFactory.create_confidence_plot( [plot_png[:path], plot_svg[:path]], prediction_set, actual_accept_value, predicted_accept_value, split_set_attribute, false )
+        Reports::PlotFactory.create_confidence_plot( [plot_png[:path], plot_svg[:path]], prediction_set, performance_attribute, 
+          performance_accept_value, split_set_attribute, false )
         @xml_report.add_imagefigure(section_conf, image_title, plot_png[:name], "PNG", 100, plot_svg[:name])
       rescue Exception => ex
         msg = "WARNING could not create confidence plot: "+ex.message

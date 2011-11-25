@@ -2,6 +2,10 @@ ENV['JAVA_HOME'] = "/usr/bin" unless ENV['JAVA_HOME']
 ENV['PATH'] = ENV['JAVA_HOME']+":"+ENV['PATH'] unless ENV['PATH'].split(":").index(ENV['JAVA_HOME'])
 ENV['RANK_PLOTTER_JAR'] = "RankPlotter/RankPlotter.jar" unless ENV['RANK_PLOTTER_JAR']
 
+CONF_PLOT_RANGE = { :accuracy => [0.45,1.05], :true_positive_rate => [0.45,1.05],:true_negative_rate => [0.45,1.05],
+  :false_positive_rate => [0.45,1.05], :false_negative_rate => [0.45,1.05], :positive_predictive_value => [0.45,1.05],
+  :negative_predictive_value => [0.45,1.05], :r_square => [0, 1.05],  :sample_correlation_coefficient => [0, 1.05] }
+
 class Array
   def swap!(i,j)
     tmp = self[i]
@@ -47,7 +51,6 @@ class Array
   end
 end
 
-
 module Reports
   
   module PlotFactory
@@ -81,9 +84,11 @@ module Reports
           y_i = valid_indices.collect{ |i| y_i[i] }
         end
 
-        names << ( name_attribute==:crossvalidation_fold ? "fold " : "" ) + v.send(name_attribute).to_s
-        x << x_i
-        y << y_i
+        if x_i.size>0
+          names << ( name_attribute==:crossvalidation_fold ? "fold " : "" ) + v.send(name_attribute).to_s
+          x << x_i
+          y << y_i
+        end
       end
       names = [""] if names.size==1 
 
@@ -130,31 +135,22 @@ module Reports
       end
     end
     
-    def self.confidence_plot_class_performance( validation_set, actual_accept_value, predicted_accept_value )
+    def self.confidence_plot_class_performance( validation_set, performance_attribute, performance_accept_value )
       true_class = nil
-      if actual_accept_value==nil and predicted_accept_value==nil
-        perf = "Accuracy"
-      elsif actual_accept_value!=nil
-        if validation_set.get_true_accept_value==actual_accept_value
-          perf = "True Positive Rate"
-          true_class = actual_accept_value
-        elsif validation_set.get_accept_values.size==2 and validation_set.get_true_accept_value==(validation_set.get_accept_values-[actual_accept_value])[0]
-          perf = "True Negative Rate"
+      if performance_accept_value==nil
+        perf = performance_attribute.to_s.nice_attr
+      else
+        invert_true_class = (validation_set.get_accept_values.size==2 and 
+          validation_set.get_true_accept_value==(validation_set.get_accept_values-[performance_accept_value])[0])
+        if invert_true_class && performance_attribute==:true_positive_rate 
+          perf = :true_negative_rate.to_s.nice_attr
+          true_class = validation_set.get_true_accept_value
+        elsif invert_true_class && performance_attribute==:positive_predictive_value
+          perf = :negative_predictive_value.to_s.nice_attr
           true_class = validation_set.get_true_accept_value
         else
-          perf = "True Positive Rate"
-          true_class = actual_accept_value
-        end
-      elsif predicted_accept_value!=nil
-         if validation_set.get_true_accept_value==predicted_accept_value
-          perf = "Positive Predictive Value"
-          true_class = predicted_accept_value
-        elsif validation_set.get_accept_values.size==2 and validation_set.get_true_accept_value==(validation_set.get_accept_values-[predicted_accept_value])[0]
-          perf = "Negative Predictive Value"
-          true_class = validation_set.get_true_accept_value
-        else
-          perf = "Positive Predictive Value"
-          true_class = predicted_accept_value
+          perf = performance_attribute.to_s.nice_attr
+          true_class = performance_accept_value
         end
       end
       title = perf+" vs Confidence Plot"
@@ -162,12 +158,8 @@ module Reports
       {:title =>title, :performance => perf}
     end
     
-    
-    def self.create_confidence_plot( out_files, validation_set, actual_accept_value = nil,
-                            predicted_accept_value = nil, split_set_attribute=nil, show_single_curves=false )
+    def self.create_confidence_plot( out_files, validation_set, performance_attribute, performance_accept_value, split_set_attribute=nil, show_single_curves=false )
                             
-      raise "param combination not supported" if actual_accept_value!=nil and predicted_accept_value!=nil
-      
       out_files = [out_files] unless out_files.is_a?(Array)
       LOGGER.debug "creating confidence plot for '"+validation_set.size.to_s+"' validations, out-file:"+out_files.inspect
       
@@ -178,7 +170,7 @@ module Reports
         performance = []
         attribute_values.each do |value|
           begin
-            data = transform_confidence_predictions(validation_set.filter({split_set_attribute => value}), actual_accept_value, predicted_accept_value, false)
+            data = transform_confidence_predictions(validation_set.filter({split_set_attribute => value}), performance_attribute, performance_accept_value, false)
             names << split_set_attribute.to_s.nice_attr+" "+value.to_s
             confidence << data[:confidence][0]
             performance << data[:performance][0]
@@ -186,30 +178,20 @@ module Reports
             LOGGER.warn "could not create confidence plot for "+value.to_s
           end
         end
-        #RubyPlot::plot_lines(out_file, "Percent Correct vs Confidence Plot", "Confidence", "Percent Correct", names, fp_rates, tp_rates )
         out_files.each do |out_file|
-          case validation_set.unique_feature_type
-          when "classification"
-            info = confidence_plot_class_performance( validation_set, actual_accept_value, predicted_accept_value )
-            RubyPlot::accuracy_confidence_plot(out_file, info[:title], "Confidence", info[:performance], names, confidence, performance)
-          when "regression"
-            RubyPlot::accuracy_confidence_plot(out_file, "RMSE vs Confidence Plot", "Confidence", "RMSE", names, confidence, performance, true)
-          end
+          info = confidence_plot_class_performance( validation_set, performance_attribute, performance_accept_value )
+          RubyPlot::confidence_plot(out_file, info[:title], "Confidence", info[:performance], 
+            names, confidence, performance, CONF_PLOT_RANGE[performance_attribute])
         end
       else
-        data = transform_confidence_predictions(validation_set, actual_accept_value, predicted_accept_value, show_single_curves)
-        out_files.each do |out_file|
-          case validation_set.unique_feature_type
-          when "classification"
-            info = confidence_plot_class_performance( validation_set, actual_accept_value, predicted_accept_value )
-            RubyPlot::accuracy_confidence_plot(out_file, info[:title], "Confidence", info[:performance], data[:names], data[:confidence], data[:performance])
-          when "regression"
-            RubyPlot::accuracy_confidence_plot(out_file, "RMSE vs Confidence Plot", "Confidence", "RMSE", data[:names], data[:confidence], data[:performance], true)
-          end
+        data = transform_confidence_predictions(validation_set, performance_attribute, performance_accept_value, show_single_curves)
+        out_files.each do |out_file|  
+          info = confidence_plot_class_performance( validation_set, performance_attribute, performance_accept_value )
+          RubyPlot::confidence_plot(out_file, info[:title], "Confidence", info[:performance], 
+            data[:names], data[:confidence], data[:performance], CONF_PLOT_RANGE[performance_attribute])
         end
       end  
     end
-    
     
     def self.create_bar_plot( out_files, validation_set, title_attribute, value_attributes )
   
@@ -349,7 +331,11 @@ module Reports
     end
     
     
-    def self.transform_confidence_predictions(validation_set, actual_accept_value, predicted_accept_value, add_single_folds=false)
+    
+    def self.transform_confidence_predictions(validation_set, performance_attribute, performance_accept_value, add_single_folds)
+      
+      feature_type = validation_set.unique_feature_type
+      accept_values = validation_set.unique_feature_type=="classification" ? validation_set.get_accept_values : nil
       
       if (validation_set.size > 1)
         
@@ -357,34 +343,37 @@ module Reports
         sum_confidence_values = { :predicted_values => [], :actual_values => [], :confidence_values => []}
         
         (0..validation_set.size-1).each do |i|
-          confidence_values = validation_set.get(i).get_predictions.get_prediction_values(actual_accept_value, predicted_accept_value)
+          confidence_values = validation_set.get(i).get_predictions.get_prediction_values(performance_attribute, performance_accept_value)
           sum_confidence_values[:predicted_values] += confidence_values[:predicted_values]
           sum_confidence_values[:confidence_values] += confidence_values[:confidence_values]
           sum_confidence_values[:actual_values] += confidence_values[:actual_values]
           
           if add_single_folds
             begin
-              pref_conf_rates = get_performance_confidence_rates(confidence_values)
+              perf_conf_rates = get_performance_confidence_rates(confidence_values, performance_attribute, performance_accept_value, 
+                feature_type, accept_values)
               names << "fold "+i.to_s
-              performance << pref_conf_rates[:performance]
-              confidence << pref_conf_rates[:confidence]
+              performance << perf_conf_rates[:performance]
+              confidence << perf_conf_rates[:confidence]
               faint << true
             rescue
               LOGGER.warn "could not get confidence vals for fold "+i.to_s
             end
           end
         end
-        pref_conf_rates = get_performance_confidence_rates(sum_confidence_values, validation_set.unique_feature_type)
+        perf_conf_rates = get_performance_confidence_rates(sum_confidence_values, performance_attribute, performance_accept_value, 
+          feature_type, accept_values)
         names << nil # "all"
-        performance << pref_conf_rates[:performance]
-        confidence << pref_conf_rates[:confidence]
+        performance << perf_conf_rates[:performance]
+        confidence << perf_conf_rates[:confidence]
         faint << false
         return { :names => names, :performance => performance, :confidence => confidence, :faint => faint }
         
       else
-        confidence_values = validation_set.validations[0].get_predictions.get_prediction_values(actual_accept_value, predicted_accept_value)
-        pref_conf_rates = get_performance_confidence_rates(confidence_values, validation_set.unique_feature_type)
-        return { :names => [""], :performance => [pref_conf_rates[:performance]], :confidence => [pref_conf_rates[:confidence]] }
+        confidence_values = validation_set.validations[0].get_predictions.get_prediction_values(performance_attribute, performance_accept_value)
+        perf_conf_rates = get_performance_confidence_rates(confidence_values, performance_attribute, performance_accept_value, 
+          feature_type, accept_values)
+        return { :names => [""], :performance => [perf_conf_rates[:performance]], :confidence => [perf_conf_rates[:confidence]] }
       end
     end    
     
@@ -408,11 +397,11 @@ module Reports
         "True Positive Rate", plot_data )
     end
     
-    def self.get_performance_confidence_rates(roc_values, feature_type)
+    def self.get_performance_confidence_rates(pred_values, performance_attribute, performance_accept_value, feature_type, accept_values)
       
-      c = roc_values[:confidence_values]
-      p = roc_values[:predicted_values]
-      a = roc_values[:actual_values]
+      c = pred_values[:confidence_values]
+      p = pred_values[:predicted_values]
+      a = pred_values[:actual_values]
       raise "no prediction values for confidence plot" if p.size==0
      
       (0..p.size-2).each do |i|
@@ -425,40 +414,26 @@ module Reports
         end
       end
       #puts c.inspect+"\n"+a.inspect+"\n"+p.inspect+"\n\n"
-      
       perf = []
       conf = []
-      
-      case feature_type
-      when "classification"
-        count = 0
-        correct = 0
-        (0..p.size-1).each do |i|
-          count += 1
-          correct += 1 if p[i]==a[i]
-          if i>0 && (c[i]>=conf[-1]-0.00001)
-            perf.pop
-            conf.pop
-          end
-          perf << correct/count.to_f * 100
-          conf << c[i]
+      predictions = nil       
+      (0..p.size-1).each do |i|
+        # melt nearly identical confidence values to get a smoother graph
+        if i>0 && (c[i]>=conf[-1]-0.00001)
+          perf.pop
+          conf.pop
         end
-      when "regression"
-        count = 0
-        sum_squared_error = 0
-        (0..p.size-1).each do |i|
-          count += 1
-          sum_squared_error += (p[i]-a[i])**2
-          if i>0 && (c[i]>=conf[-1]-0.00001)
-            perf.pop
-            conf.pop
-          end
-          perf << Math.sqrt(sum_squared_error/count.to_f)
-          conf << c[i]
+        if (predictions == nil)
+          predictions = Lib::Predictions.new([p[i]],[a[i]],[c[i]],feature_type, accept_values)
+        else
+          predictions.update_stats(p[i], a[i], c[i])
         end
+        
+        val = predictions.send(performance_attribute)
+        val = val[performance_accept_value] if val.is_a?(Hash)
+        perf << val
+        conf << c[i]
       end
-      #puts perf.inspect
-      
       return {:performance => perf,:confidence => conf}
     end
     
