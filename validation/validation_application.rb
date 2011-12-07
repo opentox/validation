@@ -190,6 +190,15 @@ get '/crossvalidation/:id/statistics' do
   end
 end
 
+get '/crossvalidation/:id/statistics/probabilities' do
+  
+  LOGGER.info "get crossvalidation statistics for crossvalidation with id "+params[:id].to_s
+  v = Validation::Validation.from_cv_statistics( params[:id], @subjectid )
+  props = v.probabilities(params[:confidence].to_s.to_f,params[:prediction].to_s)
+  content_type "text/x-yaml"
+  props.to_yaml
+end
+
 delete '/crossvalidation/:id/?' do
   LOGGER.info "delete crossvalidation with id "+params[:id].to_s
   content_type "text/plain"
@@ -569,6 +578,22 @@ post '/validate_datasets' do
   end
   return_task(task)
 end
+
+get '/:id/probabilities' do
+  LOGGER.info "get validation probabilities "+params.inspect
+  
+  begin
+    validation = Validation::Validation.get(params[:id])
+  rescue ActiveRecord::RecordNotFound => ex
+    raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found."
+  end
+  validation.subjectid = @subjectid
+  raise OpenTox::BadRequestError.new "Validation '"+params[:id].to_s+"' not finished" unless validation.finished
+  props = validation.probabilities(params[:confidence].to_s.to_f,params[:prediction].to_s)
+  content_type "text/x-yaml"
+  props.to_yaml
+end 
+
 
 get '/:id/predictions' do
   LOGGER.info "get validation predictions "+params.inspect

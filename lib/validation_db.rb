@@ -72,6 +72,7 @@ module Validation
     attribute :classification_statistics_yaml
     attribute :regression_statistics_yaml
     attribute :finished    
+    attribute :prediction_data
     
     index :model_uri
     index :validation_type

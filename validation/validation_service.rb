@@ -72,6 +72,7 @@ module Validation
         v.crossvalidation_id = crossvalidation.id
         v.crossvalidation_fold = vals.collect{ |vv| vv.crossvalidation_fold }.uniq.join(";")       
         v.real_runtime = vals.collect{ |vv| vv.real_runtime }.uniq.join(";")
+        v.prediction_data = prediction.data.to_yaml
         v.save
       end
       waiting_task.progress(100) if waiting_task
@@ -236,7 +237,8 @@ module Validation
       LOGGER.debug "computing prediction stats"
       prediction = Lib::OTPredictions.new( feature_type, 
         self.test_dataset_uri, self.test_target_dataset_uri, self.prediction_feature, 
-        self.prediction_dataset_uri, predicted_variable, predicted_confidence, self.subjectid, OpenTox::SubTask.create(task, 0, 80) )
+        self.prediction_dataset_uri, predicted_variable, predicted_confidence, self.subjectid,
+        OpenTox::SubTask.create(task, 0, 80) )
       #reading datasets and computing the main stats is 80% the work 
       
       unless dry_run
@@ -261,12 +263,38 @@ module Validation
                :percent_without_class => prediction.percent_without_class,
                :num_unpredicted => prediction.num_unpredicted,
                :percent_unpredicted => prediction.percent_unpredicted,
+               :prediction_data => prediction.data.to_yaml,
                :finished => true
         raise unless self.valid?
       end
       
       task.progress(100) if task
       prediction
+    end
+    
+    
+    def probabilities( confidence, prediction )
+      raise OpenTox::BadRequestError.new "Only supported for classification" if classification_statistics==nil
+      raise OpenTox::BadRequestError.new("illegal confidence value #{confidence}") if !confidence.is_a?(Numeric) or confidence<0 or confidence>1
+      
+      p_data = YAML.load(self.prediction_data.to_s)
+      raise OpenTox::BadRequestError.new("probabilities method works only for new validations - prediction data missing") unless p_data
+      raise OpenTox::BadRequestError.new("illegal prediction value: '"+prediction+"', available: "+
+        p_data[:accept_values].inspect) if p_data[:accept_values].index(prediction)==nil
+     
+      p = Lib::Predictions.from_data(p_data, confidence, p_data[:accept_values].index(prediction))
+      raise OpenTox::BadRequestError("no confidence values available") unless p.confidence_values_available?
+
+      prediction_counts = p.confusion_matrix_row( p_data[:accept_values].index(prediction) )
+      sum = 0
+      prediction_counts.each{|v| sum+=v}
+
+      probs = {}
+      p_data[:accept_values].size.times do |i|
+          probs[p_data[:accept_values][i]] = prediction_counts[i]/sum.to_f
+      end
+      probs
+      {:probs => probs, :num_predictions => sum, :min_confidence => p.min_confidence}
     end
   end
   

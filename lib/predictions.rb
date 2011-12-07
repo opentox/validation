@@ -18,7 +18,29 @@ module Lib
     def identifier(instance_index)
       return instance_index.to_s
     end
-  
+    
+    def data
+      { :predicted_values => @predicted_values, :actual_values => @actual_values, :confidence_values => @confidence_values,
+        :feature_type => @feature_type, :accept_values => @accept_values }
+    end
+    
+    def self.from_data( data, min_confidence=nil, prediction_index=nil )
+      if min_confidence!=nil
+        valid_indices = []
+        data[:confidence_values].size.times do |i|
+          valid_indices << i if prediction_index==data[:predicted_values][i] and
+            (valid_indices.size<=12 or data[:confidence_values][i]>=min_confidence)
+        end
+        [ :predicted_values, :actual_values, :confidence_values ].each do |key|
+          arr = []
+          valid_indices.each{|i| arr << data[key][i]}
+          data[key] = arr
+        end
+      end
+      Predictions.new( data[:predicted_values], data[:actual_values], data[:confidence_values],
+        data[:feature_type], data[:accept_values] )
+    end
+    
     def initialize( predicted_values, 
                     actual_values, 
                     confidence_values, 
@@ -278,6 +300,15 @@ module Lib
         end
       end
       return res
+    end
+    
+    # returns acutal values for a certain prediction
+    def confusion_matrix_row(predicted_class_index)
+      r = []
+      (0..@num_classes-1).each do |actual|
+        r << @confusion_matrix[actual][predicted_class_index]
+      end
+      return r
     end
     
     def area_under_roc(class_index=nil)
@@ -740,6 +771,10 @@ module Lib
     
     def confidence_values_available?
       @conf_provided
+    end
+    
+    def min_confidence
+      @confidence_values[-1]
     end
     
     ###################################################################################################################
