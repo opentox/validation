@@ -38,32 +38,12 @@ module Validation
         crossvalidation = Crossvalidation.get(cv_id)
         raise OpenTox::NotFoundError.new "Crossvalidation '#{cv_id}' not found." unless crossvalidation
         raise OpenTox::BadRequestError.new "Crossvalidation '"+cv_id.to_s+"' not finished" unless crossvalidation.finished
-        
         vals = Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation" ).collect{|x| x}
-        models = vals.collect{|v| OpenTox::Model::Generic.find(v.model_uri, subjectid)}
-        feature_type = models.first.feature_type(subjectid)
-        test_dataset_uris = vals.collect{|v| v.test_dataset_uri}
-        test_target_dataset_uris = vals.collect{|v| v.test_target_dataset_uri}
-        prediction_feature = vals.first.prediction_feature
-        prediction_dataset_uris = vals.collect{|v| v.prediction_dataset_uri}
-        predicted_variables = models.collect{|m| m.predicted_variable(subjectid)}
-        predicted_confidences = models.collect{|m| m.predicted_confidence(subjectid)}
-        prediction = Lib::OTPredictions.new( feature_type, test_dataset_uris, test_target_dataset_uris, prediction_feature, 
-          prediction_dataset_uris, predicted_variables, predicted_confidences, subjectid, OpenTox::SubTask.create(waiting_task, 0, 90) )
-          
+        
         v = Validation.new
-        case feature_type
-        when "classification"
-          v.classification_statistics = prediction.compute_stats
-        when "regression"
-          v.regression_statistics = prediction.compute_stats
-        end
-        v.update :num_instances => prediction.num_instances,
-               :num_without_class => prediction.num_without_class,
-               :percent_without_class => prediction.percent_without_class,
-               :num_unpredicted => prediction.num_unpredicted,
-               :percent_unpredicted => prediction.percent_unpredicted,
-               :finished => true
+        v.compute_prediction_data_with_cv(vals, waiting_task)
+        v.compute_validation_stats()
+          
         (VAL_PROPS_GENERAL-[:validation_uri]).each do |p|
           v.send("#{p.to_s}=".to_sym, vals.collect{ |vv| vv.send(p) }.uniq.join(";"))
         end
@@ -72,7 +52,6 @@ module Validation
         v.crossvalidation_id = crossvalidation.id
         v.crossvalidation_fold = vals.collect{ |vv| vv.crossvalidation_fold }.uniq.join(";")       
         v.real_runtime = vals.collect{ |vv| vv.real_runtime }.uniq.join(";")
-        v.prediction_data = prediction.data.to_yaml
         v.save
       end
       waiting_task.progress(100) if waiting_task
@@ -200,13 +179,26 @@ module Validation
       self.prediction_dataset_uri = prediction_dataset_uri
       self.real_runtime = benchmark.real
              
-      compute_validation_stats_with_model( model, false, OpenTox::SubTask.create(task, 50, 100) )
+      compute_prediction_data_with_model( model, OpenTox::SubTask.create(task, 50, 100) )
+      compute_validation_stats()
     end
-      
-    def compute_validation_stats_with_model( model=nil, dry_run=false, task=nil )
-      
-      #model = OpenTox::Model::PredictionModel.find(self.model_uri) if model==nil and self.model_uri
-      #raise OpenTox::NotFoundError.new "model not found: "+self.model_uri.to_s unless model
+    
+    def compute_prediction_data_with_cv(cv_vals, waiting_task=nil)
+      models = cv_vals.collect{|v| OpenTox::Model::Generic.find(v.model_uri, subjectid)}
+      feature_type = models.first.feature_type(subjectid)
+      test_dataset_uris = cv_vals.collect{|v| v.test_dataset_uri}
+      test_target_dataset_uris = cv_vals.collect{|v| v.test_target_dataset_uri}
+      prediction_feature = cv_vals.first.prediction_feature
+      prediction_dataset_uris = cv_vals.collect{|v| v.prediction_dataset_uri}
+      predicted_variables = models.collect{|m| m.predicted_variable(subjectid)}
+      predicted_confidences = models.collect{|m| m.predicted_confidence(subjectid)}
+      p_data = Lib::PredictionData.create( feature_type, test_dataset_uris, test_target_dataset_uris, prediction_feature, 
+        prediction_dataset_uris, predicted_variables, predicted_confidences, subjectid, waiting_task )
+      self.prediction_data = p_data.data
+      p_data.data
+    end
+    
+    def compute_prediction_data_with_model(model=nil, task=nil)
       model = OpenTox::Model::Generic.find(self.model_uri, self.subjectid) if model==nil and self.model_uri
       raise OpenTox::NotFoundError.new "model not found: "+self.model_uri.to_s unless model
       
@@ -219,76 +211,82 @@ module Validation
       raise "cannot determine whether model '"+model.uri.to_s+"' performs classification or regression, "+
           "please set rdf-type of predictedVariables feature '"+predicted_variable.to_s+
           "' to NominalFeature or NumericFeature" if (feature_type.to_s!="classification" and feature_type.to_s!="regression")        
-      compute_validation_stats( feature_type, predicted_variable, predicted_confidence, 
-        prediction_feature, algorithm_uri, dry_run, task )
+      compute_prediction_data( feature_type, predicted_variable, predicted_confidence, 
+        prediction_feature, algorithm_uri, task )
     end
-      
-    def compute_validation_stats( feature_type, predicted_variable, predicted_confidence, prediction_feature, 
-        algorithm_uri, dry_run, task )        
-      
-#      self.attributes = { :prediction_feature => prediction_feature } if self.prediction_feature==nil && prediction_feature
-#      self.attributes = { :algorithm_uri => algorithm_uri } if self.algorithm_uri==nil && algorithm_uri
-#      self.save!
-#      self.update :prediction_feature => prediction_feature if self.prediction_feature==nil && prediction_feature
-#      self.update :algorithm_uri => algorithm_uri if self.algorithm_uri==nil && algorithm_uri
+    
+    def compute_prediction_data( feature_type, predicted_variable, predicted_confidence, prediction_feature, 
+        algorithm_uri, task )
       self.prediction_feature = prediction_feature if self.prediction_feature==nil && prediction_feature
       self.algorithm_uri = algorithm_uri if self.algorithm_uri==nil && algorithm_uri
-      
+    
       LOGGER.debug "computing prediction stats"
-      prediction = Lib::OTPredictions.new( feature_type, 
+      p_data = Lib::PredictionData.create( feature_type, 
         self.test_dataset_uri, self.test_target_dataset_uri, self.prediction_feature, 
         self.prediction_dataset_uri, predicted_variable, predicted_confidence, self.subjectid,
         OpenTox::SubTask.create(task, 0, 80) )
-      #reading datasets and computing the main stats is 80% the work 
-      
-      unless dry_run
-        case feature_type
-        when "classification"
-          #self.attributes = { :classification_statistics => prediction.compute_stats }
-          #self.update :classification_statistics => prediction.compute_stats 
-          self.classification_statistics = prediction.compute_stats
-        when "regression"
-          #self.attributes = { :regression_statistics => prediction.compute_stats }
-          self.regression_statistics = prediction.compute_stats
-        end
-#        self.attributes = { :num_instances => prediction.num_instances,
-#               :num_without_class => prediction.num_without_class,
-#               :percent_without_class => prediction.percent_without_class,
-#               :num_unpredicted => prediction.num_unpredicted,
-#               :percent_unpredicted => prediction.percent_unpredicted,
-#               :finished => true}
-#        self.save!
-        self.update :num_instances => prediction.num_instances,
-               :num_without_class => prediction.num_without_class,
-               :percent_without_class => prediction.percent_without_class,
-               :num_unpredicted => prediction.num_unpredicted,
-               :percent_unpredicted => prediction.percent_unpredicted,
-               :prediction_data => prediction.data.to_yaml,
-               :finished => true
-        raise unless self.valid?
-      end
-      
+      self.prediction_data = p_data.data
       task.progress(100) if task
-      prediction
+      p_data.data
     end
     
+    def compute_validation_stats( save_stats=true )
+      p_data = self.prediction_data
+      raise "compute prediction data before" if p_data==nil
+      predictions = Lib::OTPredictions.new(p_data)
+      case p_data[:feature_type]
+      when "classification"
+        self.classification_statistics = predictions.compute_stats()
+      when "regression"
+        self.regression_statistics = predictions.compute_stats()
+      end
+      self.num_instances = predictions.num_instances
+      self.num_without_class = predictions.num_without_class
+      self.percent_without_class = predictions.percent_without_class
+      self.num_unpredicted = predictions.num_unpredicted
+      self.percent_unpredicted = predictions.percent_unpredicted
+      if (save_stats)
+        self.finished = true
+        self.save
+        raise unless self.valid?
+      end
+    end
+    
+    def filter_predictions( min_confidence, min_num_predictions, max_num_predictions, prediction=nil )
+      self.prediction_data = nil
+      self.save
+      
+      raise OpenTox::BadRequestError.new "only supported for classification" if prediction!=nil and classification_statistics==nil
+      raise OpenTox::BadRequestError.new "illegal confidence value #{min_confidence}" unless 
+        min_confidence==nil or (min_confidence.is_a?(Numeric) and min_confidence>=0 and min_confidence<=1)
+      p_data = self.prediction_data
+      if p_data==nil
+        # this is to ensure backwards compatibilty
+        # may cause a timeout on the first run, as this is not meant to run in a task
+        if validation_type=="crossvalidation_statistics"
+          vals = Validation.find( :crossvalidation_id => self.crossvalidation_id, :validation_type => "crossvalidation" ).collect{|x| x}
+          compute_prediction_data_with_cv(vals)
+        else
+          compute_prediction_data_with_model
+        end
+        self.save
+        p_data = self.prediction_data
+      end
+      raise OpenTox::BadRequestError.new("illegal prediction value: '"+prediction+"', available: "+
+        p_data[:accept_values].inspect) if prediction!=nil and p_data[:accept_values].index(prediction)==nil
+      p = Lib::PredictionData.filter_data(p_data, nil, min_confidence, min_num_predictions, max_num_predictions,
+        prediction==nil ? nil : p_data[:accept_values].index(prediction))
+      self.prediction_data = p.data
+      compute_validation_stats(false)
+    end
     
     def probabilities( confidence, prediction )
-      raise OpenTox::BadRequestError.new "Only supported for classification" if classification_statistics==nil
-      raise OpenTox::BadRequestError.new("illegal confidence value #{confidence}") if !confidence.is_a?(Numeric) or confidence<0 or confidence>1
-      
-      p_data = YAML.load(self.prediction_data.to_s)
-      raise OpenTox::BadRequestError.new("probabilities method works only for new validations - prediction data missing") unless p_data
-      raise OpenTox::BadRequestError.new("illegal prediction value: '"+prediction+"', available: "+
-        p_data[:accept_values].inspect) if p_data[:accept_values].index(prediction)==nil
-     
-      p = Lib::Predictions.from_data(p_data, confidence, p_data[:accept_values].index(prediction))
-      raise OpenTox::BadRequestError("no confidence values available") unless p.confidence_values_available?
-
+      filter_predictions( confidence, 12, nil, prediction )
+      p_data = self.prediction_data
+      p = Lib::Predictions.new(p_data)
       prediction_counts = p.confusion_matrix_row( p_data[:accept_values].index(prediction) )
       sum = 0
       prediction_counts.each{|v| sum+=v}
-
       probs = {}
       p_data[:accept_values].size.times do |i|
           probs[p_data[:accept_values][i]] = prediction_counts[i]/sum.to_f

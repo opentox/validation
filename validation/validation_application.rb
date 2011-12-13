@@ -226,34 +226,34 @@ end
 #  Validation::Validation.find( :all, :conditions => { :crossvalidation_id => params[:id] } ).collect{ |v| v.validation_uri.to_s }.join("\n")+"\n"
 #end
 
-get '/crossvalidation/:id/predictions' do
-  LOGGER.info "get predictions for crossvalidation with id "+params[:id].to_s
-  begin
-    #crossvalidation = Validation::Crossvalidation.find(params[:id])
-    crossvalidation = Validation::Crossvalidation.get(params[:id])
-  rescue ActiveRecord::RecordNotFound => ex
-    raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found."
-  end
-  raise OpenTox::BadRequestError.new "Crossvalidation '"+params[:id].to_s+"' not finished" unless crossvalidation.finished
-  
-  content_type "application/x-yaml"
-  validations = Validation::Validation.find( :crossvalidation_id => params[:id], :validation_type => "crossvalidation" )
-  p = Lib::OTPredictions.to_array( validations.collect{ |v| v.compute_validation_stats_with_model(nil, true) } ).to_yaml
-  
-  case request.env['HTTP_ACCEPT'].to_s
-  when /text\/html/
-    content_type "text/html"
-    description = 
-      "The crossvalidation predictions as (yaml-)array."
-    related_links = 
-      "All crossvalidations:         "+url_for("/crossvalidation",:full)+"\n"+
-      "Correspoding crossvalidation: "+url_for("/crossvalidation/"+params[:id],:full)
-    OpenTox.text_to_html p,@subjectid, related_links, description
-  else
-    content_type "text/x-yaml"
-    p
-  end
-end
+#get '/crossvalidation/:id/predictions' do
+#  LOGGER.info "get predictions for crossvalidation with id "+params[:id].to_s
+#  begin
+#    #crossvalidation = Validation::Crossvalidation.find(params[:id])
+#    crossvalidation = Validation::Crossvalidation.get(params[:id])
+#  rescue ActiveRecord::RecordNotFound => ex
+#    raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found."
+#  end
+#  raise OpenTox::BadRequestError.new "Crossvalidation '"+params[:id].to_s+"' not finished" unless crossvalidation.finished
+#  
+#  content_type "application/x-yaml"
+#  validations = Validation::Validation.find( :crossvalidation_id => params[:id], :validation_type => "crossvalidation" )
+#  p = Lib::OTPredictions.to_array( validations.collect{ |v| v.compute_validation_stats_with_model(nil, true) } ).to_yaml
+#  
+#  case request.env['HTTP_ACCEPT'].to_s
+#  when /text\/html/
+#    content_type "text/html"
+#    description = 
+#      "The crossvalidation predictions as (yaml-)array."
+#    related_links = 
+#      "All crossvalidations:         "+url_for("/crossvalidation",:full)+"\n"+
+#      "Correspoding crossvalidation: "+url_for("/crossvalidation/"+params[:id],:full)
+#    OpenTox.text_to_html p,@subjectid, related_links, description
+#  else
+#    content_type "text/x-yaml"
+#    p
+#  end
+#end
 
 get '/?' do
   
@@ -595,30 +595,30 @@ get '/:id/probabilities' do
 end 
 
 
-get '/:id/predictions' do
-  LOGGER.info "get validation predictions "+params.inspect
-  begin
-    #validation = Validation::Validation.find(params[:id])
-    validation = Validation::Validation.get(params[:id])
-  rescue ActiveRecord::RecordNotFound => ex
-    raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found."
-  end
-  raise OpenTox::BadRequestError.new "Validation '"+params[:id].to_s+"' not finished" unless validation.finished
-  p = validation.compute_validation_stats_with_model(nil, true)
-  case request.env['HTTP_ACCEPT'].to_s
-  when /text\/html/
-    content_type "text/html"
-    description = 
-      "The validation predictions as (yaml-)array."
-    related_links = 
-      "All validations:         "+url_for("/",:full)+"\n"+
-      "Correspoding validation: "+url_for("/"+params[:id],:full)
-    OpenTox.text_to_html p.to_array.to_yaml,@subjectid, related_links, description
-  else
-    content_type "text/x-yaml"
-    p.to_array.to_yaml
-  end
-end 
+#get '/:id/predictions' do
+#  LOGGER.info "get validation predictions "+params.inspect
+#  begin
+#    #validation = Validation::Validation.find(params[:id])
+#    validation = Validation::Validation.get(params[:id])
+#  rescue ActiveRecord::RecordNotFound => ex
+#    raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found."
+#  end
+#  raise OpenTox::BadRequestError.new "Validation '"+params[:id].to_s+"' not finished" unless validation.finished
+#  p = validation.compute_validation_stats_with_model(nil, true)
+#  case request.env['HTTP_ACCEPT'].to_s
+#  when /text\/html/
+#    content_type "text/html"
+#    description = 
+#      "The validation predictions as (yaml-)array."
+#    related_links = 
+#      "All validations:         "+url_for("/",:full)+"\n"+
+#      "Correspoding validation: "+url_for("/"+params[:id],:full)
+#    OpenTox.text_to_html p.to_array.to_yaml,@subjectid, related_links, description
+#  else
+#    content_type "text/x-yaml"
+#    p.to_array.to_yaml
+#  end
+#end 
 
 #get '/:id/:attribute' do
 #  LOGGER.info "access validation attribute "+params.inspect

@@ -13,7 +13,7 @@ class Reports::ValidationDB
     self_uri.host == val_uri.host && self_uri.port == val_uri.port
   end
   
-  def resolve_cv_uris(validation_uris, identifier=nil, subjectid=nil)
+  def resolve_cv_uris(validation_uris, identifier, subjectid)
     res = {}
     count = 0
     validation_uris.each do |u|
@@ -47,8 +47,8 @@ class Reports::ValidationDB
     res
   end
   
-  def init_validation(validation, uri, subjectid=nil)
-  
+  def init_validation(validation, uri, filter_params, subjectid)
+    
     raise OpenTox::BadRequestError.new "not a validation uri: "+uri.to_s unless uri =~ /\/[0-9]+$/
     validation_id = uri.split("/")[-1]
     raise OpenTox::BadRequestError.new "invalid validation id "+validation_id.to_s unless validation_id!=nil and 
@@ -63,6 +63,9 @@ class Reports::ValidationDB
     else
       v = YAML::load(OpenTox::RestClientWrapper.get uri, {:subjectid=>subjectid, :accept=>"application/serialize"})
     end
+    v.filter_predictions(filter_params[:min_confidence], filter_params[:min_num_predictions], filter_params[:max_num_predictions]) if 
+      filter_params
+    
     raise OpenTox::NotFoundError.new "validation with id "+validation_id.to_s+" not found" unless v
     raise OpenTox::BadRequestError.new "validation with id "+validation_id.to_s+" is not finished yet" unless v.finished
     (Validation::VAL_PROPS + Validation::VAL_CV_PROPS).each do |p|
@@ -80,7 +83,7 @@ class Reports::ValidationDB
     end
   end
   
-  def init_validation_from_cv_statistics( validation, cv_uri, subjectid=nil )
+  def init_validation_from_cv_statistics( validation, cv_uri, filter_params, subjectid )
     
     raise OpenTox::BadRequestError.new "not a crossvalidation uri: "+cv_uri.to_s unless cv_uri.uri? and cv_uri =~ /crossvalidation.*\/[0-9]+$/
     
@@ -96,6 +99,9 @@ class Reports::ValidationDB
       cv = YAML::load(OpenTox::RestClientWrapper.get cv_uri, {:subjectid=>subjectid, :accept=>"application/serialize"})
       v = YAML::load(OpenTox::RestClientWrapper.get cv_uri+"/statistics", {:subjectid=>subjectid, :accept=>"application/serialize"})
     end
+    v.filter_predictions(filter_params[:min_confidence], filter_params[:min_num_predictions], filter_params[:max_num_predictions]) if 
+      filter_params
+    
     (Validation::VAL_PROPS + Validation::VAL_CV_PROPS).each do |p|
       validation.send("#{p.to_s}=".to_sym, v.send(p))
     end
@@ -126,11 +132,14 @@ class Reports::ValidationDB
     end
   end
 
-  def get_predictions(validation, subjectid=nil, task=nil)
-    
-    Lib::OTPredictions.new( validation.feature_type, validation.test_dataset_uri, 
+  def get_predictions(validation, filter_params, subjectid, task)
+    # we need compound info, cannot reuse stored prediction data
+    data = Lib::PredictionData.create( validation.feature_type, validation.test_dataset_uri, 
       validation.test_target_dataset_uri, validation.prediction_feature, validation.prediction_dataset_uri, 
-      validation.predicted_variable, validation.predicted_confidence, subjectid, task)
+      validation.predicted_variable, validation.predicted_confidence, subjectid, task )
+    data = Lib::PredictionData.filter_data( data.data, data.compounds, 
+      filter_params[:min_confidence], filter_params[:min_num_predictions], filter_params[:max_num_predictions] ) if filter_params!=nil
+    Lib::OTPredictions.new( data.data, data.compounds )
   end
   
   def get_accept_values( validation, subjectid=nil )

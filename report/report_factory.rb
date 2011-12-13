@@ -63,14 +63,26 @@ module Reports::ReportFactory
     end
   end
   
-  def self.create_report_validation(validation_set, task=nil)
+  def self.add_filter_warning(report, filter_params)
+    msg = "The validation results for this report have been filtered."
+    msg += " Minimum confidence: "+ filter_params[:min_confidence].to_s if 
+      filter_params[:min_confidence]!=nil 
+    msg += " Minimum number of predictions (sorted with confidence): "+ filter_params[:min_num_predictions].to_s if 
+      filter_params[:min_num_predictions]!=nil 
+    msg += " Maximum number of predictions: "+ filter_params[:max_num_predictions].to_s if 
+      filter_params[:max_num_predictions]!=nil 
+    report.add_warning(msg)      
+  end
+  
+  def self.create_report_validation(validation_set, params, task=nil)
     
     raise OpenTox::BadRequestError.new("num validations is not equal to 1") unless validation_set.size==1
     val = validation_set.validations[0]
     pre_load_predictions( validation_set, OpenTox::SubTask.create(task,0,80) )
 
     report = Reports::ReportContent.new("Validation report")
-    
+    add_filter_warning(report, validation_set.filter_params) if validation_set.filter_params!=nil
+  
     case val.feature_type
     when "classification"
       report.add_result(validation_set, [:validation_uri] + VAL_ATTR_TRAIN_TEST + VAL_ATTR_CLASS, "Results", "Results")
@@ -109,8 +121,9 @@ module Reports::ReportFactory
     report
   end
   
-  def self.create_report_crossvalidation(validation_set, task=nil)
+  def self.create_report_crossvalidation(validation_set, params, task=nil)
     
+    raise OpenTox::BadRequestError.new "cv report not implemented for filter params" if validation_set.filter_params!=nil
     raise OpenTox::BadRequestError.new("num validations is not >1") unless validation_set.size>1
     raise OpenTox::BadRequestError.new("crossvalidation-id not unique and != nil: "+
       validation_set.get_values(:crossvalidation_id,false).inspect) if validation_set.unique_value(:crossvalidation_id)==nil
@@ -119,7 +132,7 @@ module Reports::ReportFactory
       validation_set.unique_value(:num_folds).to_s+")") unless validation_set.unique_value(:num_folds).to_i==validation_set.size
     raise OpenTox::BadRequestError.new("num different folds is not equal to num validations") unless validation_set.num_different_values(:crossvalidation_fold)==validation_set.size
     raise OpenTox::BadRequestError.new("validations must have unique feature type, i.e. must be either all regression, "+
-      "or all classification validations") unless validation_set.unique_feature_type  
+      "or all classification validations") unless validation_set.unique_feature_type
     pre_load_predictions( validation_set, OpenTox::SubTask.create(task,0,80) )
     validation_set.validations.sort! do |x,y|
       x.crossvalidation_fold.to_f <=> y.crossvalidation_fold.to_f
@@ -138,13 +151,12 @@ module Reports::ReportFactory
       report.add_confusion_matrix(cv_set.validations[0])
       report.add_section("Plots")
       [nil, :crossvalidation_fold].each do |split_attribute|
-        
         if (validation_set.get_accept_values.size == 2)
           if validation_set.get_true_accept_value!=nil
             report.add_roc_plot(validation_set, validation_set.get_true_accept_value,split_attribute)
           else
-            report.add_roc_plot(validation_set, validation_set.get_accept_values[0],split_attribute)
-            report.add_roc_plot(validation_set, validation_set.get_accept_values[1],split_attribute)
+            report.add_roc_plot(validation_set, validation_set.get_accept_values[0], split_attribute)
+            report.add_roc_plot(validation_set, validation_set.get_accept_values[1], split_attribute)
             report.align_last_two_images "ROC Plots"
           end
         end
@@ -156,7 +168,8 @@ module Reports::ReportFactory
         end
       end
       report.end_section
-      report.add_result(validation_set, [:validation_uri, :validation_report_uri]+VAL_ATTR_CV+VAL_ATTR_CLASS-[:num_folds, :dataset_uri, :algorithm_uri],
+      report.add_result(validation_set, 
+        [:validation_uri, :validation_report_uri]+VAL_ATTR_CV+VAL_ATTR_CLASS-[:num_folds, :dataset_uri, :algorithm_uri],
         "Results","Results")
     when "regression"
       report.add_result(cv_set, [:crossvalidation_uri]+VAL_ATTR_CV+VAL_ATTR_REGR-[:crossvalidation_fold],res_titel, res_titel, res_text)
@@ -169,7 +182,9 @@ module Reports::ReportFactory
       report.add_confidence_plot(validation_set, :r_square, nil, :crossvalidation_fold)
       report.align_last_two_images "Confidence Plots Across Folds"
       report.end_section
-      report.add_result(validation_set, [:validation_uri, :validation_report_uri]+VAL_ATTR_CV+VAL_ATTR_REGR-[:num_folds, :dataset_uri, :algorithm_uri], "Results","Results")
+      report.add_result(validation_set, 
+        [:validation_uri, :validation_report_uri]+VAL_ATTR_CV+VAL_ATTR_REGR-[:num_folds, :dataset_uri, :algorithm_uri], 
+        "Results","Results")
     end
     task.progress(90) if task
       
@@ -219,6 +234,7 @@ module Reports::ReportFactory
     
     pre_load_predictions( validation_set, OpenTox::SubTask.create(task,0,80) )
     report = Reports::ReportContent.new("Algorithm comparison report")
+    add_filter_warning(report, validation_set.filter_params) if validation_set.filter_params!=nil
     
     if (validation_set.num_different_values(:dataset_uri)>1)
       all_merged = validation_set.merge([:algorithm_uri, :dataset_uri, :crossvalidation_id, :crossvalidation_uri])

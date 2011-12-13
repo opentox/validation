@@ -72,7 +72,15 @@ module Reports
       LOGGER.debug "identifier: '"+identifier.inspect+"'"
       raise "illegal num identifiers: "+identifier.size.to_s+" should be equal to num validation-uris ("+validation_uris.size.to_s+")" if
         identifier and identifier.size!=validation_uris.size
-      validation_set = Reports::ValidationSet.new(validation_uris, identifier, subjectid)
+        
+      filter_params = nil
+      [:min_confidence, :min_num_predictions, :max_num_predictions].each do |key|
+        if params[key] != nil
+          filter_params = {} unless filter_params
+          filter_params[key] = params[key].to_f
+        end
+      end
+      validation_set = Reports::ValidationSet.new(validation_uris, identifier, filter_params, subjectid)
       raise OpenTox::BadRequestError.new("cannot get validations from validation_uris '"+validation_uris.inspect+"'") unless validation_set and validation_set.size > 0
       LOGGER.debug "loaded "+validation_set.size.to_s+" validation/s"
       task.progress(10) if task

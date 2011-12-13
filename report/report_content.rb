@@ -22,6 +22,12 @@ class Reports::ReportContent
     @current_section = @xml_report.get_root_element
   end
   
+  def add_warning(warning)
+    sec = @xml_report.add_section(@current_section, "Warning")
+    @xml_report.add_paragraph(sec, warning)
+    end_section()
+  end
+  
   def add_paired_ttest_tables( validation_set,
                        group_attribute, 
                        test_attributes,

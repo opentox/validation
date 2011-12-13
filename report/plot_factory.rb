@@ -338,7 +338,6 @@ module Reports
       accept_values = validation_set.unique_feature_type=="classification" ? validation_set.get_accept_values : nil
       
       if (validation_set.size > 1)
-        
         names = []; performance = []; confidence = []; faint = []
         sum_confidence_values = { :predicted_values => [], :actual_values => [], :confidence_values => []}
         
@@ -378,19 +377,107 @@ module Reports
     end    
     
     def self.demo_roc_plot
-#      roc_values = {:confidence_values => [0.1, 0.9, 0.5, 0.6, 0.6, 0.6], 
-#                    :predicted_values =>  [1, 0, 0, 1, 0, 1],
-#                    :actual_values =>     [0, 1, 0, 0, 1, 1]}
-      roc_values = {:confidence_values => [0.9, 0.8, 0.7, 0.6, 0.5, 0.4], 
-                    :true_positives =>    [1, 1, 1, 0, 1, 0]}
-      tp_fp_rates = get_tp_fp_rates(roc_values)
-      labels = []
-      tp_fp_rates[:youden].each do |point,confidence|
-        labels << ["confidence: "+confidence.to_s, point[0], point[1]]
-      end
-
+      
+      seed = 831 #rand(1000)
+      puts seed
+      srand seed
+      
       plot_data = []
-      plot_data << RubyPlot::LinePlotData.new(:name => "testname", :x_values => tp_fp_rates[:fp_rate], :y_values => tp_fp_rates[:tp_rate], :labels => labels)
+      n = 250
+      a_cutoff = 0.5
+      
+      a_real = []
+      a_class = []
+      n.times do |i|
+        a_real << rand
+        a_class << ( a_real[-1]>a_cutoff ? "a" : "b")
+      end
+      
+      puts a_real.to_csv
+      puts a_class.to_csv
+      
+      p_props = [[],[]]
+      p_classes = []
+      
+      2.times do |index|
+        
+        if (index==0)
+          p_noise = 0.15
+          p_cutoff = 0.8
+        else
+          p_noise = 0.5
+          p_cutoff = 0.5
+        end
+        
+        p_real = []
+        p_class = []
+        p_prop = []
+        correct = []
+        n.times do |i|
+          if rand<0.04
+            p_real << rand
+          else
+            p_real << (a_real[i] + ((rand * p_noise) * (rand<0.5 ? 1 : -1)))
+          end
+          p_prop << ((p_cutoff-p_real[i]).abs)
+          p_class << ( p_real[-1]>p_cutoff ? "a" : "b")
+          correct << ((p_class[i]==a_class[i]) ? 1 : 0)
+        end
+        
+        puts ""
+        puts p_real.to_csv
+        puts p_class.to_csv
+        puts p_prop.to_csv
+        
+        p_prop_max = p_prop.max
+        p_prop_min = p_prop.min
+        p_prop_delta = p_prop_max - p_prop_min
+        n.times do |i|
+          p_prop[i] = (p_prop[i] - p_prop_min)/p_prop_delta.to_f
+          p_props[index][i] = p_prop[i]
+        end
+        
+        puts p_prop.to_csv
+        
+        p_classes << p_class
+        
+        (0..n-2).each do |i|
+          (i+1..n-1).each do |j|
+            if p_prop[i]<p_prop[j]
+              tmp = p_prop[i]
+              p_prop[i] = p_prop[j]
+              p_prop[j] = tmp
+              tmp = correct[i]
+              correct[i] = correct[j]
+              correct[j] = tmp
+            end
+          end
+        end
+        
+        puts p_prop.to_csv
+        puts correct.to_csv
+        puts "acc: "+(correct.sum/n.to_f).to_s
+        
+        roc_values = {:confidence_values => p_prop, 
+                      :true_positives =>    correct}
+        tp_fp_rates = get_tp_fp_rates(roc_values)
+        labels = []
+        tp_fp_rates[:youden].each do |point,confidence|
+          labels << ["confidence: "+confidence.to_s, point[0], point[1]]
+        end
+      
+        plot_data << RubyPlot::LinePlotData.new(:name => "alg"+index.to_s, 
+          :x_values => tp_fp_rates[:fp_rate],
+          :y_values => tp_fp_rates[:tp_rate])
+          #,:labels => labels)
+      end
+      
+      puts "instance,class,prediction_1,propability_1,prediction_2,propability_2"
+      n.times do |i|
+        puts (i+1).to_s+","+a_class[i].to_s+","+p_classes[0][i].to_s+
+          ","+p_props[0][i].to_s+
+          ","+p_classes[1][i].to_s+","+p_props[1][i].to_s
+      end
       RubyPlot::plot_lines("/tmp/plot.png",
         "ROC-Plot", 
         "False positive rate", 
@@ -424,7 +511,9 @@ module Reports
           conf.pop
         end
         if (predictions == nil)
-          predictions = Lib::Predictions.new([p[i]],[a[i]],[c[i]],feature_type, accept_values)
+          data = {:predicted_values => [p[i]],:actual_values => [a[i]], :confidence_values => [c[i]], 
+            :feature_type => feature_type, :accept_values => accept_values}
+          predictions = Lib::Predictions.new(data)
         else
           predictions.update_stats(p[i], a[i], c[i])
         end
@@ -528,7 +617,20 @@ end
 
 #require "rubygems"
 #require "ruby-plot"
-##Reports::PlotFactory::demo_ranking_plot
+###Reports::PlotFactory::demo_ranking_plot
+#class Array
+#  def sum
+#    inject( nil ) { |sum,x| sum ? sum+x : x }
+#  end
+#  
+#  def to_csv
+#    s = ""
+#    each do |x|
+#      s += (x.is_a?(Float) ? ("%.3f"%x) : ("    "+x.to_s) )+", "
+#    end
+#    s
+#  end
+#end
 #Reports::PlotFactory::demo_roc_plot
 
 #a = [1,    0,  1,  2,  3,  0, 2]

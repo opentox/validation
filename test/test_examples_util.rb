@@ -299,7 +299,8 @@ module ValidationExamples
     
     def report( waiting_task=nil )
       #begin
-        @report_uri = Util.validation_post '/report/'+report_type,{:validation_uris => @validation_uri},@subjectid,waiting_task if @validation_uri
+        @report_uri = Util.validation_post '/report/'+report_type,{:validation_uris => @validation_uri},
+          @subjectid,waiting_task if @validation_uri
         Util.validation_get "/report/"+report_uri.split("/")[-2]+"/"+report_uri.split("/")[-1], @subjectid if @report_uri
       #rescue => ex
         #puts "could not create report: "+ex.message

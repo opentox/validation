@@ -86,18 +86,20 @@ module Reports
       VAL_ATTR_RANKING.collect{ |a| (a.to_s+"_ranking").to_sym }
     @@validation_attributes.each{ |a| attr_accessor a } 
   
-    attr_reader :predictions, :subjectid
+    attr_reader :predictions, :subjectid, :filter_params
     attr_accessor :identifier, :validation_report_uri, :crossvalidation_report_uri
     
-    def initialize(uri = nil, subjectid = nil)
-      Reports.validation_access.init_validation(self, uri, subjectid) if uri
+    def initialize(uri = nil, filter_params=nil, subjectid = nil)
+      Reports.validation_access.init_validation(self, uri, filter_params, subjectid) if uri
       @subjectid = subjectid
+      raise unless filter_params==nil || filter_params.is_a?(Hash)
+      @filter_params = filter_params
       #raise "subjectid is nil" unless subjectid
     end
     
-    def self.from_cv_statistics( cv_uri, subjectid = nil )
-      v = ReportValidation.new(nil, subjectid)
-      Reports.validation_access.init_validation_from_cv_statistics(v, cv_uri, subjectid)
+    def self.from_cv_statistics( cv_uri, filter_params, subjectid )
+      v = ReportValidation.new(nil, filter_params, subjectid)
+      Reports.validation_access.init_validation_from_cv_statistics(v, cv_uri, filter_params, subjectid)
       v
     end
   
@@ -116,7 +118,7 @@ module Reports
           task.progress(100) if task
           nil
         else
-          @predictions = Reports.validation_access.get_predictions( self, @subjectid, task )
+          @predictions = Reports.validation_access.get_predictions( self, @filter_params, @subjectid, task )
         end
       end
     end
@@ -167,13 +169,13 @@ module Reports
   #
   class ValidationSet
     
-    def initialize(validation_uris=nil, identifier=nil, subjectid=nil)
+    def initialize(validation_uris=nil, identifier=nil, filter_params=nil, subjectid=nil)
       @unique_values = {}
       @validations = []
       if validation_uris    
         validation_uri_and_ids = ReportValidation.resolve_cv_uris(validation_uris, identifier, subjectid)
         validation_uri_and_ids.each do |u,id|
-          v = ReportValidation.new(u, subjectid)
+          v = ReportValidation.new(u, filter_params, subjectid)
           v.identifier = id if id
           ids = Reports.persistance.list_reports("validation",{:validation_uris=>v.validation_uri })
           v.validation_report_uri = ReportService.instance.get_uri("validation",ids[-1]) if ids and ids.size>0
@@ -226,6 +228,10 @@ module Reports
     def has_nil_values?(attribute)
       @validations.each{ |v| return true unless v.send(attribute) } 
       return false
+    end
+    
+    def filter_params
+      @validations.first.filter_params
     end
     
     # loads the attributes of the related crossvalidation into all validation objects
@@ -424,7 +430,7 @@ module Reports
       new_set = ValidationSet.new
       grouping = Util.group(@validations, [:crossvalidation_id])
       grouping.each do |g|
-        v = ReportValidation.from_cv_statistics(g[0].crossvalidation_uri, g[0].subjectid)
+        v = ReportValidation.from_cv_statistics(g[0].crossvalidation_uri, @validations.first.filter_params, g[0].subjectid)
         v.identifier = g.collect{|vv| vv.identifier}.uniq.join(";")
         new_set.validations << v 
       end

@@ -1,4 +1,6 @@
 
+require "lib/prediction_data.rb"
+
 module Lib
 
   module Util
@@ -19,36 +21,11 @@ module Lib
       return instance_index.to_s
     end
     
-    def data
-      { :predicted_values => @predicted_values, :actual_values => @actual_values, :confidence_values => @confidence_values,
-        :feature_type => @feature_type, :accept_values => @accept_values }
-    end
-    
-    def self.from_data( data, min_confidence=nil, prediction_index=nil )
-      if min_confidence!=nil
-        valid_indices = []
-        data[:confidence_values].size.times do |i|
-          valid_indices << i if prediction_index==data[:predicted_values][i] and
-            (valid_indices.size<=12 or data[:confidence_values][i]>=min_confidence)
-        end
-        [ :predicted_values, :actual_values, :confidence_values ].each do |key|
-          arr = []
-          valid_indices.each{|i| arr << data[key][i]}
-          data[key] = arr
-        end
-      end
-      Predictions.new( data[:predicted_values], data[:actual_values], data[:confidence_values],
-        data[:feature_type], data[:accept_values] )
-    end
-    
-    def initialize( predicted_values, 
-                    actual_values, 
-                    confidence_values, 
-                    feature_type, 
-                    accept_values=nil )
+    def initialize( data )
+      raise unless data.is_a?(Hash)
                     
-      @feature_type = feature_type
-      @accept_values = accept_values
+      @feature_type = data[:feature_type]
+      @accept_values = data[:accept_values]
       @num_classes = 1
       
       #puts "predicted:  "+predicted_values.inspect
@@ -57,11 +34,11 @@ module Lib
       
       raise "unknown feature_type: '"+@feature_type.to_s+"'" unless 
         @feature_type=="classification" || @feature_type=="regression"
-      raise "no predictions" if predicted_values.size == 0
-      num_info = "predicted:"+predicted_values.size.to_s+
-        " confidence:"+confidence_values.size.to_s+" actual:"+actual_values.size.to_s
-      raise "illegal num actual values "+num_info if  actual_values.size != predicted_values.size
-      raise "illegal num confidence values "+num_info if  confidence_values.size != predicted_values.size
+      raise "no predictions" if data[:predicted_values].size == 0
+      num_info = "predicted:"+data[:predicted_values].size.to_s+
+        " confidence:"+data[:confidence_values].size.to_s+" actual:"+data[:actual_values].size.to_s
+      raise "illegal num actual values "+num_info if  data[:actual_values].size != data[:predicted_values].size
+      raise "illegal num confidence values "+num_info if  data[:confidence_values].size != data[:predicted_values].size
       
       case @feature_type
       when "classification"
@@ -76,8 +53,8 @@ module Lib
       @actual_values = []
       @confidence_values = []
       init_stats()
-      (0..predicted_values.size-1).each do |i|
-        update_stats( predicted_values[i], actual_values[i], confidence_values[i] )
+      (0..data[:predicted_values].size-1).each do |i|
+        update_stats( data[:predicted_values][i], data[:actual_values][i], data[:confidence_values][i] )
       end
     end
     

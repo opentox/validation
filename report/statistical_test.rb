@@ -69,8 +69,8 @@ module Reports
     
     def self.paired_ttest( validations1, validations2, attribute, class_value, significance_level=0.95 )
       
-      array1 = validations1.collect{ |v| (v.send(attribute).is_a?(Hash) ? v.send(attribute)[class_value] : v.send(attribute)) }
-      array2 = validations2.collect{ |v| (v.send(attribute).is_a?(Hash) ? v.send(attribute)[class_value] : v.send(attribute)) }
+      array1 = validations1.collect{ |v| (v.send(attribute).is_a?(Hash) ? v.send(attribute)[class_value].to_f : v.send(attribute).to_f) }
+      array2 = validations2.collect{ |v| (v.send(attribute).is_a?(Hash) ? v.send(attribute)[class_value].to_f : v.send(attribute).to_f) }
       LOGGER.debug "paired-t-testing "+attribute.to_s+" "+array1.inspect+" vs "+array2.inspect
       LIB::StatisticalTest.pairedTTest(array1, array2, significance_level)
     end
@@ -83,12 +83,16 @@ module Reports
 
 end
 
-#t1 = Time.new
-#10.times do
-#  puts LIB::StatisticalTest.pairedTTest([1,2,3,4,5,12,4,2],[2,3,3,3,56,3,4,5])
-#end
-#LIB::StatisticalTest.quitR
-#t2 = Time.new
-#puts t2-t1
+#x=["1.36840891838074", "2.89500403404236", "2.58440494537354", "1.96544003486633", "1.4017288684845", "1.68250012397766", "1.65089893341064", "2.24862003326416", "3.73909902572632", "2.36335206031799"]
+#y=["1.9675121307373", "2.30981087684631", "2.59359288215637", "2.62243509292603", "1.98700189590454", "2.26789593696594", "2.03917217254639", "2.69466996192932", "1.96487307548523", "1.65820598602295"]
+#puts LIB::StatisticalTest.pairedTTest(x,y)
+#
+##t1 = Time.new
+##10.times do
+#  puts LIB::StatisticalTest.pairedTTest([1.01,2,3,4,5,12,4,2],[2,3,3,3,56,3,4,5])
+##end
+#LIB::StatisticalTest.quit_r
+##t2 = Time.new
+##puts t2-t1
 
 
