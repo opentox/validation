@@ -7,6 +7,7 @@ module Lib
     
     def self.filter_data( data, compounds, min_confidence, min_num_predictions, max_num_predictions, prediction_index=nil )
       
+      raise "cannot filter anything, no confidence values available" if data[:confidence_values][0]==nil
       raise OpenTox::BadRequestError.new "please specify either min_confidence or max_num_predictions" if 
         (min_confidence!=nil and max_num_predictions!=nil) || (min_confidence==nil and max_num_predictions==nil)
       raise OpenTox::BadRequestError.new "min_num_predictions only valid for min_confidence" if 
@@ -15,14 +16,16 @@ module Lib
       
       LOGGER.debug("filtering predictions, conf:'"+min_confidence.to_s+"' min_num_predictions: '"+
         min_num_predictions.to_s+"' max_num_predictions: '"+max_num_predictions.to_s+"' ")
-        
+      #LOGGER.debug("to filter:\nconf: "+data[:confidence_values].inspect)
+       
       orig_size = data[:predicted_values].size
       valid_indices = []
       data[:confidence_values].size.times do |i|
         next if prediction_index!=nil and prediction_index!=data[:predicted_values][i]
         valid = false
         if min_confidence!=nil
-          valid = (valid_indices.size<=min_num_predictions or data[:confidence_values][i]>=min_confidence)
+          valid = (valid_indices.size<=min_num_predictions or 
+            (data[:confidence_values][i]!=nil and data[:confidence_values][i]>=min_confidence))
         else
           valid = valid_indices.size<max_num_predictions
         end
@@ -37,7 +40,6 @@ module Lib
         new_compounds = []
         valid_indices.each{|i| new_compounds << compounds[i]}
       end
-      
       LOGGER.debug("filtered predictions remaining: "+data[:predicted_values].size.to_s+"/"+orig_size.to_s)
       
       PredictionData.new(data, new_compounds)
