@@ -63,6 +63,7 @@ class Reports::ValidationDB
     else
       v = YAML::load(OpenTox::RestClientWrapper.get uri, {:subjectid=>subjectid, :accept=>"application/serialize"})
     end
+    v.subjectid = subjectid
     v.filter_predictions(filter_params[:min_confidence], filter_params[:min_num_predictions], filter_params[:max_num_predictions]) if 
       filter_params
     
