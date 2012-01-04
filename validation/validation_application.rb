@@ -193,6 +193,7 @@ end
 get '/crossvalidation/:id/statistics/probabilities' do
   
   LOGGER.info "get crossvalidation statistics for crossvalidation with id "+params[:id].to_s
+  raise OpenTox::BadRequestError.new("Missing params, plz give confidence and prediction") unless params[:confidence] and params[:prediction]
   v = Validation::Validation.from_cv_statistics( params[:id], @subjectid )
   props = v.probabilities(params[:confidence].to_s.to_f,params[:prediction].to_s)
   content_type "text/x-yaml"
@@ -585,10 +586,11 @@ get '/:id/probabilities' do
   begin
     validation = Validation::Validation.get(params[:id])
   rescue ActiveRecord::RecordNotFound => ex
-    raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found."
+    raise OpenTox::NotFoundError.new("Validation '#{params[:id]}' not found.")
   end
   validation.subjectid = @subjectid
-  raise OpenTox::BadRequestError.new "Validation '"+params[:id].to_s+"' not finished" unless validation.finished
+  raise OpenTox::BadRequestError.new("Validation '"+params[:id].to_s+"' not finished") unless validation.finished
+  raise OpenTox::BadRequestError.new("Missing params, plz give confidence and prediction") unless params[:confidence] and params[:prediction]
   props = validation.probabilities(params[:confidence].to_s.to_f,params[:prediction].to_s)
   content_type "text/x-yaml"
   props.to_yaml

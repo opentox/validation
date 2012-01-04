@@ -41,6 +41,7 @@ module Validation
         vals = Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation" ).collect{|x| x}
         
         v = Validation.new
+        v.subjectid = subjectid
         v.compute_prediction_data_with_cv(vals, waiting_task)
         v.compute_validation_stats()
           
@@ -54,6 +55,7 @@ module Validation
         v.real_runtime = vals.collect{ |vv| vv.real_runtime }.uniq.join(";")
         v.save
       end
+      v.subjectid = subjectid
       waiting_task.progress(100) if waiting_task
       v
     end
