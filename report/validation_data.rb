@@ -86,8 +86,8 @@ module Reports
       VAL_ATTR_RANKING.collect{ |a| (a.to_s+"_ranking").to_sym }
     @@validation_attributes.each{ |a| attr_accessor a } 
   
-    attr_reader :predictions, :subjectid, :filter_params
-    attr_accessor :identifier, :validation_report_uri, :crossvalidation_report_uri
+    attr_reader :predictions, :filter_params
+    attr_accessor :identifier, :validation_report_uri, :crossvalidation_report_uri, :subjectid
     
     def initialize(uri = nil, filter_params=nil, subjectid = nil)
       Reports.validation_access.init_validation(self, uri, filter_params, subjectid) if uri
@@ -456,7 +456,8 @@ module Reports
 
       #merge
       Lib::MergeObjects.register_merge_attributes( ReportValidation,
-        Validation::VAL_MERGE_AVG+Validation::VAL_MERGE_SUM,[],Validation::VAL_MERGE_GENERAL+[:identifier, :validation_report_uri, :crossvalidation_report_uri]) unless 
+        Validation::VAL_MERGE_AVG+Validation::VAL_MERGE_SUM,[],
+        Validation::VAL_MERGE_GENERAL+[:identifier, :validation_report_uri, :crossvalidation_report_uri, :subjectid]) unless 
           Lib::MergeObjects.merge_attributes_registered?(ReportValidation)
       grouping.each do |g|
         new_set.validations << g[0].clone_validation
