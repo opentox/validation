@@ -131,14 +131,20 @@ module Lib
         end
         
         actual_values = []
+        tmp_compounds = []  
         compounds.each do |c|
           case feature_type
           when "classification"
-            actual_values << classification_val(test_target_dataset, c, prediction_feature, accept_values)
+            vals = classification_vals(test_target_dataset, c, prediction_feature, accept_values)
           when "regression"
-            actual_values << regression_val(test_target_dataset, c, prediction_feature)
+            vals = regression_vals(test_target_dataset, c, prediction_feature)
+          end
+          vals.each do |v|
+            actual_values << v
+            tmp_compounds << c
           end
         end
+        compounds = tmp_compounds
         task.progress( task_status += task_step ) if task # loaded actual values
       
         prediction_dataset = Lib::DatasetCache.find prediction_dataset_uri,subjectid
@@ -174,10 +180,12 @@ module Lib
           else
             case feature_type
             when "classification"
-              predicted_values << classification_val(prediction_dataset, c, predicted_variable, accept_values)
+              vals = classification_vals(prediction_dataset, c, predicted_variable, accept_values)
             when "regression"
-              predicted_values << regression_val(prediction_dataset, c, predicted_variable)
+              vals = regression_vals(prediction_dataset, c, predicted_variable)
             end
+            raise "not yet implemented: more than one prediction for one compound" if vals.size>1
+            predicted_values << vals[0]
             if predicted_confidence
               confidence_values << confidence_val(prediction_dataset, c, predicted_confidence)
             else
@@ -229,20 +237,28 @@ module Lib
     end
     
     private
-    def self.regression_val(dataset, compound, feature)
-      v = value(dataset, compound, feature)
-      begin
-        v = v.to_f unless v==nil or v.is_a?(Numeric)
-        v
-      rescue
-        LOGGER.warn "no numeric value for regression: '"+v.to_s+"'"
-        nil
+    def self.regression_vals(dataset, compound, feature)
+      v_num = []
+      values(dataset, compound, feature).each do |v|
+        if v==nil or v.is_a?(Numeric)
+          v_num << v
+        else
+          begin
+            v_num << v.to_f
+          rescue
+            LOGGER.warn "no numeric value for regression: '"+v.to_s+"'"
+            v_num << nil
+          end
+        end
       end
+      v_num
     end
     
     def self.confidence_val(dataset, compound, confidence)
-      v = value(dataset, compound, confidence)
+      v = values(dataset, compound, confidence)
+      raise "not yet implemented: duplicate conf value" if v.size>1
       begin
+        v = v[0]
         v = v.to_f unless v==nil or v.is_a?(Numeric)
         v
       rescue
@@ -251,39 +267,31 @@ module Lib
       end
     end
     
-    def self.classification_val(dataset, compound, feature, accept_values)
-      v = value(dataset, compound, feature)
-      i = accept_values.index(v.to_s)
-      raise "illegal class_value of prediction (value is '"+v.to_s+"'), accept values are "+
-        accept_values.inspect unless v==nil or i!=nil
-      i
+    def self.classification_vals(dataset, compound, feature, accept_values)
+      v_indices = []
+      values(dataset, compound, feature).each do |v|
+        i = accept_values.index(v.to_s)
+        raise "illegal class_value of prediction (value is '"+v.to_s+"'), accept values are "+
+          accept_values.inspect unless v==nil or i!=nil
+        v_indices << i
+      end
+      v_indices
     end
     
-    def self.value(dataset, compound, feature)
-      return nil if dataset.data_entries[compound]==nil
+    def self.values(dataset, compound, feature)
+      return [nil] if dataset.data_entries[compound]==nil
       if feature==nil
         v = dataset.data_entries[compound].values[0]
       else
         v = dataset.data_entries[compound][feature]
       end
-      return nil if v==nil 
+      return [nil] if v==nil
+      # sanitiy checks
       raise "no array "+v.class.to_s+" : '"+v.to_s+"'" unless v.is_a?(Array)
-      if v.size>1
-        v.uniq!
-        if v.size>1
-          v = nil
-          LOGGER.warn "not yet implemented: multiple non-equal values "+compound.to_s+" "+v.inspect
-        else
-          v = v[0]
-        end
-      elsif v.size==1
-        v = v[0]
-      else
-        v = nil
-      end
-      raise "array" if v.is_a?(Array)
-      v = nil if v.to_s.size==0
-      v
+      v.each{|vv| raise "array-elem is array" if vv.is_a?(Array)} 
+      # replace empty strings with nil
+      v_mod = v.collect{|vv| (vv.to_s().size==0 ? nil : vv)}
+      v_mod
     end    
   end
 end
