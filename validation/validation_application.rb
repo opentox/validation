@@ -543,13 +543,16 @@ post '/cleanup_datasets/?' do
 end
 
 post '/plain_training_test_split' do
-    LOGGER.info "creating pure training test split "+params.inspect
-    raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri]
+  LOGGER.info "creating pure training test split "+params.inspect
+  raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri]
+  task = OpenTox::Task.create( "Create data-split", url_for("/plain_training_test_split", :full) ) do |task|
     strat = (params[:stratified].size>0 && params[:stratified]!="false" && params[:stratified]!="0") if params[:stratified]
     result = Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], @subjectid,
        strat, params[:split_ratio], params[:random_seed])
     content_type "text/uri-list"
     result[:training_dataset_uri]+"\n"+result[:test_dataset_uri]+"\n"
+  end
+  return_task(task)
 end
 
 post '/validate_datasets' do
