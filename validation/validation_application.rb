@@ -453,8 +453,9 @@ post '/training_test_split' do
   raise OpenTox::BadRequestError.new "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
   raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
   task = OpenTox::Task.create( "Perform training test split validation", url_for("/training_test_split", :full) )  do |task| #, params
+    strat = (params[:stratified].size>0 && params[:stratified]!="false" && params[:stratified]!="0") if params[:stratified]
     params.merge!( Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], 
-      @subjectid, params[:split_ratio], params[:random_seed], OpenTox::SubTask.create(task,0,33)))
+      @subjectid,  strat, params[:split_ratio], params[:random_seed], OpenTox::SubTask.create(task,0,33)))
     v = Validation::Validation.create  :validation_type => "training_test_split", 
                      :training_dataset_uri => params[:training_dataset_uri], 
                      :test_dataset_uri => params[:test_dataset_uri],
@@ -544,8 +545,9 @@ end
 post '/plain_training_test_split' do
     LOGGER.info "creating pure training test split "+params.inspect
     raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri]
-    
-    result = Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], params[:split_ratio], params[:random_seed])
+    strat = (params[:stratified].size>0 && params[:stratified]!="false" && params[:stratified]!="0") if params[:stratified]
+    result = Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], @subjectid,
+       strat, params[:split_ratio], params[:random_seed])
     content_type "text/uri-list"
     result[:training_dataset_uri]+"\n"+result[:test_dataset_uri]+"\n"
 end
