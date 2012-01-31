@@ -1,38 +1,6 @@
 #require "rubygems"
 #require "rinruby"
 
-module LIB
-  class StatisticalTest
-  
-    # -1 -> array1 < array2
-    # 0 -> not difference
-    # 1 -> array2 > array1
-    #
-    def self.pairedTTest(array1, array2, significance_level=0.95)
-      
-      @@r = RinRuby.new(true,false) unless defined?(@@r) and @@r 
-      @@r.assign "v1",array1
-      @@r.assign "v2",array2
-      @@r.eval "ttest = t.test(v1,v2,paired=T)"
-      t = @@r.pull "ttest$statistic"
-      p = @@r.pull "ttest$p.value"
-      if (1-significance_level > p)
-        t
-      else
-        0
-      end
-    end
-    
-    def self.quit_r
-      begin
-        @@r.quit
-        @@r = nil
-      rescue
-      end
-    end
-  end
-end
-
 module Reports
  
   class ReportStatisticalTest
@@ -72,27 +40,12 @@ module Reports
       array1 = validations1.collect{ |v| (v.send(attribute).is_a?(Hash) ? v.send(attribute)[class_value].to_f : v.send(attribute).to_f) }
       array2 = validations2.collect{ |v| (v.send(attribute).is_a?(Hash) ? v.send(attribute)[class_value].to_f : v.send(attribute).to_f) }
       LOGGER.debug "paired-t-testing "+attribute.to_s+" "+array1.inspect+" vs "+array2.inspect
-      LIB::StatisticalTest.pairedTTest(array1, array2, significance_level)
+      Reports::r_util.paired_ttest(array1, array2, significance_level)
     end
     
-    def self.quit_r
-      LIB::StatisticalTest.quit_r
-    end
-
   end
 
 end
 
-#x=["1.36840891838074", "2.89500403404236", "2.58440494537354", "1.96544003486633", "1.4017288684845", "1.68250012397766", "1.65089893341064", "2.24862003326416", "3.73909902572632", "2.36335206031799"]
-#y=["1.9675121307373", "2.30981087684631", "2.59359288215637", "2.62243509292603", "1.98700189590454", "2.26789593696594", "2.03917217254639", "2.69466996192932", "1.96487307548523", "1.65820598602295"]
-#puts LIB::StatisticalTest.pairedTTest(x,y)
-#
-##t1 = Time.new
-##10.times do
-#  puts LIB::StatisticalTest.pairedTTest([1.01,2,3,4,5,12,4,2],[2,3,3,3,56,3,4,5])
-##end
-#LIB::StatisticalTest.quit_r
-##t2 = Time.new
-##puts t2-t1
 
 

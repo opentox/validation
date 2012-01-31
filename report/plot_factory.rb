@@ -100,6 +100,34 @@ module Reports
       omit_count
     end
     
+    def self.create_train_test_plot( out_files, validation_set, only_prediction_feature, waiting_task )
+      if only_prediction_feature
+        train = []
+        test = []
+        validation_set.validations.each do |v|
+        [[v.test_dataset_uri, test, v.test_target_dataset_uri],
+         [v.training_dataset_uri, train, v.training_dataset_uri]].each do |uri,array,uri2|
+            d = Lib::DatasetCache.find(uri, validation_set.validations[0].subjectid)
+            d2 = Lib::DatasetCache.find((uri2 ? uri2 : uri), validation_set.validations[0].subjectid)
+            d.compounds.each do |c|
+              d2.data_entries[c][v.prediction_feature].each do |val|
+                array << val 
+              end if d2.data_entries[c] and d2.data_entries[c][v.prediction_feature]
+            end
+          end
+        end
+        waiting_task.progress(50) if waiting_task
+        
+        numerical = validation_set.unique_feature_type=="regression"
+        Reports::r_util.double_hist_plot(out_files, train, test, numerical, numerical, "Training Data", "Test Data",
+          "Prediction Feature Distribution", validation_set.validations.first.prediction_feature )
+      else
+        Reports::r_util.feature_value_plot(out_files, validation_set.validations[0].training_feature_dataset_uri,
+          validation_set.validations[0].test_feature_dataset_uri, "Training Data", "Test Data",
+          nil, true, validation_set.validations[0].subjectid, waiting_task )
+      end
+    end
+    
     
     # creates a roc plot (result is plotted into out_file)
     # * if (split_set_attributes == nil?)
@@ -191,6 +219,33 @@ module Reports
             data[:names], data[:confidence], data[:performance], CONF_PLOT_RANGE[performance_attribute])
         end
       end  
+    end
+    
+    def self.create_box_plot( out_files, validation_set, title_attribute, value_attribute, class_value )
+      
+      out_files = [out_files] unless out_files.is_a?(Array)
+      LOGGER.debug "creating box plot, out-files:"+out_files.inspect
+      
+      data = {}
+      validation_set.validations.each do |v|
+        value = v.send(value_attribute)
+        if value.is_a?(Hash)
+          if class_value==nil
+            avg_value = 0
+            value.values.each{ |val| avg_value+=val }
+            value = avg_value/value.values.size.to_f
+          else
+            raise "box plot value is hash, but no entry for class-value ("+class_value.to_s+
+              "); value for "+value_attribute.to_s+" -> "+value.inspect unless value.key?(class_value)
+            value = value[class_value]
+          end
+        end
+        
+        data[v.send(title_attribute).to_s] = [] unless data[v.send(title_attribute).to_s]
+        data[v.send(title_attribute).to_s] << value
+      end
+      
+      Reports::r_util.boxplot( out_files, data)
     end
     
     def self.create_bar_plot( out_files, validation_set, title_attribute, value_attributes )

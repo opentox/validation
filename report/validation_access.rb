@@ -7,6 +7,8 @@ require "lib/validation_db.rb"
 #  
 class Reports::ValidationDB
   
+  @@tmp_resources = []
+  
   def same_service?(uri)
     self_uri = URI.parse($url_provider.url)
     val_uri = URI.parse(uri)
@@ -132,27 +134,67 @@ class Reports::ValidationDB
       validation.send("#{p.to_s}=".to_sym, cv.send(p.to_s))
     end
   end
+  
+  def training_feature_dataset_uri(validation, subjectid)
+    m = OpenTox::Model::Generic.find(validation.model_uri, subjectid)
+    if m
+      f = m.metadata[OT.featureDataset]
+      return f.chomp if f
+    end
+    raise "no feature dataset found"
+  end
 
+  def test_feature_dataset_uri(validation, subjectid)
+    m = OpenTox::Model::Generic.find(validation.model_uri, subjectid)
+    feat_gen = nil
+    m.metadata[OT.parameters].each do |h|
+      if h[DC.title] and h[DC.title]=~/feature_generation/ and h[OT.paramValue]
+        feat_gen = h[OT.paramValue]
+        break
+      end
+    end if m  and m.metadata[OT.parameters]
+    raise "no feature creation alg found" unless feat_gen
+    feat_gen = File.join(feat_gen,"match") if feat_gen=~/fminer/
+    uri = OpenTox::RestClientWrapper.post(feat_gen,{:subjectid => subjectid,
+      :feature_dataset_uri=>training_feature_dataset_uri(validation,subjectid),
+      :dataset_uri=>validation.test_dataset_uri})
+    @@tmp_resources << uri
+    uri
+  end
+  
+  def delete_tmp_resources(subjectid)
+    @@tmp_resources.each do |uri|
+      OpenTox::RestClientWrapper.delete uri,{:subjectid=>subjectid}
+    end
+    @@tmp_resources = []
+  end
+    
   def get_predictions(validation, filter_params, subjectid, task)
     # we need compound info, cannot reuse stored prediction data
     data = Lib::PredictionData.create( validation.feature_type, validation.test_dataset_uri, 
       validation.test_target_dataset_uri, validation.prediction_feature, validation.prediction_dataset_uri, 
-      validation.predicted_variable, validation.predicted_confidence, subjectid, task )
+      validation.predicted_variable, validation.predicted_confidence, subjectid, OpenTox::SubTask.create(task, 0, 80 ) )
     data = Lib::PredictionData.filter_data( data.data, data.compounds, 
       filter_params[:min_confidence], filter_params[:min_num_predictions], filter_params[:max_num_predictions] ) if filter_params!=nil
+    task.progress(100) if task
     Lib::OTPredictions.new( data.data, data.compounds )
   end
   
   def get_accept_values( validation, subjectid=nil )
     # PENDING So far, one has to load the whole dataset to get the accept_value from ambit
-    test_target_dataset = validation.test_target_dataset_uri
-    test_target_dataset = validation.test_dataset_uri unless test_target_dataset
-    d = Lib::DatasetCache.find( test_target_dataset, subjectid )
-    raise "cannot get test target dataset for accept values, dataset: "+test_target_dataset.to_s unless d
-    accept_values = d.accept_values(validation.prediction_feature)
-    raise "cannot get accept values from dataset "+test_target_dataset.to_s+" for feature "+
-      validation.prediction_feature+":\n"+d.features[validation.prediction_feature].to_yaml unless accept_values!=nil
-    accept_values
+    test_target_datasets = validation.test_target_dataset_uri
+    test_target_datasets = validation.test_dataset_uri unless test_target_datasets
+    res = nil
+    test_target_datasets.split(";").each do |test_target_dataset|
+      d = Lib::DatasetCache.find( test_target_dataset, subjectid )
+      raise "cannot get test target dataset for accept values, dataset: "+test_target_dataset.to_s unless d
+      accept_values = d.accept_values(validation.prediction_feature)
+      raise "cannot get accept values from dataset "+test_target_dataset.to_s+" for feature "+
+        validation.prediction_feature+":\n"+d.features[validation.prediction_feature].to_yaml unless accept_values!=nil
+      raise "different accept values" if res && res!=accept_values
+      res = accept_values
+    end
+    res
   end
   
   def feature_type( validation, subjectid=nil )

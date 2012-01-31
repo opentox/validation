@@ -89,7 +89,9 @@ module Reports
       report_content = Reports::ReportFactory.create_report(type, validation_set, params,
         OpenTox::SubTask.create(task,10,90))
       LOGGER.debug "report created"
-      
+      Reports::quit_r
+      Reports.validation_access.delete_tmp_resources(subjectid)
+
       #step 3: persist report if creation not failed
       id = @@persistance.new_report(report_content, type, create_meta_data(type, validation_set, validation_uris), self, subjectid)
       LOGGER.debug "report persisted with id: '"+id.to_s+"'"

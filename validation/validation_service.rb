@@ -2,7 +2,6 @@
 
 require "lib/validation_db.rb"
 require "lib/ot_predictions.rb"
-require "lib/r-util.rb"
 
 require "validation/validation_format.rb"
 
@@ -639,16 +638,10 @@ module Validation
       end
       
       if stratified
-        Lib::RUtil.init_r
-        df = Lib::RUtil.dataset_to_dataframe( orig_dataset )
-        split = Lib::RUtil.stratified_split( df, split_ratio, random_seed )
-        Lib::RUtil.quit_r
-        raise "internal error" unless split.size==orig_dataset.compounds.size
-        task.progress(33) if task
-        
-        training_compounds = []
-        split.size.times{|i| training_compounds << orig_dataset.compounds[i] if split[i]==1}
-        test_compounds = orig_dataset.compounds - training_compounds
+        r_util = OpenTox::RUtil.new 
+        split_sets = r_util.stratified_split( orig_dataset, "NA", df, split_ratio, random_seed )
+        r_util.quit_r
+        result = {:training_dataset_uri => split_sets[0], :test_dataset_uri => split_sets[1]}
       else
         compounds = orig_dataset.compounds
         raise OpenTox::BadRequestError.new "Cannot split datset, num compounds in dataset < 2 ("+compounds.size.to_s+")" if compounds.size<2
@@ -661,37 +654,36 @@ module Validation
         compounds.shuffle!( random_seed )
         training_compounds = compounds[0..split]
         test_compounds = compounds[(split+1)..-1]
+        task.progress(33) if task
+  
+        result = {}
+        result[:training_dataset_uri] = orig_dataset.split( training_compounds,
+          orig_dataset.features.keys, 
+          { DC.title => "Training dataset split of "+orig_dataset.title.to_s, 
+            DC.creator => $url_provider.url_for('/training_test_split',:full) },
+          subjectid ).uri
+        task.progress(66) if task
+  
+        result[:test_dataset_uri] = orig_dataset.split( test_compounds,
+          orig_dataset.features.keys.dclone - [prediction_feature], 
+          { DC.title => "Test dataset split of "+orig_dataset.title.to_s, 
+            DC.creator => $url_provider.url_for('/training_test_split',:full) },
+          subjectid ).uri
+        task.progress(100) if task  
+        
+        if !stratified and ENV['RACK_ENV'] =~ /test|debug/
+          raise OpenTox::NotFoundError.new "Training dataset not found: '"+result[:training_dataset_uri].to_s+"'" unless 
+            Lib::DatasetCache.find(result[:training_dataset_uri],subjectid)
+          test_data = Lib::DatasetCache.find result[:test_dataset_uri],subjectid
+          raise OpenTox::NotFoundError.new "Test dataset not found: '"+result[:test_dataset_uri].to_s+"'" unless test_data 
+          test_data.load_compounds subjectid
+          raise "Test dataset num coumpounds != "+(compounds.size-split-1).to_s+", instead: "+
+            test_data.compounds.size.to_s+"\n"+test_data.to_yaml unless test_data.compounds.size==(compounds.size-1-split)
+        end
+        
+        LOGGER.debug "split done, training dataset: '"+result[:training_dataset_uri].to_s+"', test dataset: '"+result[:test_dataset_uri].to_s+"'"
       end
-      task.progress(33) if task
-
-      result = {}
-
-      result[:training_dataset_uri] = orig_dataset.split( training_compounds,
-        orig_dataset.features.keys, 
-        { DC.title => "Training dataset split of "+orig_dataset.title.to_s, 
-          DC.creator => $url_provider.url_for('/training_test_split',:full) },
-        subjectid ).uri
-      task.progress(66) if task
-
-      result[:test_dataset_uri] = orig_dataset.split( test_compounds,
-        orig_dataset.features.keys.dclone - [prediction_feature], 
-        { DC.title => "Test dataset split of "+orig_dataset.title.to_s, 
-          DC.creator => $url_provider.url_for('/training_test_split',:full) },
-        subjectid ).uri
-      task.progress(100) if task  
-      
-      if !stratified and ENV['RACK_ENV'] =~ /test|debug/
-        raise OpenTox::NotFoundError.new "Training dataset not found: '"+result[:training_dataset_uri].to_s+"'" unless 
-          Lib::DatasetCache.find(result[:training_dataset_uri],subjectid)
-        test_data = Lib::DatasetCache.find result[:test_dataset_uri],subjectid
-        raise OpenTox::NotFoundError.new "Test dataset not found: '"+result[:test_dataset_uri].to_s+"'" unless test_data 
-        test_data.load_compounds subjectid
-        raise "Test dataset num coumpounds != "+(compounds.size-split-1).to_s+", instead: "+
-          test_data.compounds.size.to_s+"\n"+test_data.to_yaml unless test_data.compounds.size==(compounds.size-1-split)
-      end
-      
-      LOGGER.debug "split done, training dataset: '"+result[:training_dataset_uri].to_s+"', test dataset: '"+result[:test_dataset_uri].to_s+"'"
-      return result
+      result
     end
   
   end

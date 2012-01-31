@@ -11,10 +11,10 @@ VAL_ATTR_REGR = [ :num_instances, :num_unpredicted, :root_mean_squared_error,
   :weighted_root_mean_squared_error, :mean_absolute_error, :weighted_mean_absolute_error, :r_square, :weighted_r_square,
   :sample_correlation_coefficient ]
 
-#VAL_ATTR_BAR_PLOT_CLASS = [ :accuracy, :average_area_under_roc, 
+#VAL_ATTR_BOX_PLOT_CLASS = [ :accuracy, :average_area_under_roc, 
 #  :area_under_roc, :f_measure, :true_positive_rate, :true_negative_rate ]
-VAL_ATTR_BAR_PLOT_CLASS = [ :accuracy, :f_measure, :true_positive_rate, :true_negative_rate, :positive_predictive_value, :negative_predictive_value ]
-VAL_ATTR_BAR_PLOT_REGR = [ :root_mean_squared_error, :mean_absolute_error, :r_square ]
+VAL_ATTR_BOX_PLOT_CLASS = [ :accuracy, :area_under_roc, :f_measure, :true_positive_rate, :true_negative_rate, :positive_predictive_value, :negative_predictive_value ]
+VAL_ATTR_BOX_PLOT_REGR = [ :root_mean_squared_error, :mean_absolute_error, :r_square ]
 
 VAL_ATTR_TTEST_REGR = [ :r_square, :root_mean_squared_error ]
 VAL_ATTR_TTEST_CLASS = [ :accuracy, :average_area_under_roc ]
@@ -29,8 +29,9 @@ module Reports::ReportFactory
   RT_VALIDATION = "validation"
   RT_CV = "crossvalidation"
   RT_ALG_COMP = "algorithm_comparison"
+  RT_METHOD_COMP = "method_comparison"
   
-  REPORT_TYPES = [RT_VALIDATION, RT_CV, RT_ALG_COMP ]
+  REPORT_TYPES = [RT_VALIDATION, RT_CV, RT_ALG_COMP, RT_METHOD_COMP ]
   
   # creates a report of a certain type according to the validation data in validation_set 
   #
@@ -40,11 +41,13 @@ module Reports::ReportFactory
   def self.create_report(type, validation_set, params={}, task=nil)
     case type
     when RT_VALIDATION
-      create_report_validation(validation_set, task)
+      create_report_validation(validation_set, {}, task)
     when RT_CV
-      create_report_crossvalidation(validation_set, task)
+      create_report_crossvalidation(validation_set, {}, task)
     when RT_ALG_COMP
       create_report_compare_algorithms(validation_set, params, task)
+    when RT_METHOD_COMP
+      create_report_compare_methods(validation_set, params, task)      
     else
       raise "unknown report type "+type.to_s
     end
@@ -78,7 +81,7 @@ module Reports::ReportFactory
     
     raise OpenTox::BadRequestError.new("num validations is not equal to 1") unless validation_set.size==1
     val = validation_set.validations[0]
-    pre_load_predictions( validation_set, OpenTox::SubTask.create(task,0,80) )
+    pre_load_predictions( validation_set, OpenTox::SubTask.create(task,0,50) )
 
     report = Reports::ReportContent.new("Validation report")
     add_filter_warning(report, validation_set.filter_params) if validation_set.filter_params!=nil
@@ -103,7 +106,6 @@ module Reports::ReportFactory
         report.add_confidence_plot(validation_set, :positive_predictive_value, accept_value)
         report.align_last_two_images "Confidence Plots"
       end
-      report.end_section
     when "regression"
       report.add_result(validation_set, [:validation_uri] + VAL_ATTR_TRAIN_TEST + VAL_ATTR_REGR, "Results", "Results")
       report.add_section("Plots")
@@ -111,10 +113,13 @@ module Reports::ReportFactory
       report.add_confidence_plot(validation_set, :root_mean_squared_error, nil)
       report.add_confidence_plot(validation_set, :r_square, nil)
       report.align_last_two_images "Confidence Plots"
-      report.end_section
     end
-    task.progress(90) if task
-    
+    task.progress(70) if task
+    report.add_train_test_plot( validation_set, false, OpenTox::SubTask.create(task,70,80) )
+    report.add_train_test_plot( validation_set, true, OpenTox::SubTask.create(task,80,90) )
+    report.align_last_two_images "Training Test Data Distribution Plots"
+    report.end_section
+
     report.add_result(validation_set, Validation::ALL_PROPS, "All Results", "All Results")
     report.add_predictions( validation_set )
     task.progress(100) if task
@@ -248,11 +253,11 @@ module Reports::ReportFactory
     when "classification"
       result_attributes += VAL_ATTR_CLASS
       ttest_attributes = VAL_ATTR_TTEST_CLASS
-      bar_plot_attributes = VAL_ATTR_BAR_PLOT_CLASS
+      box_plot_attributes = VAL_ATTR_BOX_PLOT_CLASS
     else 
       result_attributes += VAL_ATTR_REGR
       ttest_attributes = VAL_ATTR_TTEST_REGR
-      bar_plot_attributes = VAL_ATTR_BAR_PLOT_REGR
+      box_plot_attributes = VAL_ATTR_BOX_PLOT_REGR
     end
     
     if params[:ttest_attributes] and params[:ttest_attributes].chomp.size>0
@@ -263,8 +268,8 @@ module Reports::ReportFactory
       ttest_significance = params[:ttest_significance].to_f
     end
     
-    bar_plot_attributes += ttest_attributes
-    bar_plot_attributes.uniq!
+    box_plot_attributes += ttest_attributes
+    box_plot_attributes.uniq!
     
     result_attributes += ttest_attributes
     result_attributes.uniq!
@@ -287,11 +292,48 @@ module Reports::ReportFactory
       res_text = "These performance statistics have been derieved by computing the mean of the statistics on each crossvalidation fold."
       report.add_result(merged,result_attributes,res_titel,res_titel,res_text)
       # pending: regression stats have different scales!!!
-      report.add_bar_plot(merged, :identifier, bar_plot_attributes) if validation_set.unique_feature_type=="classification"
+      report.add_box_plot(set, :identifier, box_plot_attributes)
       report.add_paired_ttest_tables(set, :identifier, ttest_attributes, ttest_significance) if ttest_significance>0
       report.end_section
     end
     task.progress(100) if task
+    report
+  end
+  
+  def self.create_report_compare_methods(validation_set, params={}, task=nil)
+    raise OpenTox::BadRequestError.new("num validations is not >1") unless validation_set.size>1
+    raise OpenTox::BadRequestError.new("validations must have unique feature type, i.e. must be either all regression, "+
+      "or all classification validations") unless validation_set.unique_feature_type
+    raise OpenTox::BadRequestError.new("number of different identifiers <2: "+
+      validation_set.get_values(:identifier).inspect) if validation_set.num_different_values(:identifier)<2
+    #validation_set.load_cv_attributes
+    
+    pre_load_predictions( validation_set, OpenTox::SubTask.create(task,0,80) )
+    report = Reports::ReportContent.new("Method comparison report")
+    add_filter_warning(report, validation_set.filter_params) if validation_set.filter_params!=nil
+    
+    result_attributes = [:identifier,:validation_uri,:validation_report_uri]+VAL_ATTR_CV-[:crossvalidation_fold,:num_folds,:dataset_uri]
+    case validation_set.unique_feature_type
+    when "classification"
+      result_attributes += VAL_ATTR_CLASS
+      box_plot_attributes = VAL_ATTR_BOX_PLOT_CLASS
+    else 
+      result_attributes += VAL_ATTR_REGR
+      box_plot_attributes = VAL_ATTR_BOX_PLOT_REGR
+    end
+    
+    merged = validation_set.merge([:identifier])
+    merged.sort(:identifier)
+    
+    merged.validations.each do |v|
+      v.validation_uri = v.validation_uri.split(";").uniq.join(" ")
+      v.validation_report_uri = v.validation_report_uri.split(";").uniq.join(" ") if  v.validation_report_uri
+    end
+      
+    msg = merged.validations.collect{|v| v.identifier+" ("+Lib::MergeObjects.merge_count(v).to_s+"x)"}.join(", ")
+    report.add_result(merged,result_attributes,"Average Results","Results",msg)
+    
+    report.add_box_plot(validation_set, :identifier, box_plot_attributes)
     report
   end
 

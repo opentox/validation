@@ -94,6 +94,7 @@ module Reports
       @subjectid = subjectid
       raise unless filter_params==nil || filter_params.is_a?(Hash)
       @filter_params = filter_params
+      @created_resources = []
       #raise "subjectid is nil" unless subjectid
     end
     
@@ -102,7 +103,22 @@ module Reports
       Reports.validation_access.init_validation_from_cv_statistics(v, cv_uri, filter_params, subjectid)
       v
     end
-  
+    
+    def training_feature_dataset_uri
+      unless @training_feature_dataset
+        @training_feature_dataset = Reports.validation_access.training_feature_dataset_uri( self, @subjectid )
+      end
+      @training_feature_dataset
+    end
+    
+    #hack this does create the features for the test dataset
+    def test_feature_dataset_uri
+      unless @test_feature_dataset
+        @test_feature_dataset = Reports.validation_access.test_feature_dataset_uri( self, @subjectid )
+      end
+      @test_feature_dataset
+    end
+    
     # returns/creates predictions, cache to save rest-calls/computation time
     #
     # call-seq:
@@ -402,12 +418,17 @@ module Reports
             end
             
             if variance
+              #puts "variance given #{a}, #{val.inspect}, #{val.class}, #{variance.inspect}, #{variance.class}"
               if (val.is_a?(Array))
                 raise "not implemented"
               elsif (val.is_a?(Hash))
                 val.collect{ |i,j| i.to_nice_s+": "+j.to_nice_s + " +- " +
                   variance[i].to_nice_s  }.join(", ")
               else
+                if (variance.is_a?(Hash))
+                  raise "invalid variance" unless accept_values.size==1 && accept_values[0]!=nil
+                  variance = variance[accept_values[0]]
+                end
                 val.to_nice_s + " +- " + variance.to_nice_s
               end
             else
