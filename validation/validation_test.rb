@@ -60,6 +60,60 @@ class ValidationTest < Test::Unit::TestCase
     begin
       $test_case = self
       
+#      dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/603206?pagesize=250&page=0"
+#      test_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/603206?pagesize=250&page=1"
+#      #prediction_feature = "http://apps.ideaconsult.net:8080/ambit2/feature/528321"
+#      prediction_feature = "http://apps.ideaconsult.net:8080/ambit2/feature/528402"
+#      prediction_algorithm = "http://apps.ideaconsult.net:8080/ambit2/algorithm/RandomForest"
+#      #ad_algorithm = "http://apps.ideaconsult.net:8080/ambit2/algorithm/leverage"
+#      #ad_algorithm = "http://apps.ideaconsult.net:8080/ambit2/algorithm/distanceMahalanobis"
+#      #ad_algorithm = "http://apps.ideaconsult.net:8080/ambit2/algorithm/pcaRanges"
+#      ad_algorithm = "http://apps.ideaconsult.net:8080/ambit2/algorithm/RandomForest"
+#      post "/training_test_validation",{:training_dataset_uri=>dataset_uri, :test_dataset_uri=>test_dataset_uri,
+#        :prediction_feature => prediction_feature, :algorithm_uri=>"http://local-ot/adwrap", 
+#        :algorithm_params=>"prediction_algorithm=#{prediction_algorithm};ad_algorithm=#{ad_algorithm}"}
+#      puts last_response.body
+#      uri = last_response.body
+#      rep = wait_for_task(uri)
+#      puts rep
+#      
+#      post "/report/method_comparison",
+#        {:validation_uris=>"http://local-ot/validation/433,http://local-ot/validation/434,http://local-ot/validation/435,http://local-ot/validation/436,http://local-ot/validation/437,http://local-ot/validation/438,http://local-ot/validation/439,http://local-ot/validation/440,http://local-ot/validation/441,http://local-ot/validation/442,http://local-ot/validation/crossvalidation/30,",
+#         :identifier=>"random,random,random,random,random,random,random,random,random,random,crossvalidated,"}
+
+#      post "/report/method_comparison",
+#        {:validation_uris=>"http://local-ot/validation/389,http://local-ot/validation/390,http://local-ot/validation/391,http://local-ot/validation/392",
+#         :identifier=>"split1,split1,split2,split2"}
+
+              
+      #post "/report/validation",{:validation_uris=>"http://local-ot/validation/171"}
+      #post "/report/validation",{:validation_uris=>"http://local-ot/validation/389"}
+      
+      #dataset_uri = OpenTox::Dataset.create_from_csv_file(File.new("data/EPAFHM.csv").path, nil).uri
+      #puts dataset_uri
+      
+#      #dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/603306?feature_uris[]=http://apps.ideaconsult.net:8080/ambit2/feature/764036"
+#      #dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/603204"
+#      post "/plain_training_test_split",{:dataset_uri=>dataset_uri, :stratified=>"true", :split_ratio=>0.3}
+#      puts last_response.body
+#      uri = last_response.body
+#      rep = wait_for_task(uri)
+#      puts rep
+      #OpenTox::RestClientWrapper.post("http://opentox.informatik.uni-freiburg.de/validation/plain_training_test_split",
+      #  {:dataset_uri=>dataset_uri, :stratified=>"true", :split_ratio=>0.7407407407})  
+        
+      #puts OpenTox::Dataset.create_from_csv_file(File.new("data/hamster_carcinogenicity.csv").path, nil).uri
+      #puts OpenTox::Dataset.create_from_csv_file(File.new("data/multi_cell_call.csv").path, nil).uri
+      
+      #puts OpenTox::Dataset.find("http://opentox.informatik.uni-freiburg.de/dataset/98").compounds.size
+      
+#        
+#      #post "/plain_training_test_split",{:dataset_uri=>"http://apps.ideaconsult.net:8080/ambit2/dataset/603204", :stratified=>"true"}
+#        
+#        
+#        
+
+  
 #      post "/validate_datasets",{
 #        :test_dataset_uri=>"http://local-ot/dataset/6907",
 #        :prediction_dataset_uri=>"http://local-ot/dataset/6909",
@@ -71,20 +125,19 @@ class ValidationTest < Test::Unit::TestCase
 #        #:regression=>"true"}
 #        :classification=>"true"}
 #        
-#      puts last_response.body
-#      uri = last_response.body
-#      rep = wait_for_task(uri)
-#      puts rep
+
       
       #get 'crossvalidation/19/statistics'
       #get 'crossvalidation/189/statistics'
       #puts last_response.body
-#      run_test("1b")       
+
+      #run_test("13a")       
+    #  run_test("1a",:validation_uri=>"http://local-ot/validation/513")
 
       #get '/crossvalidation/79/predictions',nil,'HTTP_ACCEPT' => "application/x-yaml"
       #puts last_response.body
       
-      run_test("22f") #,:validation_uri=>"http://local-ot/validation/84" )
+     # run_test("22f") #,:validation_uri=>"http://local-ot/validation/84" )
     
 
       #run_test("21b")
@@ -109,12 +162,6 @@ class ValidationTest < Test::Unit::TestCase
 #      puts rep
       # 205 206 207
 
-#      post '/report/algorithm_comparison',{:validation_uris=>"http://local-ot/validation/crossvalidation/149,http://local-ot/validation/crossvalidation/210",
-#        :identifier=>"bbrc,last"}
-#      uri = last_response.body
-#      rep = wait_for_task(uri)
-#      puts rep
-      
       #run_test("1a", {:validation_uri=>"http://local-ot/validation/305"})
 #      puts "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
       #run_test("3a",{:validation_uri=>"http://local-ot/validation/crossvalidation/6"})
@@ -123,14 +170,33 @@ class ValidationTest < Test::Unit::TestCase
 #      puts "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
       #run_test("14a") #,{:validation_uri=>"http://local-ot/validation/crossvalidation/148"})
 #      puts "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-
-      #run_test("1a")
       
-#      run_test("3d",{
-#        :dataset_uri => "http://local-ot/dataset/2897", 
-#        :prediction_feature => "http://local-ot/dataset/2897/feature/Hamster%20Carcinogenicity",
+      #run_test("3a")
+      #run_test("3d",{
+      #  :dataset_uri => "http://local-ot/dataset/447", 
+      #  :prediction_feature => "http://local-ot/dataset/447/feature/Hamster%20Carcinogenicity",
+      #  :random_seed => 1
+      #  })
+      
+      #run_test("23a")
+      run_test("23a",{:validation_uri=>"http://local-ot/validation/crossvalidation/53"})
+      #run_test("23a",{:validation_uri=>"http://local-ot/validation/crossvalidation/47"})
+      #23a loo {:validation_uri=>"http://local-ot/validation/crossvalidation/47"})        
+      #loo mit datasets auf ortona {:validation_uri=>"http://local-ot/validation/crossvalidation/46"}
+      
+#      run_test("14d",{
+#        :dataset_uri => "http://local-ot/dataset/508", 
+#        :prediction_feature => "http://local-ot/dataset/508/feature/LC50_mmol",
 #        :random_seed => 1
 #        })
+      
+      #post '/report/algorithm_comparison',{
+      #   :validation_uris=>"http://local-ot/validation/crossvalidation/9,http://local-ot/validation/crossvalidation/10",
+      #   :identifier=>"bbrc,last",
+      #   :ttest_attributes=>"num_instances,num_without_class,num_unpredicted,real_runtime,percent_without_class,percent_unpredicted"}
+      #uri = last_response.body
+      #rep = wait_for_task(uri)
+      #puts rep
 
       #run_test("14",{
       #  :dataset_uri => "http://local-ot/dataset/3877", 
@@ -189,6 +255,10 @@ class ValidationTest < Test::Unit::TestCase
             
           LOGGER.debug "validation done '"+ex.validation_uri.to_s+"'"
         end
+        
+        #ex.compute_dataset_size
+        #break
+        
         if !delete and ex.validation_uri
           if SUBJECTID
             puts ex.validation_uri+"?subjectid="+CGI.escape(SUBJECTID)
