@@ -305,17 +305,19 @@ module Validation
       perform_cv_validations( algorithm_params, OpenTox::SubTask.create(task, 33, 100) )
     end
     
-    def clean_loo_files
+    def clean_loo_files( delete_feature_datasets )
       Validation.find( :crossvalidation_id => self.id, :validation_type => "crossvalidation" ).each do |v|
         LOGGER.debug "loo-cleanup> delete training dataset "+v.training_dataset_uri
         OpenTox::RestClientWrapper.delete v.training_dataset_uri,subjectid
-        begin
-          model = OpenTox::Model::Generic.find(v.model_uri)
-          if model.metadata[OT.featureDataset]
-            LOGGER.debug "loo-cleanup> delete feature dataset "+model.metadata[OT.featureDataset]
-            OpenTox::RestClientWrapper.delete model.metadata[OT.featureDataset],subjectid
+        if (delete_feature_datasets)
+          begin
+            model = OpenTox::Model::Generic.find(v.model_uri)
+            if model.metadata[OT.featureDataset]
+              LOGGER.debug "loo-cleanup> delete feature dataset "+model.metadata[OT.featureDataset]
+              OpenTox::RestClientWrapper.delete model.metadata[OT.featureDataset],subjectid
+            end
+          rescue
           end
-        rescue
         end
       end
     end

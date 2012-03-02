@@ -97,7 +97,7 @@ post '/crossvalidation/loo/?' do
     cv.perform_cv( params[:prediction_feature], params[:algorithm_params], OpenTox::SubTask.create(task,0,95))
     # computation of stats is cheap as dataset are already loaded into the memory
     Validation::Validation.from_cv_statistics( cv.id, @subjectid, OpenTox::SubTask.create(task,95,100) )
-    cv.clean_loo_files
+    cv.clean_loo_files( !(params[:algorithm_params] && params[:algorithm_params] =~ /feature_dataset_uri/) )
     cv.crossvalidation_uri
   end
   return_task(task)
