@@ -175,7 +175,8 @@ module Reports::ReportFactory
       report.end_section
       report.add_result(validation_set, 
         [:validation_uri, :validation_report_uri]+VAL_ATTR_CV+VAL_ATTR_CLASS-[:num_folds, :dataset_uri, :algorithm_uri],
-        "Results","Results")
+        "Results","Results") if 
+        (validation_set.unique_value(:num_folds) < validation_set.unique_value(:num_instances))
     when "regression"
       report.add_result(cv_set, [:crossvalidation_uri]+VAL_ATTR_CV+VAL_ATTR_REGR-[:crossvalidation_fold],res_titel, res_titel, res_text)
       report.add_section("Plots")
@@ -189,11 +190,13 @@ module Reports::ReportFactory
       report.end_section
       report.add_result(validation_set, 
         [:validation_uri, :validation_report_uri]+VAL_ATTR_CV+VAL_ATTR_REGR-[:num_folds, :dataset_uri, :algorithm_uri], 
-        "Results","Results")
+        "Results","Results") if 
+        (validation_set.unique_value(:num_folds) < validation_set.unique_value(:num_instances))
     end
     task.progress(90) if task
       
-    report.add_result(validation_set, Validation::ALL_PROPS, "All Results", "All Results")
+    report.add_result(validation_set, Validation::ALL_PROPS, "All Results", "All Results") if
+      (validation_set.unique_value(:num_folds) < validation_set.unique_value(:num_instances))
     report.add_predictions( validation_set ) #, [:crossvalidation_fold] )
     task.progress(100) if task
     report
