@@ -497,7 +497,7 @@ module Validation
                '_f'+n.to_s+'of'+self.num_folds.to_s+
                '_r'+self.random_seed.to_s+
                '_s'+self.stratified.to_s 
-        source = $url_provider.url_for('/crossvalidation',:full)
+        source = self.crossvalidation_uri
         
         test_compounds = []
         train_compounds = []
