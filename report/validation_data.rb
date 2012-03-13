@@ -86,21 +86,39 @@ module Reports
       VAL_ATTR_RANKING.collect{ |a| (a.to_s+"_ranking").to_sym }
     @@validation_attributes.each{ |a| attr_accessor a } 
   
-    attr_reader :predictions, :subjectid
-    attr_accessor :identifier, :validation_report_uri, :crossvalidation_report_uri
+    attr_reader :predictions, :filter_params
+    attr_accessor :identifier, :validation_report_uri, :crossvalidation_report_uri, :subjectid
     
-    def initialize(uri = nil, subjectid = nil)
-      Reports.validation_access.init_validation(self, uri, subjectid) if uri
+    def initialize(uri = nil, filter_params=nil, subjectid = nil)
+      Reports.validation_access.init_validation(self, uri, filter_params, subjectid) if uri
       @subjectid = subjectid
+      raise unless filter_params==nil || filter_params.is_a?(Hash)
+      @filter_params = filter_params
+      @created_resources = []
       #raise "subjectid is nil" unless subjectid
     end
     
-    def self.from_cv_statistics( cv_uri, subjectid = nil )
-      v = ReportValidation.new(nil, subjectid)
-      Reports.validation_access.init_validation_from_cv_statistics(v, cv_uri, subjectid)
+    def self.from_cv_statistics( cv_uri, filter_params, subjectid )
+      v = ReportValidation.new(nil, filter_params, subjectid)
+      Reports.validation_access.init_validation_from_cv_statistics(v, cv_uri, filter_params, subjectid)
       v
     end
-  
+    
+    def training_feature_dataset_uri
+      unless @training_feature_dataset
+        @training_feature_dataset = Reports.validation_access.training_feature_dataset_uri( self, @subjectid )
+      end
+      @training_feature_dataset
+    end
+    
+    #hack this does create the features for the test dataset
+    def test_feature_dataset_uri
+      unless @test_feature_dataset
+        @test_feature_dataset = Reports.validation_access.test_feature_dataset_uri( self, @subjectid )
+      end
+      @test_feature_dataset
+    end
+    
     # returns/creates predictions, cache to save rest-calls/computation time
     #
     # call-seq:
@@ -116,7 +134,7 @@ module Reports
           task.progress(100) if task
           nil
         else
-          @predictions = Reports.validation_access.get_predictions( self, @subjectid, task )
+          @predictions = Reports.validation_access.get_predictions( self, @filter_params, @subjectid, task )
         end
       end
     end
@@ -148,7 +166,7 @@ module Reports
     # loads all crossvalidation attributes, of the corresponding cv into this object 
     def load_cv_attributes
       raise "crossvalidation-id not set" unless @crossvalidation_id
-      Reports.validation_access.init_cv(self)
+      Reports.validation_access.init_cv(self, @subjectid)
       # load cv report
       ids = Reports.persistance.list_reports("crossvalidation",{:crossvalidation=>self.crossvalidation_uri.to_s })
       @crossvalidation_report_uri = ReportService.instance.get_uri("crossvalidation",ids[-1]) if ids and ids.size>0
@@ -167,13 +185,13 @@ module Reports
   #
   class ValidationSet
     
-    def initialize(validation_uris=nil, identifier=nil, subjectid=nil)
+    def initialize(validation_uris=nil, identifier=nil, filter_params=nil, subjectid=nil)
       @unique_values = {}
       @validations = []
       if validation_uris    
         validation_uri_and_ids = ReportValidation.resolve_cv_uris(validation_uris, identifier, subjectid)
         validation_uri_and_ids.each do |u,id|
-          v = ReportValidation.new(u, subjectid)
+          v = ReportValidation.new(u, filter_params, subjectid)
           v.identifier = id if id
           ids = Reports.persistance.list_reports("validation",{:validation_uris=>v.validation_uri })
           v.validation_report_uri = ReportService.instance.get_uri("validation",ids[-1]) if ids and ids.size>0
@@ -226,6 +244,10 @@ module Reports
     def has_nil_values?(attribute)
       @validations.each{ |v| return true unless v.send(attribute) } 
       return false
+    end
+    
+    def filter_params
+      @validations.first.filter_params
     end
     
     # loads the attributes of the related crossvalidation into all validation objects
@@ -396,12 +418,17 @@ module Reports
             end
             
             if variance
+              #puts "variance given #{a}, #{val.inspect}, #{val.class}, #{variance.inspect}, #{variance.class}"
               if (val.is_a?(Array))
                 raise "not implemented"
               elsif (val.is_a?(Hash))
                 val.collect{ |i,j| i.to_nice_s+": "+j.to_nice_s + " +- " +
                   variance[i].to_nice_s  }.join(", ")
               else
+                if (variance.is_a?(Hash))
+                  raise "invalid variance" unless accept_values.size==1 && accept_values[0]!=nil
+                  variance = variance[accept_values[0]]
+                end
                 val.to_nice_s + " +- " + variance.to_nice_s
               end
             else
@@ -424,7 +451,7 @@ module Reports
       new_set = ValidationSet.new
       grouping = Util.group(@validations, [:crossvalidation_id])
       grouping.each do |g|
-        v = ReportValidation.from_cv_statistics(g[0].crossvalidation_uri, g[0].subjectid)
+        v = ReportValidation.from_cv_statistics(g[0].crossvalidation_uri, @validations.first.filter_params, g[0].subjectid)
         v.identifier = g.collect{|vv| vv.identifier}.uniq.join(";")
         new_set.validations << v 
       end
@@ -450,7 +477,8 @@ module Reports
 
       #merge
       Lib::MergeObjects.register_merge_attributes( ReportValidation,
-        Validation::VAL_MERGE_AVG+Validation::VAL_MERGE_SUM,[],Validation::VAL_MERGE_GENERAL+[:identifier, :validation_report_uri, :crossvalidation_report_uri]) unless 
+        Validation::VAL_MERGE_AVG+Validation::VAL_MERGE_SUM,[],
+        Validation::VAL_MERGE_GENERAL+[:identifier, :validation_report_uri, :crossvalidation_report_uri, :subjectid]) unless 
           Lib::MergeObjects.merge_attributes_registered?(ReportValidation)
       grouping.each do |g|
         new_set.validations << g[0].clone_validation

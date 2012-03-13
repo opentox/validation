@@ -72,6 +72,7 @@ module Validation
     attribute :classification_statistics_yaml
     attribute :regression_statistics_yaml
     attribute :finished    
+    attribute :prediction_data_yaml
     
     index :model_uri
     index :validation_type
@@ -98,6 +99,14 @@ module Validation
     
     def regression_statistics=(rs)
       self.regression_statistics_yaml = rs.to_yaml
+    end
+    
+    def prediction_data
+      YAML.load(self.prediction_data_yaml) if self.prediction_data_yaml
+    end
+    
+    def prediction_data=(pd)
+      self.prediction_data_yaml = pd.to_yaml
     end
 
     def save

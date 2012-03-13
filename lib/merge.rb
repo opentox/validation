@@ -31,6 +31,11 @@ module Lib
       return merge_count(object)>1
     end
     
+    def self.merge_count( object )
+      @@merge_count[object] = 1 if @@merge_count[object]==nil
+      return @@merge_count[object] 
+    end
+    
     def self.merge_objects( object1, object2 )
       raise "classes not equal : "+object1.class.to_s+" != "+object2.class.to_s if object1.class != object2.class
       object_class = object1.class
@@ -136,11 +141,6 @@ module Lib
       end
       {:value => value, :variance => variance }
     end 
-    
-    def self.merge_count( object )
-      @@merge_count[object] = 1 if @@merge_count[object]==nil
-      return @@merge_count[object] 
-    end
     
     def self.set_merge_count(object, merge_count)
       @@merge_count[object] = merge_count

@@ -1,4 +1,6 @@
 
+require "lib/prediction_data.rb"
+
 module Lib
 
   module Util
@@ -18,18 +20,12 @@ module Lib
     def identifier(instance_index)
       return instance_index.to_s
     end
-  
-    def initialize( predicted_values, 
-                    actual_values, 
-                    confidence_values, 
-                    feature_type, 
-                    accept_values=nil )
+    
+    def initialize( data )
+      raise unless data.is_a?(Hash)
                     
-      @predicted_values = predicted_values
-      @actual_values = actual_values
-      @confidence_values = confidence_values
-      @feature_type = feature_type
-      @accept_values = accept_values
+      @feature_type = data[:feature_type]
+      @accept_values = data[:accept_values]
       @num_classes = 1
       
       #puts "predicted:  "+predicted_values.inspect
@@ -38,34 +34,27 @@ module Lib
       
       raise "unknown feature_type: '"+@feature_type.to_s+"'" unless 
         @feature_type=="classification" || @feature_type=="regression"
-      raise "no predictions" if @predicted_values.size == 0
-      num_info = "predicted:"+@predicted_values.size.to_s+
-        " confidence:"+@confidence_values.size.to_s+" actual:"+@actual_values.size.to_s
-      raise "illegal num actual values "+num_info if  @actual_values.size != @predicted_values.size
-      raise "illegal num confidence values "+num_info if  @confidence_values.size != @predicted_values.size
-      
-      @confidence_values.each{ |c| raise "illegal confidence value: '"+c.to_s+"'" unless c==nil or (c.is_a?(Numeric) and c>=0 and c<=1) }
+      raise "no predictions" if data[:predicted_values].size == 0
+      num_info = "predicted:"+data[:predicted_values].size.to_s+
+        " confidence:"+data[:confidence_values].size.to_s+" actual:"+data[:actual_values].size.to_s
+      raise "illegal num actual values "+num_info if  data[:actual_values].size != data[:predicted_values].size
+      raise "illegal num confidence values "+num_info if  data[:confidence_values].size != data[:predicted_values].size
       
       case @feature_type
       when "classification"
         raise "accept_values missing while performing classification" unless @accept_values
         @num_classes = @accept_values.size
         raise "num classes < 2" if @num_classes<2
-        { "predicted"=>@predicted_values, "actual"=>@actual_values }.each do |s,values|
-          values.each{ |v| raise "illegal "+s+" classification-value ("+v.to_s+"),"+
-            "has to be either nil or index of predicted-values" if v!=nil and (!v.is_a?(Numeric) or v<0 or v>@num_classes)}
-        end
       when "regression"
         raise "accept_values != nil while performing regression" if @accept_values
-        { "predicted"=>@predicted_values, "actual"=>@actual_values }.each do |s,values|
-          values.each{ |v| raise "illegal "+s+" regression-value ("+v.to_s+"),"+
-            " has to be either nil or number (not NaN, not Infinite)" unless v==nil or (v.is_a?(Numeric) and !v.nan? and v.finite?)}
-        end
       end
       
+      @predicted_values = []
+      @actual_values = []
+      @confidence_values = []
       init_stats()
-      (0..@predicted_values.size-1).each do |i|
-        update_stats( @predicted_values[i], @actual_values[i], @confidence_values[i] )
+      (0..data[:predicted_values].size-1).each do |i|
+        update_stats( data[:predicted_values][i], data[:actual_values][i], data[:confidence_values][i] )
       end
     end
     
@@ -114,12 +103,38 @@ module Lib
         @sum_squares_actual = 0
         @sum_squares_predicted = 0
         
+        @sum_confidence = 0
+        @weighted_sum_actual = 0
+        @weighted_sum_predicted = 0
+        @weighted_sum_multiply = 0
+        @weighted_sum_squares_actual = 0
+        @weighted_sum_squares_predicted = 0
+        
         @sum_weighted_abs_error = 0
         @sum_weighted_squared_error = 0
       end
     end
     
     def update_stats( predicted_value, actual_value, confidence_value )
+      
+      raise "illegal confidence value: '"+confidence_value.to_s+"'" unless 
+        confidence_value==nil or (confidence_value.is_a?(Numeric) and confidence_value>=0 and confidence_value<=1)
+      case @feature_type
+      when "classification"
+        { "predicted"=>predicted_value, "actual"=>actual_value }.each do |s,v|
+          raise "illegal "+s+" classification-value ("+v.to_s+"),"+
+            "has to be either nil or index of predicted-values" if v!=nil and (!v.is_a?(Numeric) or v<0 or v>@num_classes)
+        end
+      when "regression"
+        { "predicted"=>predicted_value, "actual"=>actual_value }.each do |s,v|
+          raise "illegal "+s+" regression-value ("+v.to_s+"),"+
+            " has to be either nil or number (not NaN, not Infinite)" unless v==nil or (v.is_a?(Numeric) and !v.nan? and v.finite?)
+        end
+      end
+      
+      @predicted_values << predicted_value
+      @actual_values << actual_value
+      @confidence_values << confidence_value
       
       if actual_value==nil
         @num_no_actual_value += 1
@@ -165,6 +180,16 @@ module Lib
             @sum_multiply += (actual_value*predicted_value)
             @sum_squares_actual += actual_value**2
             @sum_squares_predicted += predicted_value**2
+            
+            if @conf_provided
+              w_a = actual_value * confidence_value
+              w_p = predicted_value * confidence_value
+              @weighted_sum_actual += w_a
+              @weighted_sum_predicted += w_p
+              @weighted_sum_multiply += (w_a*w_p) if @conf_provided
+              @weighted_sum_squares_actual += w_a**2 if @conf_provided
+              @weighted_sum_squares_predicted += w_p**2 if @conf_provided
+            end
           end
         end
       end
@@ -252,6 +277,15 @@ module Lib
         end
       end
       return res
+    end
+    
+    # returns acutal values for a certain prediction
+    def confusion_matrix_row(predicted_class_index)
+      r = []
+      (0..@num_classes-1).each do |actual|
+        r << @confusion_matrix[actual][predicted_class_index]
+      end
+      return r
     end
     
     def area_under_roc(class_index=nil)
@@ -514,7 +548,7 @@ module Lib
       return @sum_squared_error
     end
     
-    def r_square
+    def r_square #_old
       #return sample_correlation_coefficient ** 2
       
       # see http://en.wikipedia.org/wiki/Coefficient_of_determination#Definitions
@@ -525,7 +559,7 @@ module Lib
       ( r_2.infinite? || r_2.nan? ) ? 0 : r_2
     end
     
-    def weighted_r_square
+    def weighted_r_square #_old
       return 0 unless confidence_values_available?      
       ss_tot = weighted_total_sum_of_squares
       return 0 if ss_tot==0
@@ -533,12 +567,32 @@ module Lib
       ( r_2.infinite? || r_2.nan? ) ? 0 : r_2
     end
     
+    #def r_square
+    #  # as implemted in R
+    #  return sample_correlation_coefficient ** 2
+    #end
+    
+    #def weighted_r_square
+    #  # as implemted in R
+    #  return weighted_sample_correlation_coefficient ** 2
+    #end
+    
     def sample_correlation_coefficient
       begin
         # formula see http://en.wikipedia.org/wiki/Correlation_and_dependence#Pearson.27s_product-moment_coefficient
         scc = ( @num_predicted * @sum_multiply - @sum_actual * @sum_predicted ) /
           ( Math.sqrt( @num_predicted * @sum_squares_actual - @sum_actual**2 ) *
             Math.sqrt( @num_predicted * @sum_squares_predicted - @sum_predicted**2 ) )
+        ( scc.infinite? || scc.nan? ) ? 0 : scc
+      rescue; 0; end
+    end
+    
+    def weighted_sample_correlation_coefficient
+      begin
+        # formula see http://en.wikipedia.org/wiki/Correlation_and_dependence#Pearson.27s_product-moment_coefficient
+        scc = ( @num_predicted * @weighted_sum_multiply - @weighted_sum_actual * @weighted_sum_predicted ) /
+          ( Math.sqrt( @num_predicted * @weighted_sum_squares_actual - @weighted_sum_actual**2 ) *
+            Math.sqrt( @num_predicted * @weighted_sum_squares_predicted - @weighted_sum_predicted**2 ) )
         ( scc.infinite? || scc.nan? ) ? 0 : scc
       rescue; 0; end
     end
@@ -608,17 +662,23 @@ module Lib
       return h
     end
     
-    def get_prediction_values(actual_accept_value, predicted_accept_value)
+    def get_prediction_values(performance_attr, performance_accept_value)
       
       #puts "get_roc_values for class_value: "+class_value.to_s
       raise "no confidence values" unless confidence_values_available?
       #raise "no class-value specified" if class_value==nil
       
+      actual_accept_value = nil
+      predicted_accept_value = nil
+      if performance_attr==:true_positive_rate
+        actual_accept_value = performance_accept_value
+      elsif performance_attr==:positive_predictive_value
+        predicted_accept_value = performance_accept_value
+      end
       actual_class_index = @accept_values.index(actual_accept_value) if actual_accept_value!=nil
       raise "class not found '"+actual_accept_value.to_s+"' in "+@accept_values.inspect if (actual_accept_value!=nil && actual_class_index==nil)
-      
       predicted_class_index = @accept_values.index(predicted_accept_value) if predicted_accept_value!=nil
-      raise "class not found "+predicted_accept_value.to_s+" in "+@accept_values.inspect if (predicted_accept_value!=nil && predicted_class_index==nil)
+      raise "class not found '"+predicted_accept_value.to_s+"' in "+@accept_values.inspect if (predicted_accept_value!=nil && predicted_class_index==nil)
       
       c = []; p = []; a = []
       (0..@predicted_values.size-1).each do |i|
@@ -690,6 +750,10 @@ module Lib
       @conf_provided
     end
     
+    def min_confidence
+      @confidence_values[-1]
+    end
+    
     ###################################################################################################################
     
     #def compound(instance_index)
@@ -697,6 +761,67 @@ module Lib
     #end
     
     private
+    def self.test_update
+      p=[0.4,0.2,0.3,0.5,0.8]
+      a=[0.45,0.21,0.25,0.55,0.75]
+      c = Array.new(p.size)
+      pred = Predictions.new(p,a,c,"regression")
+      puts pred.r_square
+      
+      pred = nil
+      p.size.times do |i|
+        if pred==nil
+          pred = Predictions.new([p[0]],[a[0]],[c[0]],"regression")
+        else
+          pred.update_stats(p[i],a[i],c[i])
+        end
+        puts pred.r_square
+      end
+    end
+    
+    def self.test_r_square
+      require "rubygems"
+      require "opentox-ruby"
+      
+      max_deviation = rand * 0.9
+      avg_deviation = max_deviation * 0.5
+      
+      p = []
+      a = []
+      c = []
+      (100 + rand(1000)).times do |i|
+        r = rand
+        deviation = rand * max_deviation
+        a << r
+        p << r + ((rand<0.5 ? -1 : 1) * deviation)
+        #c << 0.5
+        if (deviation > avg_deviation)
+          c << 0.4
+        else
+          c << 0.6
+        end
+        #puts a[-1].to_s+" "+p[-1].to_s
+      end
+      puts "num values "+p.size.to_s
+      
+      pred = Predictions.new(p,a,c,"regression")
+      puts "internal"
+      #puts "r-square old        "+pred.r_square_old.to_s
+      puts "cor                 "+pred.sample_correlation_coefficient.to_s
+      puts "weighted cor        "+pred.weighted_sample_correlation_coefficient.to_s
+      puts "r-square            "+pred.r_square.to_s
+      
+      puts "R"
+      @@r = RinRuby.new(true,false) unless defined?(@@r) and @@r 
+      @@r.assign "v1",a
+      @@r.assign "v2",p
+      puts "r cor               "+@@r.pull("cor(v1,v2)").to_s
+      @@r.eval "fit <- lm(v1 ~ v2)"
+      @@r.eval "sum <- summary(fit)"
+      puts "r r-square          "+@@r.pull("sum$r.squared").to_s
+      puts "r adjusted-r-square "+@@r.pull("sum$adj.r.squared").to_s
+    end
+
     def prediction_feature_value_map(proc)
       res = {}
       (0..@num_classes-1).each do |i|
@@ -707,3 +832,11 @@ module Lib
     
   end
 end
+
+#class Float
+#  def to_s
+#    "%.5f" % self
+#  end
+#end
+##Lib::Predictions.test_update
+#Lib::Predictions.test_r_square

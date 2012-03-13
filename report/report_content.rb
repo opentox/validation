@@ -22,6 +22,12 @@ class Reports::ReportContent
     @current_section = @xml_report.get_root_element
   end
   
+  def add_warning(warning)
+    sec = @xml_report.add_section(@current_section, "Warning")
+    @xml_report.add_paragraph(sec, warning)
+    end_section()
+  end
+  
   def add_paired_ttest_tables( validation_set,
                        group_attribute, 
                        test_attributes,
@@ -55,7 +61,6 @@ class Reports::ReportContent
           test_matrix[:num_results].to_s, table, true, true)
       end
     end
-    Reports::ReportStatisticalTest.quit_r
   end
   
   def add_predictions( validation_set, 
@@ -156,6 +161,7 @@ class Reports::ReportContent
       
         section_text += "\nWARNING: regression plot information not available for all validation results" if prediction_set.size!=validation_set.size
         @xml_report.add_paragraph(section_regr, section_text) if section_text
+        
         begin
           log_str = (log ? "_log" : "")
           plot_png = add_tmp_file("regr_plot"+log_str, "png")
@@ -174,6 +180,39 @@ class Reports::ReportContent
       @xml_report.add_paragraph(section_regr, "No prediction info for regression available.")
     end
     align_last_two_images section_title+" in logarithmic and linear scale (values <= 0 are omitted in logarithmic scale)"
+  end
+  
+  def add_train_test_plot( validation_set,
+                           only_prediction_feature,
+                           waiting_task,
+                           section_title="Training Test Distribution Plot",
+                           section_text=nil,
+                           image_title=nil)
+                            
+    section_plot = @current_section
+    prediction_set = validation_set.collect{ |v| v.get_predictions }
+    @xml_report.add_paragraph(section_plot, section_text) if section_text
+    
+    begin
+      plot_png = add_tmp_file("train_test_plot_#{only_prediction_feature}", "png")
+      plot_svg = add_tmp_file("train_test_plot_#{only_prediction_feature}", "svg")
+      omit_count = Reports::PlotFactory.create_train_test_plot( [plot_png[:path], plot_svg[:path]], 
+        prediction_set, only_prediction_feature, waiting_task )
+      unless image_title
+        if only_prediction_feature
+          image_title = "Prediction Feature: #{validation_set.validations.first.prediction_feature}"
+        else
+          image_title = "Features Excluding Prediction Feature"
+        end
+      end
+      @xml_report.add_imagefigure(section_plot, image_title,  plot_png[:name], "PNG", 100, plot_svg[:name])
+    rescue Exception => ex
+      LOGGER.error("Could not create train test plot: "+ex.message)
+      rm_tmp_file(plot_png[:name]) if plot_png
+      rm_tmp_file(plot_svg[:name]) if plot_svg
+      @xml_report.add_paragraph(section_plot, "could not create train test plot: "+ex.message)
+    end  
+        
   end
   
   def add_roc_plot( validation_set, 
@@ -213,8 +252,8 @@ class Reports::ReportContent
   end
   
   def add_confidence_plot( validation_set,
-                            actual_accept_value = nil,
-                            predicted_accept_value = nil,
+                            performance_attribute,
+                            performance_accept_value,
                             split_set_attribute = nil,
                             image_title = "Confidence Plot",
                             section_text="")
@@ -234,7 +273,8 @@ class Reports::ReportContent
       begin
         plot_png = add_tmp_file("conf_plot", "png")
         plot_svg = add_tmp_file("conf_plot", "svg")
-        Reports::PlotFactory.create_confidence_plot( [plot_png[:path], plot_svg[:path]], prediction_set, actual_accept_value, predicted_accept_value, split_set_attribute, false )
+        Reports::PlotFactory.create_confidence_plot( [plot_png[:path], plot_svg[:path]], prediction_set, performance_attribute, 
+          performance_accept_value, split_set_attribute, false )
         @xml_report.add_imagefigure(section_conf, image_title, plot_png[:name], "PNG", 100, plot_svg[:name])
       rescue Exception => ex
         msg = "WARNING could not create confidence plot: "+ex.message
@@ -307,6 +347,57 @@ class Reports::ReportContent
     plot_svg = add_tmp_file("bar_plot", "svg")
     Reports::PlotFactory.create_bar_plot([plot_png[:path], plot_svg[:path]], validation_set, title_attribute, value_attributes )
     @xml_report.add_imagefigure(section_bar, image_title, plot_png[:name], "PNG", 100, plot_svg[:name])
+  end  
+  
+  def add_box_plot(validation_set,
+                   title_attribute,
+                   value_attributes,
+                   section_title="Boxplots",
+                   section_text=nil)
+    
+    section_box = @xml_report.add_section(@current_section, section_title)
+    @xml_report.add_paragraph(section_box, section_text) if section_text
+    
+    plot_png = nil; plot_svg = nil
+    begin
+      plot_input = []
+      value_attributes.each do |a|
+        accept = validation_set.get_accept_values_for_attr(a)
+        if accept and accept.size>0
+          accept.each do |c|
+            title = a.to_s.gsub("_","-") + ( (accept.size==1 || c==nil) ? "" : "("+c.to_s+")" )
+            plot_input << [a,c,title]
+          end
+        else
+          plot_input << [a,nil,a.to_s.gsub("_","-")]
+        end  
+      end
+      
+      i = 0
+      figs = []
+      plot_input.each do |attrib,class_value,image_title|
+        plot_png = add_tmp_file("box_plot#{i}", "png")
+        plot_svg = add_tmp_file("box_plot#{i}", "svg")      
+        Reports::PlotFactory.create_box_plot([plot_png[:path], plot_svg[:path]], 
+           validation_set, title_attribute, attrib, class_value )
+        figs << @xml_report.imagefigure(image_title, plot_png[:name],
+           "PNG", 50, plot_svg[:name])
+        plot_png = nil; plot_svg = nil
+        i += 1
+      end
+      
+      i = 1
+      figs.each_slice(4) do |f| 
+        @xml_report.add_imagefigures_in_row(section_box,f,"Boxplots #{i}")
+        i+=1
+      end
+    rescue Exception => ex
+      msg = "WARNING could not create box plot: "+ex.message
+      LOGGER.error(msg)
+      rm_tmp_file(plot_png[:name]) if plot_png
+      rm_tmp_file(plot_svg[:name]) if plot_svg
+      @xml_report.add_paragraph(section_box, msg)
+    end   
   end  
   
   private

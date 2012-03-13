@@ -51,7 +51,7 @@ post '/crossvalidation/?' do
     cv_params = { :dataset_uri => params[:dataset_uri],  
                   :algorithm_uri => params[:algorithm_uri],
                   :loo => "false",
-                  :subjectid => params[:subjectid] }
+                  :subjectid => @subjectid }
     [ :num_folds, :random_seed ].each{ |sym| cv_params[sym] = params[sym] if params[sym] }
     cv_params[:stratified] = (params[:stratified].size>0 && params[:stratified]!="false" && params[:stratified]!="0") if params[:stratified]
     cv = Validation::Crossvalidation.create cv_params
@@ -152,10 +152,14 @@ get '/crossvalidation/:id' do
     description = 
         "A crossvalidation resource."
     content_type "text/html"
-    OpenTox.text_to_html crossvalidation.to_yaml,@subjectid,related_links,description
+    OpenTox.text_to_html crossvalidation.to_rdf_yaml,@subjectid,related_links,description
+  when "application/serialize"
+    content_type "application/serialize"
+    crossvalidation.inspect # to load all the stuff
+    crossvalidation.to_yaml
   when /application\/x-yaml|\*\/\*/
     content_type "application/x-yaml"
-    crossvalidation.to_yaml
+    crossvalidation.to_rdf_yaml
   else
     raise OpenTox::BadRequestError.new "MIME type '"+request.env['HTTP_ACCEPT'].to_s+"' not supported, valid Accept-Headers: \"application/rdf+xml\", \"application/x-yaml\", \"text/html\"."
   end
@@ -172,14 +176,28 @@ get '/crossvalidation/:id/statistics' do
     description = 
        "The averaged statistics for the crossvalidation."
     content_type "text/html"
-    OpenTox.text_to_html v.to_yaml,@subjectid,related_links,description
+    OpenTox.text_to_html v.to_rdf_yaml,@subjectid,related_links,description
   when "application/rdf+xml"
     content_type "application/rdf+xml"
     v.to_rdf
+  when "application/serialize"
+    content_type "application/serialize"
+    v.inspect # to load all the stuff
+    v.to_yaml    
   else
     content_type "application/x-yaml"
-    v.to_yaml
+    v.to_rdf_yaml
   end
+end
+
+get '/crossvalidation/:id/statistics/probabilities' do
+  
+  LOGGER.info "get crossvalidation statistics for crossvalidation with id "+params[:id].to_s
+  raise OpenTox::BadRequestError.new("Missing params, plz give confidence and prediction") unless params[:confidence] and params[:prediction]
+  v = Validation::Validation.from_cv_statistics( params[:id], @subjectid )
+  props = v.probabilities(params[:confidence].to_s.to_f,params[:prediction].to_s)
+  content_type "text/x-yaml"
+  props.to_yaml
 end
 
 delete '/crossvalidation/:id/?' do
@@ -209,34 +227,34 @@ end
 #  Validation::Validation.find( :all, :conditions => { :crossvalidation_id => params[:id] } ).collect{ |v| v.validation_uri.to_s }.join("\n")+"\n"
 #end
 
-get '/crossvalidation/:id/predictions' do
-  LOGGER.info "get predictions for crossvalidation with id "+params[:id].to_s
-  begin
-    #crossvalidation = Validation::Crossvalidation.find(params[:id])
-    crossvalidation = Validation::Crossvalidation.get(params[:id])
-  rescue ActiveRecord::RecordNotFound => ex
-    raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found."
-  end
-  raise OpenTox::BadRequestError.new "Crossvalidation '"+params[:id].to_s+"' not finished" unless crossvalidation.finished
-  
-  content_type "application/x-yaml"
-  validations = Validation::Validation.find( :crossvalidation_id => params[:id], :validation_type => "crossvalidation" )
-  p = Lib::OTPredictions.to_array( validations.collect{ |v| v.compute_validation_stats_with_model(nil, true) } ).to_yaml
-  
-  case request.env['HTTP_ACCEPT'].to_s
-  when /text\/html/
-    content_type "text/html"
-    description = 
-      "The crossvalidation predictions as (yaml-)array."
-    related_links = 
-      "All crossvalidations:         "+url_for("/crossvalidation",:full)+"\n"+
-      "Correspoding crossvalidation: "+url_for("/crossvalidation/"+params[:id],:full)
-    OpenTox.text_to_html p,@subjectid, related_links, description
-  else
-    content_type "text/x-yaml"
-    p
-  end
-end
+#get '/crossvalidation/:id/predictions' do
+#  LOGGER.info "get predictions for crossvalidation with id "+params[:id].to_s
+#  begin
+#    #crossvalidation = Validation::Crossvalidation.find(params[:id])
+#    crossvalidation = Validation::Crossvalidation.get(params[:id])
+#  rescue ActiveRecord::RecordNotFound => ex
+#    raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found."
+#  end
+#  raise OpenTox::BadRequestError.new "Crossvalidation '"+params[:id].to_s+"' not finished" unless crossvalidation.finished
+#  
+#  content_type "application/x-yaml"
+#  validations = Validation::Validation.find( :crossvalidation_id => params[:id], :validation_type => "crossvalidation" )
+#  p = Lib::OTPredictions.to_array( validations.collect{ |v| v.compute_validation_stats_with_model(nil, true) } ).to_yaml
+#  
+#  case request.env['HTTP_ACCEPT'].to_s
+#  when /text\/html/
+#    content_type "text/html"
+#    description = 
+#      "The crossvalidation predictions as (yaml-)array."
+#    related_links = 
+#      "All crossvalidations:         "+url_for("/crossvalidation",:full)+"\n"+
+#      "Correspoding crossvalidation: "+url_for("/crossvalidation/"+params[:id],:full)
+#    OpenTox.text_to_html p,@subjectid, related_links, description
+#  else
+#    content_type "text/x-yaml"
+#    p
+#  end
+#end
 
 get '/?' do
   
@@ -435,8 +453,9 @@ post '/training_test_split' do
   raise OpenTox::BadRequestError.new "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
   raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
   task = OpenTox::Task.create( "Perform training test split validation", url_for("/training_test_split", :full) )  do |task| #, params
+    strat = (params[:stratified].size>0 && params[:stratified]!="false" && params[:stratified]!="0") if params[:stratified]
     params.merge!( Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], 
-      @subjectid, params[:split_ratio], params[:random_seed], OpenTox::SubTask.create(task,0,33)))
+      @subjectid,  strat, params[:split_ratio], params[:random_seed], OpenTox::SubTask.create(task,0,33)))
     v = Validation::Validation.create  :validation_type => "training_test_split", 
                      :training_dataset_uri => params[:training_dataset_uri], 
                      :test_dataset_uri => params[:test_dataset_uri],
@@ -524,12 +543,16 @@ post '/cleanup_datasets/?' do
 end
 
 post '/plain_training_test_split' do
-    LOGGER.info "creating pure training test split "+params.inspect
-    raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri]
-    
-    result = Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], params[:split_ratio], params[:random_seed])
+  LOGGER.info "creating pure training test split "+params.inspect
+  raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri]
+  task = OpenTox::Task.create( "Create data-split", url_for("/plain_training_test_split", :full) ) do |task|
+    strat = (params[:stratified].size>0 && params[:stratified]!="false" && params[:stratified]!="0") if params[:stratified]
+    result = Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], @subjectid,
+       strat, params[:split_ratio], params[:random_seed])
     content_type "text/uri-list"
     result[:training_dataset_uri]+"\n"+result[:test_dataset_uri]+"\n"
+  end
+  return_task(task)
 end
 
 post '/validate_datasets' do
@@ -562,30 +585,47 @@ post '/validate_datasets' do
   return_task(task)
 end
 
-get '/:id/predictions' do
-  LOGGER.info "get validation predictions "+params.inspect
+get '/:id/probabilities' do
+  LOGGER.info "get validation probabilities "+params.inspect
+  
   begin
-    #validation = Validation::Validation.find(params[:id])
     validation = Validation::Validation.get(params[:id])
   rescue ActiveRecord::RecordNotFound => ex
-    raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found."
+    raise OpenTox::NotFoundError.new("Validation '#{params[:id]}' not found.")
   end
-  raise OpenTox::BadRequestError.new "Validation '"+params[:id].to_s+"' not finished" unless validation.finished
-  p = validation.compute_validation_stats_with_model(nil, true)
-  case request.env['HTTP_ACCEPT'].to_s
-  when /text\/html/
-    content_type "text/html"
-    description = 
-      "The validation predictions as (yaml-)array."
-    related_links = 
-      "All validations:         "+url_for("/",:full)+"\n"+
-      "Correspoding validation: "+url_for("/"+params[:id],:full)
-    OpenTox.text_to_html p.to_array.to_yaml,@subjectid, related_links, description
-  else
-    content_type "text/x-yaml"
-    p.to_array.to_yaml
-  end
+  validation.subjectid = @subjectid
+  raise OpenTox::BadRequestError.new("Validation '"+params[:id].to_s+"' not finished") unless validation.finished
+  raise OpenTox::BadRequestError.new("Missing params, plz give confidence and prediction") unless params[:confidence] and params[:prediction]
+  props = validation.probabilities(params[:confidence].to_s.to_f,params[:prediction].to_s)
+  content_type "text/x-yaml"
+  props.to_yaml
 end 
+
+
+#get '/:id/predictions' do
+#  LOGGER.info "get validation predictions "+params.inspect
+#  begin
+#    #validation = Validation::Validation.find(params[:id])
+#    validation = Validation::Validation.get(params[:id])
+#  rescue ActiveRecord::RecordNotFound => ex
+#    raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found."
+#  end
+#  raise OpenTox::BadRequestError.new "Validation '"+params[:id].to_s+"' not finished" unless validation.finished
+#  p = validation.compute_validation_stats_with_model(nil, true)
+#  case request.env['HTTP_ACCEPT'].to_s
+#  when /text\/html/
+#    content_type "text/html"
+#    description = 
+#      "The validation predictions as (yaml-)array."
+#    related_links = 
+#      "All validations:         "+url_for("/",:full)+"\n"+
+#      "Correspoding validation: "+url_for("/"+params[:id],:full)
+#    OpenTox.text_to_html p.to_array.to_yaml,@subjectid, related_links, description
+#  else
+#    content_type "text/x-yaml"
+#    p.to_array.to_yaml
+#  end
+#end 
 
 #get '/:id/:attribute' do
 #  LOGGER.info "access validation attribute "+params.inspect
@@ -626,10 +666,14 @@ get '/:id' do
       "Get validation predictions:      "+url_for("/"+params[:id]+"/predictions",:full)+"\n"+
       "All validations:                 "+url_for("/",:full)+"\n"+
       "All validation reports:          "+url_for("/report/validation",:full)
-    OpenTox.text_to_html validation.to_yaml,@subjectid,related_links,description
+    OpenTox.text_to_html validation.to_rdf_yaml,@subjectid,related_links,description
+  when "application/serialize"
+    content_type "application/serialize"
+    validation.inspect # to load all the stuff
+    validation.to_yaml
   else #default is yaml 
     content_type "application/x-yaml"
-    validation.to_yaml
+    validation.to_rdf_yaml
   end
 end
 

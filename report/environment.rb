@@ -1,12 +1,24 @@
-
 ['rubygems', 'logger', 'fileutils', 'sinatra', 'sinatra/url_for', 'rest_client', 
   'yaml', 'fileutils', 'mime/types', 'abbrev', 
   'rexml/document',  'ruby-plot', 'opentox-ruby' ].each do |g|
     require g
 end
-gem 'ruby-plot', "~>0.5.0"
+gem 'ruby-plot', "~>0.6.0"
 
 module Reports
+
+  def self.r_util
+    @@r_util = OpenTox::RUtil.new unless defined?@@r_util and @@r_util
+    @@r_util
+  end
+  
+  def self.quit_r
+    if defined?@@r_util and @@r_util
+      @@r_util.quit_r
+      @@r_util = nil
+    end
+  end
+    
 end
 
 require "lib/ot_predictions.rb"
