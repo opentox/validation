@@ -51,7 +51,7 @@ post '/crossvalidation/?' do
     cv_params = { :dataset_uri => params[:dataset_uri],  
                   :algorithm_uri => params[:algorithm_uri],
                   :loo => "false",
-                  :subjectid => params[:subjectid] }
+                  :subjectid => @subjectid }
     [ :num_folds, :random_seed ].each{ |sym| cv_params[sym] = params[sym] if params[sym] }
     cv_params[:stratified] = (params[:stratified].size>0 && params[:stratified]!="false" && params[:stratified]!="0") if params[:stratified]
     cv = Validation::Crossvalidation.create cv_params
