@@ -9,7 +9,7 @@ VAL_ATTR_CLASS = [ :num_instances, :num_unpredicted, :accuracy, :weighted_accura
   :area_under_roc, :f_measure, :true_positive_rate, :true_negative_rate, :positive_predictive_value, :negative_predictive_value ]
 VAL_ATTR_REGR = [ :num_instances, :num_unpredicted, :root_mean_squared_error, 
   :weighted_root_mean_squared_error, :mean_absolute_error, :weighted_mean_absolute_error, :r_square, :weighted_r_square,
-  :sample_correlation_coefficient ]
+  :sample_correlation_coefficient, :concordance_correlation_coefficient ]
 
 #VAL_ATTR_BOX_PLOT_CLASS = [ :accuracy, :average_area_under_roc, 
 #  :area_under_roc, :f_measure, :true_positive_rate, :true_negative_rate ]
@@ -113,6 +113,9 @@ module Reports::ReportFactory
       report.add_confidence_plot(validation_set, :root_mean_squared_error, nil)
       report.add_confidence_plot(validation_set, :r_square, nil)
       report.align_last_two_images "Confidence Plots"
+      report.add_confidence_plot(validation_set, :sample_correlation_coefficient, nil)
+      report.add_confidence_plot(validation_set, :concordance_correlation_coefficient, nil)
+      report.align_last_two_images "More Confidence Plots"
     end
     task.progress(70) if task
     report.add_train_test_plot( validation_set, false, OpenTox::SubTask.create(task,70,80) )

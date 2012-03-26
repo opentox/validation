@@ -210,9 +210,10 @@ module Validation
       algorithm_uri = self.algorithm_uri ? nil : model.metadata[OT.algorithm]
       predicted_variable = model.predicted_variable(self.subjectid)
       predicted_confidence = model.predicted_confidence(self.subjectid)
-      raise "cannot determine whether model '"+model.uri.to_s+"' performs classification or regression, "+
+      raise "cannot determine whether model '"+model.uri.to_s+"' performs classification or regression: '#{feature_type}', "+
           "please set rdf-type of predictedVariables feature '"+predicted_variable.to_s+
-          "' to NominalFeature or NumericFeature" if (feature_type.to_s!="classification" and feature_type.to_s!="regression")        
+          "' to NominalFeature or NumericFeature" if
+          (feature_type.to_s!="classification" and feature_type.to_s!="regression")        
       compute_prediction_data( feature_type, predicted_variable, predicted_confidence, 
         prediction_feature, algorithm_uri, task )
     end

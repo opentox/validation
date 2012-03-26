@@ -577,6 +577,31 @@ module Lib
     #  return weighted_sample_correlation_coefficient ** 2
     #end
     
+    def concordance_correlation_coefficient
+      begin
+        numerator = 0
+        @predicted_values.size.times do |i|
+          numerator += (@actual_values[i]-@actual_mean) * (@predicted_values[i]-@prediction_mean) if  
+            @actual_values[i]!=nil and @predicted_values[i]!=nil 
+        end
+        numerator *= 2
+        denominator = total_sum_of_squares 
+        denominator += prediction_total_sum_of_squares
+        denominator += @num_predicted * (@actual_mean - @prediction_mean)**2
+        ccc = numerator / denominator
+        ( ccc.infinite? || ccc.nan? ) ? 0 : ccc
+      rescue; 0; end
+    end
+    
+    def prediction_total_sum_of_squares
+      #return @variance_actual * ( @num_predicted - 1 )
+      sum = 0
+      @predicted_values.size.times do |i|
+        sum += (@predicted_values[i]-@prediction_mean)**2 if @actual_values[i]!=nil and @predicted_values[i]!=nil 
+      end
+      sum
+    end
+    
     def sample_correlation_coefficient
       begin
         # formula see http://en.wikipedia.org/wiki/Correlation_and_dependence#Pearson.27s_product-moment_coefficient
@@ -804,22 +829,45 @@ module Lib
       end
       puts "num values "+p.size.to_s
       
-      pred = Predictions.new(p,a,c,"regression")
+      #a = [1.0,2.0, 3.0,4.0, 5.0]
+      #p = [1.5,2.25,3.0,3.75,4.5]
+      
+      #a = [1.0,2.0,3.0,4.0,5.0]
+      #p = [1.5,2.5,3.5,4.5,5.5]
+
+      #p = a.collect{|v| v-0.5} 
+      #p = a.collect{|v| v+0.5}
+      
+      #p = [2.0,2.5,3.0,3.5,4.0]
+      
+      c = Array.new(p.size,nil)
+      
+      data = { :predicted_values => p, :actual_values => a, :confidence_values => c,
+        :feature_type => "regression", :accept_values => nil }
+            
+      pred = Predictions.new(data)
       puts "internal"
       #puts "r-square old        "+pred.r_square_old.to_s
       puts "cor                 "+pred.sample_correlation_coefficient.to_s
-      puts "weighted cor        "+pred.weighted_sample_correlation_coefficient.to_s
+      #puts "weighted cor        "+pred.weighted_sample_correlation_coefficient.to_s
       puts "r-square            "+pred.r_square.to_s
+      puts "ccc                 "+pred.concordance_correlation_coefficient.to_s
       
       puts "R"
-      @@r = RinRuby.new(true,false) unless defined?(@@r) and @@r 
-      @@r.assign "v1",a
-      @@r.assign "v2",p
-      puts "r cor               "+@@r.pull("cor(v1,v2)").to_s
-      @@r.eval "fit <- lm(v1 ~ v2)"
-      @@r.eval "sum <- summary(fit)"
-      puts "r r-square          "+@@r.pull("sum$r.squared").to_s
-      puts "r adjusted-r-square "+@@r.pull("sum$adj.r.squared").to_s
+      rutil = OpenTox::RUtil.new
+      
+      rutil.r.assign "v1",a
+      rutil.r.assign "v2",p
+      puts "r cor               "+rutil.r.pull("cor(v1,v2)").to_s
+      rutil.r.eval "fit <- lm(v1 ~ v2)"
+      rutil.r.eval "sum <- summary(fit)"
+      puts "r r-square          "+rutil.r.pull("sum$r.squared").to_s
+      puts "r adjusted-r-square "+rutil.r.pull("sum$adj.r.squared").to_s
+      rutil.r.eval "save.image(\"/tmp/image.R\")"
+      #rutil.r.eval "require(epiR)"
+      #rutil.r.eval "tmp.ccc <- epi.ccc(v1,v2)"
+      #puts "r ccc               "+rutil.r.pull("tmp.ccc$rho.c$est").to_s
+      rutil.quit_r
     end
 
     def prediction_feature_value_map(proc)

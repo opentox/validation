@@ -145,20 +145,35 @@ class Reports::ValidationDB
   end
 
   def test_feature_dataset_uri(validation, subjectid)
-    m = OpenTox::Model::Generic.find(validation.model_uri, subjectid)
-    feat_gen = nil
-    m.metadata[OT.parameters].each do |h|
-      if h[DC.title] and h[DC.title]=~/feature_generation/ and h[OT.paramValue]
-        feat_gen = h[OT.paramValue]
+    training_features = Lib::DatasetCache.find( training_feature_dataset_uri(validation,subjectid), subjectid )
+    test_dataset = Lib::DatasetCache.find( validation.test_dataset_uri, subjectid )
+    features_found = true 
+    training_features.features.keys.each do |f|
+      unless test_dataset.features.keys.include?(f)
+        features_found = false
+        LOGGER.debug "training-feature are not in test-datset #{f}"
         break
       end
-    end if m  and m.metadata[OT.parameters]
-    raise "no feature creation alg found" unless feat_gen
-    feat_gen = File.join(feat_gen,"match") if feat_gen=~/fminer/
-    uri = OpenTox::RestClientWrapper.post(feat_gen,{:subjectid => subjectid,
-      :feature_dataset_uri=>training_feature_dataset_uri(validation,subjectid),
-      :dataset_uri=>validation.test_dataset_uri})
-    @@tmp_resources << uri
+    end
+    if features_found
+      LOGGER.debug "all training-features found in test-datset"
+      uri = test_dataset.uri
+    else
+      m = OpenTox::Model::Generic.find(validation.model_uri, subjectid)
+      feat_gen = nil
+      m.metadata[OT.parameters].each do |h|
+        if h[DC.title] and h[DC.title]=~/feature_generation/ and h[OT.paramValue]
+          feat_gen = h[OT.paramValue]
+          break
+        end
+      end if m  and m.metadata[OT.parameters]
+      raise "no feature creation alg found" unless feat_gen
+      feat_gen = File.join(feat_gen,"match") if feat_gen=~/fminer/
+      uri = OpenTox::RestClientWrapper.post(feat_gen,{:subjectid => subjectid,
+        :feature_dataset_uri=>training_feature_dataset_uri(validation,subjectid),
+        :dataset_uri=>validation.test_dataset_uri})
+      @@tmp_resources << uri
+    end
     uri
   end
   

@@ -38,7 +38,7 @@ module Validation
   # :regression_statistics
   VAL_REGR_PROPS = [ :root_mean_squared_error, :mean_absolute_error, :r_square, :weighted_r_square,
     :target_variance_actual, :target_variance_predicted, :sum_squared_error, :sample_correlation_coefficient,
-    :weighted_mean_absolute_error, :weighted_root_mean_squared_error ]
+    :weighted_mean_absolute_error, :weighted_root_mean_squared_error, :concordance_correlation_coefficient ]
   
   CROSS_VAL_PROPS = [:dataset_uri, :num_folds, :stratified, :random_seed]
   CROSS_VAL_PROPS_REDUNDANT = [:crossvalidation_uri, :algorithm_uri, :date] + CROSS_VAL_PROPS 
