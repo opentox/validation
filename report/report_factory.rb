@@ -124,7 +124,7 @@ module Reports::ReportFactory
     report.end_section
 
     report.add_result(validation_set, Validation::ALL_PROPS, "All Results", "All Results")
-    report.add_predictions( validation_set )
+    report.add_predictions( validation_set, false )
     task.progress(100) if task
     report
   end
@@ -200,7 +200,7 @@ module Reports::ReportFactory
       
     report.add_result(validation_set, Validation::ALL_PROPS, "All Results", "All Results") if
       (cv_set.unique_value(:num_folds).to_i < cv_set.unique_value(:num_instances).to_i)
-    report.add_predictions( validation_set ) #, [:crossvalidation_fold] )
+    report.add_predictions( validation_set, true )
     task.progress(100) if task
     report
   end

@@ -35,7 +35,7 @@ module Lib
       OTPredictions.to_array( [self] )
     end
     
-    def self.to_array( predictions, add_pic=false, format=false )
+    def self.to_array( predictions, add_pic=false, format=false, validation_uris=nil )
   
       confidence_available = false
       predictions.each do |p|
@@ -43,7 +43,10 @@ module Lib
       end
       res = []
       conf_column = nil
+      count = 0
       predictions.each do |p|
+        v_uris = validation_uris[count] if validation_uris
+        count += 1
         (0..p.num_instances-1).each do |i|
           a = []
           
@@ -75,6 +78,9 @@ module Lib
             conf_column = a.size if conf_column==nil
             a << p.confidence_value(i)
           end
+          if validation_uris
+            a << v_uris[i]
+          end
           a << p.identifier(i)
           res << a
         end
@@ -90,12 +96,13 @@ module Lib
         end
       end
       header = []
-      header << "compound" if add_pic
-      header << "actual value"
-      header << "predicted value"
-      header << "classification" if predictions[0].feature_type=="classification"
-      header << "confidence value" if predictions[0].confidence_values_available?
-      header << "compound-uri"
+      header << "Compound" if add_pic
+      header << "Actual value"
+      header << "Predicted value"
+      header << "Classification" if predictions[0].feature_type=="classification"
+      header << "Confidence value" if predictions[0].confidence_values_available?
+      header << "Validation URI" if validation_uris
+      header << "Compound URI"
       res.insert(0, header)
       
       return res

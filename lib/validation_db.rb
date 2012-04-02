@@ -6,8 +6,9 @@ require "lib/merge.rb"
 
 module Validation
 
-  VAL_PROPS_GENERAL = [ :validation_uri, :validation_type, :model_uri, :algorithm_uri, :training_dataset_uri, :prediction_feature,
-                :test_dataset_uri, :test_target_dataset_uri, :prediction_dataset_uri, :date ] 
+  VAL_PROPS_GENERAL = [ :validation_uri, :validation_type, :model_uri, :algorithm_uri, :algorithm_params,
+                :training_dataset_uri, :prediction_feature, :test_dataset_uri, :test_target_dataset_uri, 
+                :prediction_dataset_uri, :date ] 
   VAL_PROPS_SUM = [ :num_instances, :num_without_class, :num_unpredicted ]
   VAL_PROPS_AVG = [:real_runtime, :percent_without_class, :percent_unpredicted ]
   VAL_PROPS = VAL_PROPS_GENERAL + VAL_PROPS_SUM + VAL_PROPS_AVG
@@ -41,7 +42,8 @@ module Validation
     :weighted_mean_absolute_error, :weighted_root_mean_squared_error, :concordance_correlation_coefficient ]
   
   CROSS_VAL_PROPS = [:dataset_uri, :num_folds, :stratified, :random_seed]
-  CROSS_VAL_PROPS_REDUNDANT = [:crossvalidation_uri, :algorithm_uri, :date] + CROSS_VAL_PROPS 
+  CROSS_VAL_PROPS_REDUNDANT = [:crossvalidation_uri, :algorithm_uri, :algorithm_params, 
+    :prediction_feature, :date] + CROSS_VAL_PROPS 
   
   ALL_PROPS = VAL_PROPS + VAL_CV_PROPS + VAL_CLASS_PROPS + VAL_REGR_PROPS + CROSS_VAL_PROPS
 
@@ -55,6 +57,7 @@ module Validation
     attribute :validation_type
     attribute :model_uri
     attribute :algorithm_uri
+    attribute :algorithm_params
     attribute :training_dataset_uri
     attribute :test_target_dataset_uri
     attribute :test_dataset_uri
@@ -77,6 +80,11 @@ module Validation
     index :model_uri
     index :validation_type
     index :crossvalidation_id
+    index :algorithm_uri
+    index :algorithm_params
+    index :prediction_feature
+    index :training_dataset_uri
+    index :test_dataset_uri
     
     attr_accessor :subjectid
     
@@ -141,6 +149,8 @@ module Validation
   class Crossvalidation < Ohm::Model
   
     attribute :algorithm_uri
+    attribute :algorithm_params
+    attribute :prediction_feature
     attribute :dataset_uri
     attribute :date
     attribute :num_folds
@@ -152,6 +162,8 @@ module Validation
     attr_accessor :subjectid
     
     index :algorithm_uri
+    index :algorithm_params
+    index :prediction_feature
     index :dataset_uri
     index :num_folds
     index :random_seed
