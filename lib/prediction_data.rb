@@ -270,7 +270,7 @@ module Lib
     def self.classification_vals(dataset, compound, feature, accept_values)
       v_indices = []
       values(dataset, compound, feature).each do |v|
-        i = accept_values.index(v.to_s)
+        i = accept_values.index(v)
         raise "illegal class_value of prediction (value is '"+v.to_s+"'), accept values are "+
           accept_values.inspect unless v==nil or i!=nil
         v_indices << i
