@@ -200,6 +200,7 @@ module Reports
     index :report_type
     index :validation_uris
     index :crossvalidation_uris
+    index :algorithm_uris
     
     attr_accessor :subjectid
     

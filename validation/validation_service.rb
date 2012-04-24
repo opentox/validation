@@ -116,8 +116,8 @@ module Validation
       raise OpenTox::BadRequestError.new "no algorithm uri: '"+self.algorithm_uri.to_s+"'" if self.algorithm_uri==nil or self.algorithm_uri.to_s.size<1
       
       params = { :dataset_uri => self.training_dataset_uri, :prediction_feature => self.prediction_feature }
-      if (algorithm_params!=nil)
-        algorithm_params.split(";").each do |alg_params|
+      if (self.algorithm_params!=nil)
+        self.algorithm_params.split(";").each do |alg_params|
           alg_param = alg_params.split("=",2)
           raise OpenTox::BadRequestError.new "invalid algorithm param: '"+alg_params.to_s+"'" unless alg_param.size==2 or alg_param[0].to_s.size<1 or alg_param[1].to_s.size<1
           LOGGER.warn "algorihtm param contains empty space, encode? "+alg_param[1].to_s if alg_param[1] =~ /\s/
@@ -371,7 +371,7 @@ module Validation
     # executes the cross-validation (build models and validates them)
     def perform_cv_validations( task=nil )
       
-      LOGGER.debug "perform cv validations "+algorithm_params.inspect
+      LOGGER.debug "perform cv validations"
       i = 0
       task_step = 100 / self.num_folds.to_f;
       @tmp_validations.each do | val |
@@ -490,9 +490,11 @@ module Validation
         else
           features = nil
         end
-        train_datasets, test_datasets = stratified_k_fold_split(orig_dataset,meta,
+        r_util = OpenTox::RUtil.new 
+        train_datasets, test_datasets = r_util.stratified_k_fold_split(orig_dataset,meta,
           "NA",self.num_folds.to_i,@subjectid,self.random_seed, features)
-        train_dataset_uris = test_datasets.collect{|d| d.uri}
+        r_util.quit_r
+        train_dataset_uris = train_datasets.collect{|d| d.uri}
         test_dataset_uris = test_datasets.collect{|d| d.uri}
       else
         raise OpenTox::BadRequestError.new
