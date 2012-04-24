@@ -863,7 +863,7 @@ module Lib
       rutil.r.eval "sum <- summary(fit)"
       puts "r r-square          "+rutil.r.pull("sum$r.squared").to_s
       puts "r adjusted-r-square "+rutil.r.pull("sum$adj.r.squared").to_s
-      rutil.r.eval "save.image(\"/tmp/image.R\")"
+      #rutil.r.eval "save.image(\"/tmp/image.R\")"
       #rutil.r.eval "require(epiR)"
       #rutil.r.eval "tmp.ccc <- epi.ccc(v1,v2)"
       #puts "r ccc               "+rutil.r.pull("tmp.ccc$rho.c$est").to_s
