@@ -508,7 +508,8 @@ module Validation
                            :test_target_dataset_uri => self.dataset_uri,
                            :crossvalidation_id => self.id, :crossvalidation_fold => (n+1),
                            :prediction_feature => self.prediction_feature,
-                           :algorithm_uri => self.algorithm_uri }
+                           :algorithm_uri => self.algorithm_uri,
+                           :algorithm_params => self.algorithm_params}
         @tmp_validations << tmp_validation
         task.progress( n / self.num_folds.to_f * 100 ) if task
       end
