@@ -124,7 +124,7 @@ module Reports::ReportFactory
     report.end_section
 
     report.add_result(validation_set, Validation::ALL_PROPS, "All Results", "All Results")
-    report.add_predictions( validation_set, false )
+    report.add_predictions( validation_set, true )
     task.progress(100) if task
     report
   end
