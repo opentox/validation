@@ -85,6 +85,7 @@ module Validation
     index :prediction_feature
     index :training_dataset_uri
     index :test_dataset_uri
+    index :finished
     
     attr_accessor :subjectid
     

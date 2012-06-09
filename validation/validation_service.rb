@@ -446,6 +446,8 @@ module Validation
       
       meta = { DC.creator => self.crossvalidation_uri }
       case stratified
+      when "anti"
+         raise "anti-stratification not yet supported for cv"
       when "false"
         if self.loo=="true"
           shuffled_compounds = orig_dataset.compounds
@@ -631,16 +633,16 @@ module Validation
       meta = { DC.creator => $url_provider.url_for('/training_test_split',:full) }
       
       case stratified
-      when /true|super/
+      when /true|super|anti/
         if stratified=="true"
           raise OpenTox::BadRequestError.new "prediction feature required for stratified splits" unless prediction_feature
           features = [prediction_feature]
         else
-          LOGGER.warn "prediction feature is ignored for super-stratified splits" if prediction_feature
+          LOGGER.warn "prediction feature is ignored for super- or anti-stratified splits" if prediction_feature
           features = nil
         end
         r_util = OpenTox::RUtil.new 
-        train, test = r_util.stratified_split( orig_dataset, meta, "NA", split_ratio, @subjectid, random_seed, features )
+        train, test = r_util.stratified_split( orig_dataset, meta, "NA", split_ratio, @subjectid, random_seed, features, stratified=="anti" )
         r_util.quit_r
         result = {:training_dataset_uri => train.uri, :test_dataset_uri => test.uri}
       when "false"

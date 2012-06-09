@@ -6,7 +6,7 @@ module Reports
   class ReportStatisticalTest
     
     # __grouped_validations__ : array of validation arrays
-    def self.test_matrix( validations, group_attribute, test_attribute, class_value, test_method="paired_ttest", significance_level=0.95 )
+    def self.test_matrix( validations, group_attribute, test_attribute, class_value, test_method="ttest", significance_level=0.95 )
       
       raise "statistical-test: '"+test_method+"' does not exist" unless ReportStatisticalTest.respond_to?(test_method)
       grouped_validations = Reports::Util.group(validations, [group_attribute])
@@ -35,12 +35,20 @@ module Reports
       {:titles => titles, :matrix => matrix, :num_results => grouped_validations[0].size}
     end
     
-    def self.paired_ttest( validations1, validations2, attribute, class_value, significance_level=0.95 )
+    def self.ttest( validations1, validations2, attribute, class_value, significance_level=0.95 )
       
       array1 = validations1.collect{ |v| (v.send(attribute).is_a?(Hash) ? v.send(attribute)[class_value].to_f : v.send(attribute).to_f) }
       array2 = validations2.collect{ |v| (v.send(attribute).is_a?(Hash) ? v.send(attribute)[class_value].to_f : v.send(attribute).to_f) }
       LOGGER.debug "paired-t-testing "+attribute.to_s+" "+array1.inspect+" vs "+array2.inspect
-      Reports::r_util.paired_ttest(array1, array2, significance_level)
+      if array1.size>1 && array2.size>1
+        Reports::r_util.paired_ttest(array1, array2, significance_level)
+      elsif array1.size==1 && array2.size>1
+         -1 * Reports::r_util.ttest(array2, array1[0], significance_level)
+      elsif array1.size>1 && array2.size==1
+         Reports::r_util.ttest(array1, array2[0], significance_level)
+      else
+        raise "illegal input for ttest"
+      end
     end
     
   end

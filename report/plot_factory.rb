@@ -246,7 +246,11 @@ module Reports
         data[v.send(title_attribute).to_s] << value
       end
       
-      Reports::r_util.boxplot( out_files, data)
+      data_array = []
+      data.each do |k,v|
+        data_array << [k, v]
+      end
+      Reports::r_util.boxplot( out_files, data_array.sort)
     end
     
     def self.create_bar_plot( out_files, validation_set, title_attribute, value_attributes )

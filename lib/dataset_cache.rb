@@ -12,6 +12,7 @@ module Lib
       return nil if (dataset_uri==nil)
       d = @@cache[dataset_uri.to_s+"_"+subjectid.to_s]
       if d==nil
+        LOGGER.debug "loading dataset #{dataset_uri}"
         d = OpenTox::Dataset.find(dataset_uri, subjectid)
         @@cache[dataset_uri.to_s+"_"+subjectid.to_s] = d
       end

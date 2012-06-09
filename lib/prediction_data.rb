@@ -172,11 +172,16 @@ module Lib
         
         predicted_values = []
         confidence_values = []
+        dup_compounds = []
+        dup_actual_values = []
         count = 0
-        compounds.each do |c|
+        compounds.size.times do |i|
+          c = compounds[i]
           if prediction_dataset.compounds.index(c)==nil
             predicted_values << nil
             confidence_values << nil
+            dup_compounds << c
+            dup_actual_values << actual_values[i]
           else
             case feature_type
             when "classification"
@@ -184,19 +189,28 @@ module Lib
             when "regression"
               vals = regression_vals(prediction_dataset, c, predicted_variable)
             end
-            raise "not yet implemented: more than one prediction for one compound" if vals.size>1
-            predicted_values << vals[0]
-            if predicted_confidence
-              confidence_values << confidence_val(prediction_dataset, c, predicted_confidence)
-            else
-              confidence_values << nil
-            end
+            
+            #vals.uniq! #more than one prediciton is ok if it yields the equal value 
+            #raise "not yet implemented: more than one prediction for one compound '#{vals.inspect}'" if vals.size>1
+            #predicted_values << vals[0]
+            
+            vals.each do |val|
+              dup_compounds << c
+              dup_actual_values << actual_values[i]
+              predicted_values << val
+              
+              if predicted_confidence
+                confidence_values << confidence_val(prediction_dataset, c, predicted_confidence)
+              else
+                confidence_values << nil
+              end
+            end    
           end
           count += 1
         end
-        all_compounds += compounds
+        all_compounds += dup_compounds
         all_predicted_values += predicted_values
-        all_actual_values += actual_values
+        all_actual_values += dup_actual_values
         all_confidence_values += confidence_values
         
         task.progress( task_status += task_step ) if task # loaded predicted values and confidence

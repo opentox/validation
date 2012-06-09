@@ -28,11 +28,11 @@ class Reports::ReportContent
     end_section()
   end
   
-  def add_paired_ttest_tables( validation_set,
+  def add_ttest_tables( validation_set,
                        group_attribute, 
                        test_attributes,
                        ttest_level = 0.9,
-                       section_title = "Paired t-test",
+                       section_title = "T-Test",
                        section_text = nil)
 
     raise "no test_attributes given: "+test_attributes.inspect unless test_attributes.is_a?(Array) and test_attributes.size>0
@@ -46,7 +46,7 @@ class Reports::ReportContent
       
       accept_values.each do |accept_value| 
         test_matrix = Reports::ReportStatisticalTest.test_matrix( validation_set.validations, 
-          group_attribute, test_attribute, accept_value, "paired_ttest", ttest_level )
+          group_attribute, test_attribute, accept_value, "ttest", ttest_level )
         #puts test_matrix.inspect
         titles = test_matrix[:titles]
         matrix = test_matrix[:matrix]
@@ -356,7 +356,7 @@ class Reports::ReportContent
     @xml_report.add_paragraph(section_box, section_text) if section_text
     
     plot_png = nil; plot_svg = nil
-    begin
+    #begin
       plot_input = []
       value_attributes.each do |a|
         accept = validation_set.get_accept_values_for_attr(a)
@@ -388,13 +388,13 @@ class Reports::ReportContent
         @xml_report.add_imagefigures_in_row(section_box,f,"Boxplots #{i}")
         i+=1
       end
-    rescue Exception => ex
-      msg = "WARNING could not create box plot: "+ex.message
-      LOGGER.error(msg)
-      rm_tmp_file(plot_png[:name]) if plot_png
-      rm_tmp_file(plot_svg[:name]) if plot_svg
-      @xml_report.add_paragraph(section_box, msg)
-    end   
+    #rescue Exception => ex
+    #  msg = "WARNING could not create box plot: "+ex.message
+    #  LOGGER.error(msg)
+    #  rm_tmp_file(plot_png[:name]) if plot_png
+    #  rm_tmp_file(plot_svg[:name]) if plot_svg
+    #  @xml_report.add_paragraph(section_box, msg)
+    #end   
   end  
   
   private

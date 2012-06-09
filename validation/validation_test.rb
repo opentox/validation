@@ -84,9 +84,14 @@ class ValidationTest < Test::Unit::TestCase
 #      post "/report/method_comparison",
 #        {:validation_uris=>"http://local-ot/validation/389,http://local-ot/validation/390,http://local-ot/validation/391,http://local-ot/validation/392",
 #         :identifier=>"split1,split1,split2,split2"}
-
-              
-      #post "/report/validation",{:validation_uris=>"http://local-ot/validation/171"}
+      
+      get '15709/viz'
+      puts last_response.body
+      exit
+        
+      post "/report/validation",{:validation_uris=>"http://local-ot/validation/15647"}
+      exit
+      
       #post "/report/validation",{:validation_uris=>"http://local-ot/validation/389"}
       
       #dataset_uri = OpenTox::Dataset.create_from_csv_file(File.new("data/EPAFHM.csv").path, nil).uri
@@ -94,9 +99,13 @@ class ValidationTest < Test::Unit::TestCase
       
 #      #dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/603306?feature_uris[]=http://apps.ideaconsult.net:8080/ambit2/feature/764036"
 #      #dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/603204"
-#      post "/plain_training_test_split",{:dataset_uri=>dataset_uri, :stratified=>"true", :split_ratio=>0.3}
-#      puts last_response.body
-#      uri = last_response.body
+      
+      dataset_uri = "http://local-ot/dataset/9264"
+      post "/plain_training_test_split",{:dataset_uri=>dataset_uri, :stratified=>"false", :split_ratio=>0.5}
+      puts last_response.body
+      uri = last_response.body
+      exit
+      
 #      rep = wait_for_task(uri)
 #      puts rep
       #OpenTox::RestClientWrapper.post("http://opentox.informatik.uni-freiburg.de/validation/plain_training_test_split",
@@ -131,7 +140,8 @@ class ValidationTest < Test::Unit::TestCase
       #get 'crossvalidation/189/statistics'
       #puts last_response.body
 
-      #run_test("13a")       
+      run_test("1a")
+      #run_test("13a",:validation_uri=>"http://local-ot/validation/1568")  
     #  run_test("1a",:validation_uri=>"http://local-ot/validation/513")
 
       #get '/crossvalidation/79/predictions',nil,'HTTP_ACCEPT' => "application/x-yaml"
@@ -178,8 +188,8 @@ class ValidationTest < Test::Unit::TestCase
       #  :random_seed => 1
       #  })
       
-      #run_test("23a")
-      run_test("23a",{:validation_uri=>"http://local-ot/validation/crossvalidation/53"})
+      #run_test("3a")
+      #run_test("23a",{:validation_uri=>"http://local-ot/validation/crossvalidation/56"})
       #run_test("23a",{:validation_uri=>"http://local-ot/validation/crossvalidation/47"})
       #23a loo {:validation_uri=>"http://local-ot/validation/crossvalidation/47"})        
       #loo mit datasets auf ortona {:validation_uri=>"http://local-ot/validation/crossvalidation/46"}

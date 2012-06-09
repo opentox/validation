@@ -396,6 +396,7 @@ module Reports
       @validations.each do |v|
         index = -1
         array.push(attributes.collect do |a|
+          
           index += 1
           if VAL_ATTR_VARIANCE.index(a)
             variance = v.send( (a.to_s+"_variance").to_sym )

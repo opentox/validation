@@ -195,30 +195,50 @@ class Reports::ValidationDB
     Lib::OTPredictions.new( data.data, data.compounds )
   end
   
+  @@accept_values = {}
+  
   def get_accept_values( validation, subjectid=nil )
-    # PENDING So far, one has to load the whole dataset to get the accept_value from ambit
-    test_target_datasets = validation.test_target_dataset_uri
-    test_target_datasets = validation.test_dataset_uri unless test_target_datasets
-    res = nil
-    test_target_datasets.split(";").each do |test_target_dataset|
-      d = Lib::DatasetCache.find( test_target_dataset, subjectid )
-      raise "cannot get test target dataset for accept values, dataset: "+test_target_dataset.to_s unless d
-      accept_values = d.accept_values(validation.prediction_feature)
-      raise "cannot get accept values from dataset "+test_target_dataset.to_s+" for feature "+
-        validation.prediction_feature+":\n"+d.features[validation.prediction_feature].to_yaml unless accept_values!=nil
-      raise "different accept values" if res && res!=accept_values
-      res = accept_values
+    begin
+      return @@accept_values[validation.prediction_feature] if @@accept_values[validation.prediction_feature]
+      LOGGER.debug "get accept values ..."
+      pred = OpenTox::Feature.find(validation.prediction_feature)
+      accept = pred.metadata[OT.acceptValue]
+      accept = accept[0] if accept.is_a?(Array) and accept.size==1 and accept[0].is_a?(Array)
+      raise unless accept.is_a?(Array) and accept.size>1
+      @@accept_values[validation.prediction_feature] = accept
+      LOGGER.debug "get accept values ... #{accept} #{accept.size}"
+      accept
+    rescue
+      # PENDING So far, one has to load the whole dataset to get the accept_value from ambit
+      test_target_datasets = validation.test_target_dataset_uri
+      test_target_datasets = validation.test_dataset_uri unless test_target_datasets
+      res = nil
+      test_target_datasets.split(";").each do |test_target_dataset|
+        d = Lib::DatasetCache.find( test_target_dataset, subjectid )
+        raise "cannot get test target dataset for accept values, dataset: "+test_target_dataset.to_s unless d
+        accept_values = d.accept_values(validation.prediction_feature)
+        raise "cannot get accept values from dataset "+test_target_dataset.to_s+" for feature "+
+          validation.prediction_feature+":\n"+d.features[validation.prediction_feature].to_yaml unless accept_values!=nil
+        raise "different accept values" if res && res!=accept_values
+        res = accept_values
+      end
+      res
     end
-    res
   end
   
   def feature_type( validation, subjectid=nil )
-    OpenTox::Model::Generic.new(validation.model_uri).feature_type(subjectid)
+    if validation.model_uri.include?(";")
+      model_uri = validation.model_uri.split(";")[0]
+    else
+      model_uri = validation.model_uri
+    end 
+    OpenTox::Model::Generic.new(model_uri).feature_type(subjectid)
     #get_model(validation).classification?
   end
   
   def predicted_variable(validation, subjectid=nil)
     raise "cannot derive model depended props for merged validations" if Lib::MergeObjects.merged?(validation)
+    raise "multiple models in this validation, cannot get one predicted variable (#{validation.model_uri})" if validation.model_uri.include?(";")
     model = OpenTox::Model::Generic.find(validation.model_uri, subjectid)
     raise OpenTox::NotFoundError.new "model not found '"+validation.model_uri+"'" unless model
     model.predicted_variable(subjectid)
@@ -226,6 +246,7 @@ class Reports::ValidationDB
   
   def predicted_confidence(validation, subjectid=nil)
     raise "cannot derive model depended props for merged validations" if Lib::MergeObjects.merged?(validation)
+    raise "multiple models in this validation, cannot get one predicted confidence (#{validation.model_uri})" if validation.model_uri.include?(";")
     model = OpenTox::Model::Generic.find(validation.model_uri, subjectid)
     raise OpenTox::NotFoundError.new "model not found '"+validation.model_uri+"'" unless model
     model.predicted_confidence(subjectid)

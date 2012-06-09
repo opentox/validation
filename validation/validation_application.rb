@@ -9,8 +9,8 @@ require 'validation/validation_service.rb'
 helpers do
   def check_stratified(params)
     params[:stratified] = "false" unless params[:stratified]
-    raise OpenTox::BadRequestError.new "stratified != true|false|super, is #{params[:stratified]}" unless
-      params[:stratified]=~/true|false|super/
+    raise OpenTox::BadRequestError.new "stratified != true|false|super|anti, is #{params[:stratified]}" unless
+      params[:stratified]=~/true|false|super|anti/
   end
 end
 
@@ -22,7 +22,7 @@ get '/crossvalidation/?' do
     params[:algorithm] = model.metadata[OT.algorithm]
     params[:dataset] = model.metadata[OT.trainingDataset]
   end
-  uri_list = Lib::OhmUtil.find( Validation::Crossvalidation, params ).sort.collect{|v| v.crossvalidation_uri}.join("\n") + "\n"
+  uri_list = Lib::OhmUtil.find( Validation::Crossvalidation, params ).sort.delete_if{|v| !v.finished}.collect{|v| v.crossvalidation_uri}.join("\n") + "\n"
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
       "Single validations:             "+url_for("/",:full)+"\n"+
@@ -204,6 +204,18 @@ get '/crossvalidation/:id/statistics' do
   end
 end
 
+get '/crossvalidation/:id/statistics/uri' do
+  uri = Validation::Validation.find( :crossvalidation_id => params[:id], :validation_type => "crossvalidation_statistics" ).first.validation_uri
+  case request.env['HTTP_ACCEPT'].to_s
+  when /text\/html/
+    content_type "text/html"
+    OpenTox.text_to_html uri
+  else
+    content_type "text/uri-list"
+    uri
+  end  
+end
+
 get '/crossvalidation/:id/statistics/probabilities' do
   
   LOGGER.info "get crossvalidation statistics for crossvalidation with id "+params[:id].to_s
@@ -273,7 +285,7 @@ end
 get '/?' do
   
   LOGGER.info "list all validations, params: "+params.inspect
-  uri_list = Lib::OhmUtil.find( Validation::Validation, params ).sort.collect{|v| v.validation_uri}.join("\n") + "\n"
+  uri_list = Lib::OhmUtil.find( Validation::Validation, params ).sort.delete_if{|v| !v.finished}.collect{|v| v.validation_uri}.join("\n") + "\n"
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
       "To perform a validation:\n"+
@@ -618,6 +630,58 @@ get '/:id/probabilities' do
   props.to_yaml
 end 
 
+
+get '/:id/viz' do
+  
+  begin
+    validation = Validation::Validation.get(params[:id])
+  rescue ActiveRecord::RecordNotFound => ex
+    raise OpenTox::NotFoundError.new("Validation '#{params[:id]}' not found.")
+  end
+  
+  m = OpenTox::Model::Generic.find(validation.model_uri)
+  predicted_feature = m.predicted_variable(nil)
+  actual_feature = validation.prediction_feature
+  
+  d = OpenTox::Dataset.create
+  
+  test = OpenTox::Dataset.find(validation.test_dataset_uri)
+  training = OpenTox::Dataset.find(validation.training_dataset_uri)
+  prediction = OpenTox::Dataset.find(validation.prediction_dataset_uri)
+  
+  dataset_feature = "http://dataset"
+  d.add_feature(dataset_feature)
+  correct_classified_feature = "http://correct-classified"
+  d.add_feature(correct_classified_feature)
+  predicted_nice_feature = "http://predicted"
+  d.add_feature(predicted_nice_feature)
+    
+  [training, test].each do |data|
+    data.compounds.each do |c|
+      d.add_compound(c)
+      d.add(c,dataset_feature,data==training ? "training" : "test")
+      data.features.each do |f,m|
+        d.add_feature(f,m)
+        data.data_entries[c][f].each do |v|
+          d.add(c,f,v)
+        end if data.data_entries[c][f]
+      end
+    end
+  end
+  
+  prediction.compounds.each do |c|
+    if prediction.data_entries[c][predicted_feature]
+      p = prediction.data_entries[c][predicted_feature]
+      a = d.data_entries[c][actual_feature]
+      [p,a].each do |v|
+        raise p.class.to_s+" "+p.inspect unless p.is_a?(Array) and p.size==1
+      end
+      d.add(c,predicted_nice_feature,p[0])
+      d.add(c,correct_classified_feature,p[0]==a[0] ? "correct" : "miss")
+    end 
+  end
+  d.to_csv
+end
 
 #get '/:id/predictions' do
 #  LOGGER.info "get validation predictions "+params.inspect
