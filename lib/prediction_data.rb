@@ -194,16 +194,24 @@ module Lib
             #raise "not yet implemented: more than one prediction for one compound '#{vals.inspect}'" if vals.size>1
             #predicted_values << vals[0]
             
+            if predicted_confidence
+              conf_vals = confidence_vals(prediction_dataset, c, predicted_confidence) 
+              conf_vals *= vals.size if conf_vals.size==1 and vals.size>1
+              raise "confidence #{conf_vals.size} != predicted #{vals.size}" if conf_vals.size!=vals.size
+            end
+            
+            idx = 0
             vals.each do |val|
               dup_compounds << c
               dup_actual_values << actual_values[i]
               predicted_values << val
               
               if predicted_confidence
-                confidence_values << confidence_val(prediction_dataset, c, predicted_confidence)
+                confidence_values << conf_vals[idx] 
               else
                 confidence_values << nil
               end
+              idx+=1
             end    
           end
           count += 1
@@ -268,17 +276,21 @@ module Lib
       v_num
     end
     
-    def self.confidence_val(dataset, compound, confidence)
-      v = values(dataset, compound, confidence)
-      raise "not yet implemented: duplicate conf value" if v.size>1
-      begin
-        v = v[0]
-        v = v.to_f unless v==nil or v.is_a?(Numeric)
-        v
-      rescue
-        LOGGER.warn "no numeric value for confidence '"+v.to_s+"'"
-        nil
+    def self.confidence_vals(dataset, compound, confidence)
+      v_num = []
+      values(dataset, compound, confidence).each do |v|
+        if v==nil or v.is_a?(Numeric)
+          v_num << v
+        else
+          begin
+            v_num << v.to_f
+          rescue
+            LOGGER.warn "no numeric value for confidence: '"+v.to_s+"'"
+            v_num << nil
+          end
+        end
       end
+      v_num
     end
     
     def self.classification_vals(dataset, compound, feature, accept_values)
