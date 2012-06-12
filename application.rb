@@ -15,7 +15,7 @@ require "example.rb"
 
 
 get '/examples/?' do
-  LOGGER.info "list examples"
+  LOGGER.debug "list examples"
   
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     content_type "text/html"
@@ -27,7 +27,7 @@ get '/examples/?' do
 end
 
 get '/prepare_examples/?' do
-  LOGGER.info "prepare examples"
+  LOGGER.debug "prepare examples"
   content_type "text/plain"
   return_task(Example.prepare_example_resources)
 end

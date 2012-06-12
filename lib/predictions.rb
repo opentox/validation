@@ -293,9 +293,9 @@ module Lib
         class_index==nil
       return 0 unless confidence_values_available?
       
-      LOGGER.warn("TODO: implement approx computiation of AUC,"+
+      LOGGER.warn("TODO: implement approx computiation of AUC, "+
         "so far Wilcoxon-Man-Whitney is used (exponential)") if 
-        @predicted_values.size>1000
+        @predicted_values.size>5000
       #puts "COMPUTING AUC "+class_index.to_s
       
       tp_conf = []

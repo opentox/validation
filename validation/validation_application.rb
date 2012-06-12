@@ -15,7 +15,7 @@ helpers do
 end
 
 get '/crossvalidation/?' do
-  LOGGER.info "list all crossvalidations "+params.inspect
+  LOGGER.debug "list all crossvalidations "+params.inspect
   model_uri = params.delete("model") || params.delete("model_uri")
   if model_uri
     model = OpenTox::Model::Generic.find(model_uri, @subjectid)
@@ -70,6 +70,7 @@ post '/crossvalidation/?' do
     cv.perform_cv( OpenTox::SubTask.create(task,0,95) )
     # computation of stats is cheap as dataset are already loaded into the memory
     Validation::Validation.from_cv_statistics( cv.id, @subjectid, OpenTox::SubTask.create(task,95,100) )
+    LOGGER.info "crossvalidation done #{cv.crossvalidation_uri}"  
     cv.crossvalidation_uri
   end
   return_task(task)
@@ -111,13 +112,14 @@ post '/crossvalidation/loo/?' do
     # computation of stats is cheap as dataset are already loaded into the memory
     Validation::Validation.from_cv_statistics( cv.id, @subjectid, OpenTox::SubTask.create(task,95,100) )
     cv.clean_loo_files( !(params[:algorithm_params] && params[:algorithm_params] =~ /feature_dataset_uri/) )
+    LOGGER.info "loo-crossvalidation done #{cv.crossvalidation_uri}"
     cv.crossvalidation_uri
   end
   return_task(task)
 end
 
 get '/crossvalidation/loo/?' do
-  LOGGER.info "list all crossvalidations"
+  LOGGER.debug "list all crossvalidations"
   params[:loo]="true"
   uri_list = Lib::OhmUtil.find( Validation::Crossvalidation, params ).sort.collect{|v| v.crossvalidation_uri}.join("\n") + "\n"
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
@@ -143,7 +145,7 @@ get '/crossvalidation/loo/?' do
 end
 
 get '/crossvalidation/:id' do
-  LOGGER.info "get crossvalidation with id "+params[:id].to_s
+  LOGGER.debug "get crossvalidation with id "+params[:id].to_s
 #  begin
 #    #crossvalidation = Validation::Crossvalidation.find(params[:id])
 #  rescue ActiveRecord::RecordNotFound => ex
@@ -181,7 +183,7 @@ end
 
 get '/crossvalidation/:id/statistics' do
   
-  LOGGER.info "get crossvalidation statistics for crossvalidation with id "+params[:id].to_s
+  LOGGER.debug "get crossvalidation statistics for crossvalidation with id "+params[:id].to_s
   v = Validation::Validation.from_cv_statistics( params[:id], @subjectid )
   case request.env['HTTP_ACCEPT'].to_s
   when /text\/html/
@@ -218,7 +220,7 @@ end
 
 get '/crossvalidation/:id/statistics/probabilities' do
   
-  LOGGER.info "get crossvalidation statistics for crossvalidation with id "+params[:id].to_s
+  LOGGER.debug "get crossvalidation statistics for crossvalidation with id "+params[:id].to_s
   raise OpenTox::BadRequestError.new("Missing params, plz give confidence and prediction") unless params[:confidence] and params[:prediction]
   v = Validation::Validation.from_cv_statistics( params[:id], @subjectid )
   props = v.probabilities(params[:confidence].to_s.to_f,params[:prediction].to_s)
@@ -284,7 +286,7 @@ end
 
 get '/?' do
   
-  LOGGER.info "list all validations, params: "+params.inspect
+  LOGGER.debug "list all validations, params: "+params.inspect
   uri_list = Lib::OhmUtil.find( Validation::Validation, params ).sort.delete_if{|v| !v.finished}.collect{|v| v.validation_uri}.join("\n") + "\n"
   if request.env['HTTP_ACCEPT'] =~ /text\/html/
     related_links = 
@@ -324,6 +326,7 @@ post '/test_set_validation' do
                        :prediction_feature => params[:prediction_feature]
       v.subjectid = @subjectid
       v.validate_model( task )
+      LOGGER.info "test-set-validation done #{v.validation_uri}"
       v.validation_uri
     end
     return_task(task)
@@ -334,7 +337,7 @@ post '/test_set_validation' do
 end
 
 get '/test_set_validation' do
-  LOGGER.info "list all test-set-validations, params: "+params.inspect
+  LOGGER.debug "list all test-set-validations, params: "+params.inspect
   
   #uri_list = Validation::Validation.find( :all, :conditions => { :validation_type => "test_set_validation" } ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #uri_list = Validation::Validation.all( :validation_type => "test_set_validation" ).collect{ |v| v.validation_uri }.join("\n")+"\n"
@@ -375,7 +378,8 @@ post '/training_test_validation/?' do
                         :test_target_dataset_uri => params[:test_target_dataset_uri],
                         :prediction_feature => params[:prediction_feature]
       v.subjectid = @subjectid
-      v.validate_algorithm( task ) 
+      v.validate_algorithm( task )
+      LOGGER.info "training-test-validation done #{v.validation_uri}" 
       v.validation_uri
     end
     return_task(task)
@@ -386,7 +390,7 @@ post '/training_test_validation/?' do
 end
 
 get '/training_test_validation' do
-  LOGGER.info "list all training-test-validations, params: "+params.inspect
+  LOGGER.debug "list all training-test-validations, params: "+params.inspect
   #uri_list = Validation::Validation.find( :all, :conditions => { :validation_type => "training_test_validation" } ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #uri_list = Validation::Validation.all( :validation_type => "training_test_validation" ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #params[:validation_type] = "training_test_validation"
@@ -434,13 +438,14 @@ post '/bootstrapping' do
                      :test_dataset_uri => params[:test_dataset_uri]
     v.subjectid = @subjectid
     v.validate_algorithm( OpenTox::SubTask.create(task,33,100))
+    LOGGER.info "bootstrapping validation done #{v.validation_uri}"
     v.validation_uri
   end
   return_task(task)
 end
 
 get '/bootstrapping' do
-  LOGGER.info "list all bootstrapping-validations, params: "+params.inspect
+  LOGGER.debug "list all bootstrapping-validations, params: "+params.inspect
   #uri_list = Validation::Validation.find( :all, :conditions => { :validation_type => "bootstrapping" } ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #uri_list = Validation::Validation.all( :validation_type => "bootstrapping" ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #params[:validation_type] = "bootstrapping"
@@ -493,6 +498,7 @@ post '/training_test_split' do
                      :algorithm_params => params[:algorithm_params]
     v.subjectid = @subjectid
     v.validate_algorithm( OpenTox::SubTask.create(task,33,100))
+    LOGGER.info "training test split done #{v.validation_uri}"
     v.validation_uri
   end
   return_task(task)
@@ -500,7 +506,7 @@ post '/training_test_split' do
 end
 
 get '/training_test_split' do
-  LOGGER.info "list all training-test-split-validations, params: "+params.inspect
+  LOGGER.debug "list all training-test-split-validations, params: "+params.inspect
   #uri_list = Validation::Validation.find( :all, :conditions => { :validation_type => "training_test_split" } ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #uri_list = Validation::Validation.all( :validation_type => "training_test_split" ).collect{ |v| v.validation_uri }.join("\n")+"\n"
   #params[:validation_type] = "training_test_split"
@@ -579,7 +585,9 @@ post '/plain_training_test_split' do
     result = Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], @subjectid,
       params[:stratified], params[:split_ratio], params[:random_seed], task)
     content_type "text/uri-list"
-    result[:training_dataset_uri]+"\n"+result[:test_dataset_uri]+"\n"
+    res = result[:training_dataset_uri]+"\n"+result[:test_dataset_uri]+"\n"
+    LOGGER.info "plain training test split done #{res}"      
+    res
   end
   return_task(task)
 end
@@ -609,13 +617,14 @@ post '/validate_datasets' do
       v.subjectid = @subjectid
       v.compute_validation_stats(feature_type,predicted_variable,predicted_confidence,nil,nil,false,task)
     end
+    LOGGER.info "validate datasets done #{v.validation_uri}"
     v.validation_uri
   end
   return_task(task)
 end
 
 get '/:id/probabilities' do
-  LOGGER.info "get validation probabilities "+params.inspect
+  LOGGER.debug "get validation probabilities "+params.inspect
   
   begin
     validation = Validation::Validation.get(params[:id])
@@ -725,7 +734,7 @@ end
 #end
 
 get '/:id' do
-  LOGGER.info "get validation with id "+params[:id].to_s+" '"+request.env['HTTP_ACCEPT'].to_s+"'"
+  LOGGER.debug "get validation with id "+params[:id].to_s+" '"+request.env['HTTP_ACCEPT'].to_s+"'"
 #  begin
     #validation = Validation::Validation.find(params[:id])
 #  rescue ActiveRecord::RecordNotFound => ex
@@ -733,6 +742,8 @@ get '/:id' do
 #  end
   validation = Validation::Validation[params[:id]]
   raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found." unless validation
+  
+  validation.filter_predictions(params["min_confidence"].to_f,12,nil) if params["min_confidence"]!=nil
   
   case request.env['HTTP_ACCEPT'].to_s
   when "application/rdf+xml"

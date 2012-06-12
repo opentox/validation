@@ -85,11 +85,8 @@ class ValidationTest < Test::Unit::TestCase
 #        {:validation_uris=>"http://local-ot/validation/389,http://local-ot/validation/390,http://local-ot/validation/391,http://local-ot/validation/392",
 #         :identifier=>"split1,split1,split2,split2"}
       
-      get '15709/viz'
-      puts last_response.body
-      exit
-        
-      post "/report/validation",{:validation_uris=>"http://local-ot/validation/15647"}
+      #post "/report/validation",{:validation_uris=>"http://local-ot/validation/22849",:min_confidence=>0.5}
+      get "/22849",{:min_confidence=>0.5}
       exit
       
       #post "/report/validation",{:validation_uris=>"http://local-ot/validation/389"}

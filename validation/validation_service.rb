@@ -256,8 +256,12 @@ module Validation
     end
     
     def filter_predictions( min_confidence, min_num_predictions, max_num_predictions, prediction=nil )
-      self.prediction_data = nil
-      self.save
+      
+      #3.times{LOGGER.debug("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")}
+      #LOGGER.debug("filtering predictions")
+      
+      #self.prediction_data = nil
+      #self.save
       
       raise OpenTox::BadRequestError.new "only supported for classification" if prediction!=nil and classification_statistics==nil
       raise OpenTox::BadRequestError.new "illegal confidence value #{min_confidence}" unless 
@@ -381,7 +385,7 @@ module Validation
         raise "validation '"+validation.validation_uri+"' for crossvaldation could not be finished" unless 
           validation.finished
         i += 1
-        LOGGER.debug "fold "+i.to_s+" done: "+validation.validation_uri.to_s
+        LOGGER.info "fold "+i.to_s+" done: "+validation.validation_uri.to_s
       end
       
 #      self.attributes = { :finished => true }
@@ -427,7 +431,7 @@ module Validation
         end
         if tmp_val.size == self.num_folds.to_i
           @tmp_validations = tmp_val
-          LOGGER.debug "copied dataset uris from cv "+cv.crossvalidation_uri.to_s #+":\n"+tmp_val.inspect
+          LOGGER.info "copied dataset uris from cv "+cv.crossvalidation_uri.to_s
           return true
         end
       end
@@ -437,7 +441,7 @@ module Validation
     # creates cv folds (training and testdatasets)
     # stores uris in validation objects 
     def create_new_cv_datasets( task = nil )
-      LOGGER.debug "creating datasets for crossvalidation"
+      LOGGER.info "creating new datasets for crossvalidation"
       orig_dataset = Lib::DatasetCache.find(self.dataset_uri,self.subjectid)
       raise OpenTox::NotFoundError.new "Dataset not found: "+self.dataset_uri.to_s unless orig_dataset
       
@@ -445,7 +449,7 @@ module Validation
       test_dataset_uris = []
       
       meta = { DC.creator => self.crossvalidation_uri }
-      case stratified
+      case self.stratified
       when "anti"
          raise "anti-stratification not yet supported for cv"
       when "false"
