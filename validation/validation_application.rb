@@ -488,7 +488,8 @@ post '/training_test_split' do
   check_stratified(params)
   task = OpenTox::Task.create( "Perform training test split validation", url_for("/training_test_split", :full) )  do |task| #, params
     params.merge!( Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], 
-      @subjectid,  params[:stratified], params[:split_ratio], params[:random_seed], OpenTox::SubTask.create(task,0,33)))
+      @subjectid,  params[:stratified], params[:split_ratio], params[:random_seed], params[:missing_values],
+      OpenTox::SubTask.create(task,0,33)))
     v = Validation::Validation.create  :validation_type => "training_test_split", 
                      :training_dataset_uri => params[:training_dataset_uri], 
                      :test_dataset_uri => params[:test_dataset_uri],
@@ -583,10 +584,10 @@ post '/plain_training_test_split' do
   check_stratified(params)
   task = OpenTox::Task.create( "Create data-split", url_for("/plain_training_test_split", :full) ) do |task|
     result = Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], @subjectid,
-      params[:stratified], params[:split_ratio], params[:random_seed], task)
+      params[:stratified], params[:split_ratio], params[:random_seed], params[:missing_values], task)
     content_type "text/uri-list"
     res = result[:training_dataset_uri]+"\n"+result[:test_dataset_uri]+"\n"
-    LOGGER.info "plain training test split done #{res}"      
+    LOGGER.info "plain training test split done #{res.to_s.gsub("\n"," \\n ")}"      
     res
   end
   return_task(task)
@@ -672,7 +673,7 @@ get '/:id/viz' do
       data.features.each do |f,m|
         d.add_feature(f,m)
         data.data_entries[c][f].each do |v|
-          d.add(c,f,v)
+          d.add(c,f,v,true)
         end if data.data_entries[c][f]
       end
     end
@@ -685,8 +686,8 @@ get '/:id/viz' do
       [p,a].each do |v|
         raise p.class.to_s+" "+p.inspect unless p.is_a?(Array) and p.size==1
       end
-      d.add(c,predicted_nice_feature,p[0])
-      d.add(c,correct_classified_feature,p[0]==a[0] ? "correct" : "miss")
+      d.add(c,predicted_nice_feature,p[0],true)
+      d.add(c,correct_classified_feature,p[0]==a[0] ? "correct" : "miss",true)
     end 
   end
   d.to_csv

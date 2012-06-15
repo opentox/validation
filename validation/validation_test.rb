@@ -85,7 +85,14 @@ class ValidationTest < Test::Unit::TestCase
 #        {:validation_uris=>"http://local-ot/validation/389,http://local-ot/validation/390,http://local-ot/validation/391,http://local-ot/validation/392",
 #         :identifier=>"split1,split1,split2,split2"}
       
-      #post "/report/validation",{:validation_uris=>"http://local-ot/validation/22849",:min_confidence=>0.5}
+      post "/training_test_validation",{:prediction_feature=>"http://opentox.informatik.uni-freiburg.de/dataset/2/feature/MTP", 
+        :training_dataset_uri=>"http://opentox.informatik.uni-freiburg.de/dataset/4755", 
+        :algorithm_uri=>"http://opentox.informatik.uni-freiburg.de/superservice", 
+        :test_dataset_uri=>"http://opentox.informatik.uni-freiburg.de/dataset/3556", 
+        :algorithm_params=>"prediction_algorithm=http://opentox.informatik.uni-freiburg.de/weka/M5P;create_bbrc_features=false;ad_algorithm=http://opentox.informatik.uni-freiburg.de/appdomain/EuclideanDistance"}
+      exit
+        
+        #post "/report/validation",{:validation_uris=>"http://local-ot/validation/22849",:min_confidence=>0.5}
       get "/22849",{:min_confidence=>0.5}
       exit
       

@@ -491,6 +491,7 @@ module Validation
           test_dataset_uris << test_dataset_uri
         end
       when /true|super/
+        raise "DO NOT USED SUPER-STRATIFICATION FOR VAL-EXPERIMENTS AND CV, IF SO SOLVE _MISSING_VAULE_NA_ PROBLEM" if stratified=="super"
         if stratified=="true"
           features = [ self.prediction_feature ] 
         else
@@ -540,7 +541,7 @@ module Validation
           "' not found in dataset, features are: \n"+
           orig_dataset.features.inspect unless orig_dataset.features.include?(prediction_feature)
       else
-        LOGGER.warn "no prediciton feature given, all features included in test dataset"
+        LOGGER.debug "no prediciton feature given, all features included in test dataset"
       end
       
       compounds = orig_dataset.compounds
@@ -615,12 +616,15 @@ module Validation
     
     # splits a dataset into test and training dataset
     # returns map with training_dataset_uri and test_dataset_uri
-    def self.train_test_dataset_split( orig_dataset_uri, prediction_feature, subjectid, stratified="false", split_ratio=nil, random_seed=nil, task=nil )
+    def self.train_test_dataset_split( orig_dataset_uri, prediction_feature, subjectid, stratified="false",
+      split_ratio=nil, random_seed=nil, missing_values=nil, task=nil )
+      
       split_ratio=0.67 unless split_ratio
       split_ratio = split_ratio.to_f
       random_seed=1 unless random_seed
       random_seed = random_seed.to_i
-      
+      missing_values = "NA" unless missing_values
+        
       raise OpenTox::NotFoundError.new "Split ratio invalid: "+split_ratio.to_s unless split_ratio and split_ratio=split_ratio.to_f
       raise OpenTox::NotFoundError.new "Split ratio not >0 and <1 :"+split_ratio.to_s unless split_ratio>0 && split_ratio<1
       orig_dataset = Lib::DatasetCache.find orig_dataset_uri, subjectid
@@ -631,7 +635,7 @@ module Validation
           "' not found in dataset, features are: \n"+
           orig_dataset.features.keys.inspect unless orig_dataset.features.include?(prediction_feature)
       else
-        LOGGER.warn "no prediciton feature given, all features will be included in test dataset"
+        LOGGER.debug "no prediciton feature given, all features will be included in test dataset"
       end
       
       meta = { DC.creator => $url_provider.url_for('/training_test_split',:full) }
@@ -646,7 +650,7 @@ module Validation
           features = nil
         end
         r_util = OpenTox::RUtil.new 
-        train, test = r_util.stratified_split( orig_dataset, meta, "NA", split_ratio, @subjectid, random_seed, features, stratified=="anti" )
+        train, test = r_util.stratified_split( orig_dataset, meta, missing_values, split_ratio, @subjectid, random_seed, features, stratified=="anti" )
         r_util.quit_r
         result = {:training_dataset_uri => train.uri, :test_dataset_uri => test.uri}
       when "false"

@@ -1,5 +1,5 @@
 
-require 'lib/test_util.rb'
+#require 'lib/test_util.rb'
 
 class Example
   
