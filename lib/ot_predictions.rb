@@ -36,7 +36,9 @@ module Lib
     end
     
     def self.to_array( predictions, add_pic=false, format=false, validation_uris=nil )
-  
+
+      add_pic = false #predictions.size<=250
+     
       confidence_available = false
       predictions.each do |p|
         confidence_available |= p.confidence_values_available?
@@ -54,7 +56,7 @@ module Lib
           begin
             #a.push( "http://ambit.uni-plovdiv.bg:8080/ambit2/depict/cdk?search="+
             #  URI.encode(OpenTox::Compound.new(:uri=>p.identifier(i)).smiles) ) if add_pic
-            a << p.identifier(i)+"?media=image/png"
+            a << p.identifier(i)+"?media=image/png" if add_pic
           rescue => ex
             raise ex
             #a.push("Could not add pic: "+ex.message)

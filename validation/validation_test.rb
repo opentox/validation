@@ -85,16 +85,16 @@ class ValidationTest < Test::Unit::TestCase
 #        {:validation_uris=>"http://local-ot/validation/389,http://local-ot/validation/390,http://local-ot/validation/391,http://local-ot/validation/392",
 #         :identifier=>"split1,split1,split2,split2"}
       
-      post "/training_test_validation",{:prediction_feature=>"http://opentox.informatik.uni-freiburg.de/dataset/2/feature/MTP", 
-        :training_dataset_uri=>"http://opentox.informatik.uni-freiburg.de/dataset/4755", 
-        :algorithm_uri=>"http://opentox.informatik.uni-freiburg.de/superservice", 
-        :test_dataset_uri=>"http://opentox.informatik.uni-freiburg.de/dataset/3556", 
-        :algorithm_params=>"prediction_algorithm=http://opentox.informatik.uni-freiburg.de/weka/M5P;create_bbrc_features=false;ad_algorithm=http://opentox.informatik.uni-freiburg.de/appdomain/EuclideanDistance"}
-      exit
-        
-        #post "/report/validation",{:validation_uris=>"http://local-ot/validation/22849",:min_confidence=>0.5}
-      get "/22849",{:min_confidence=>0.5}
-      exit
+#      post "/training_test_validation",{:prediction_feature=>"http://opentox.informatik.uni-freiburg.de/dataset/2/feature/MTP", 
+#        :training_dataset_uri=>"http://opentox.informatik.uni-freiburg.de/dataset/4755", 
+#        :algorithm_uri=>"http://opentox.informatik.uni-freiburg.de/superservice", 
+#        :test_dataset_uri=>"http://opentox.informatik.uni-freiburg.de/dataset/3556", 
+#        :algorithm_params=>"prediction_algorithm=http://opentox.informatik.uni-freiburg.de/weka/M5P;create_bbrc_features=false;ad_algorithm=http://opentox.informatik.uni-freiburg.de/appdomain/EuclideanDistance"}
+#      exit
+#        
+#        #post "/report/validation",{:validation_uris=>"http://local-ot/validation/22849",:min_confidence=>0.5}
+#      get "/22849",{:min_confidence=>0.5}
+#      exit
       
       #post "/report/validation",{:validation_uris=>"http://local-ot/validation/389"}
       
@@ -105,7 +105,7 @@ class ValidationTest < Test::Unit::TestCase
 #      #dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/603204"
       
       dataset_uri = "http://local-ot/dataset/9264"
-      post "/plain_training_test_split",{:dataset_uri=>dataset_uri, :stratified=>"false", :split_ratio=>0.5}
+      post "/plain_training_test_split",{:dataset_uri=>dataset_uri, :stratified=>"super", :split_ratio=>0.25}
       puts last_response.body
       uri = last_response.body
       exit
