@@ -10,7 +10,7 @@ module Validation
                 :training_dataset_uri, :prediction_feature, :test_dataset_uri, :test_target_dataset_uri, 
                 :prediction_dataset_uri, :date ] 
   VAL_PROPS_SUM = [ :num_instances, :num_without_class, :num_unpredicted ]
-  VAL_PROPS_AVG = [:real_runtime, :percent_without_class, :percent_unpredicted ]
+  VAL_PROPS_AVG = [ :real_runtime, :percent_without_class, :percent_unpredicted, :median_confidence ]
   VAL_PROPS = VAL_PROPS_GENERAL + VAL_PROPS_SUM + VAL_PROPS_AVG
   
   # :crossvalidation_info
@@ -76,6 +76,7 @@ module Validation
     attribute :regression_statistics_yaml
     attribute :finished    
     attribute :prediction_data_yaml
+    attribute :median_confidence
     
     index :model_uri
     index :validation_type

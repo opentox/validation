@@ -1,6 +1,15 @@
 
 require "lib/prediction_data.rb"
 
+
+class Array
+  
+  def median #array has to be sorted!     
+    (self[size/2] + self[(size+1)/2]) / 2.0
+  end 
+  
+end
+
 module Lib
 
   module Util
@@ -657,6 +666,10 @@ module Lib
     end
 
     # data for (roc-)plots ###################################################################################
+    
+    def median_confidence
+      @confidence_values.median if confidence_values_available?
+    end
     
      def get_roc_prediction_values(class_value)
       

@@ -104,10 +104,11 @@ class ValidationTest < Test::Unit::TestCase
 #      #dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/603306?feature_uris[]=http://apps.ideaconsult.net:8080/ambit2/feature/764036"
 #      #dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/603204"
       
-      dataset_uri = "http://local-ot/dataset/9264"
-      post "/plain_training_test_split",{:dataset_uri=>dataset_uri, :stratified=>"super", :split_ratio=>0.25}
+      #dataset_uri = "http://local-ot/dataset/9264"
+      #post "/plain_training_test_split",{:dataset_uri=>dataset_uri, :stratified=>"super", :split_ratio=>0.25}
+      
+      get '31355/median_confidence'
       puts last_response.body
-      uri = last_response.body
       exit
       
 #      rep = wait_for_task(uri)

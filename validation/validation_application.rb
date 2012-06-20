@@ -734,6 +734,15 @@ end
 #  return validation.send(params[:attribute])
 #end
 
+get '/:id/migrate_median_confidence' do
+  LOGGER.debug "migrate median confidence"
+  validation = Validation::Validation[params[:id]]
+  raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found." unless validation
+  validation.migrate_median_confidence
+  content_type "text/plain"
+  return "computed median confidence #{validation.median_confidence}"
+end
+
 get '/:id' do
   LOGGER.debug "get validation with id "+params[:id].to_s+" '"+request.env['HTTP_ACCEPT'].to_s+"'"
 #  begin

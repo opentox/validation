@@ -233,6 +233,15 @@ module Validation
       p_data.data
     end
     
+    def migrate_median_confidence()
+      p_data = self.prediction_data
+      raise "compute prediction data before" if p_data==nil
+      predictions = Lib::OTPredictions.new(p_data)
+      self.median_confidence = predictions.median_confidence
+      self.save
+      raise unless self.valid?
+    end
+    
     def compute_validation_stats( save_stats=true )
       p_data = self.prediction_data
       raise "compute prediction data before" if p_data==nil
@@ -248,6 +257,7 @@ module Validation
       self.percent_without_class = predictions.percent_without_class
       self.num_unpredicted = predictions.num_unpredicted
       self.percent_unpredicted = predictions.percent_unpredicted
+      self.median_confidence = predictions.median_confidence
       if (save_stats)
         self.finished = true
         self.save
