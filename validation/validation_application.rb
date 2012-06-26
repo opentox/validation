@@ -9,8 +9,8 @@ require 'validation/validation_service.rb'
 helpers do
   def check_stratified(params)
     params[:stratified] = "false" unless params[:stratified]
-    raise OpenTox::BadRequestError.new "stratified != true|false|super|anti, is #{params[:stratified]}" unless
-      params[:stratified]=~/true|false|super|anti/
+    raise OpenTox::BadRequestError.new "stratified != true|false|super|super4|anti, is #{params[:stratified]}" unless
+      params[:stratified]=~/^(true|false|super|super4|anti)$/
   end
 end
 
@@ -583,8 +583,10 @@ post '/plain_training_test_split' do
   raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri]
   check_stratified(params)
   task = OpenTox::Task.create( "Create data-split", url_for("/plain_training_test_split", :full) ) do |task|
+    split_features = nil
+    split_features = params[:split_features].split(";") if params[:split_features]
     result = Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], @subjectid,
-      params[:stratified], params[:split_ratio], params[:random_seed], params[:missing_values], task)
+      params[:stratified], params[:split_ratio], params[:random_seed], params[:missing_values], task, split_features)
     content_type "text/uri-list"
     res = result[:training_dataset_uri]+"\n"+result[:test_dataset_uri]+"\n"
     LOGGER.info "plain training test split done #{res.to_s.gsub("\n"," \\n ")}"      
@@ -651,6 +653,7 @@ get '/:id/viz' do
   
   m = OpenTox::Model::Generic.find(validation.model_uri)
   predicted_feature = m.predicted_variable(nil)
+  confidence_feature = m.predicted_confidence(nil)
   actual_feature = validation.prediction_feature
   
   d = OpenTox::Dataset.create
@@ -665,6 +668,8 @@ get '/:id/viz' do
   d.add_feature(correct_classified_feature)
   predicted_nice_feature = "http://predicted"
   d.add_feature(predicted_nice_feature)
+  confidence_nice_feature = "http://confidence"
+  d.add_feature(confidence_nice_feature)
     
   [training, test].each do |data|
     data.compounds.each do |c|
@@ -689,6 +694,11 @@ get '/:id/viz' do
       d.add(c,predicted_nice_feature,p[0],true)
       d.add(c,correct_classified_feature,p[0]==a[0] ? "correct" : "miss",true)
     end 
+    if prediction.data_entries[c][confidence_feature]
+      conf = prediction.data_entries[c][confidence_feature]
+      raise if conf.size!=1
+      d.add(c,confidence_nice_feature,conf[0],true)
+    end
   end
   d.to_csv
 end

@@ -500,8 +500,8 @@ module Validation
             meta, self.subjectid ).uri
           test_dataset_uris << test_dataset_uri
         end
-      when /true|super/
-        raise "DO NOT USED SUPER-STRATIFICATION FOR VAL-EXPERIMENTS AND CV, IF SO SOLVE _MISSING_VAULE_NA_ PROBLEM" if stratified=="super"
+      when /^(true|super|super4)$/
+        raise "DO NOT USED SUPER-STRATIFICATION FOR VAL-EXPERIMENTS AND CV, IF SO SOLVE _MISSING_VAULE_NA_ PROBLEM" if stratified=~/super/
         if stratified=="true"
           features = [ self.prediction_feature ] 
         else
@@ -627,7 +627,7 @@ module Validation
     # splits a dataset into test and training dataset
     # returns map with training_dataset_uri and test_dataset_uri
     def self.train_test_dataset_split( orig_dataset_uri, prediction_feature, subjectid, stratified="false",
-      split_ratio=nil, random_seed=nil, missing_values=nil, task=nil )
+      split_ratio=nil, random_seed=nil, missing_values=nil, task=nil, features=nil )
       
       split_ratio=0.67 unless split_ratio
       split_ratio = split_ratio.to_f
@@ -651,30 +651,31 @@ module Validation
       meta = { DC.creator => $url_provider.url_for('/training_test_split',:full) }
       
       case stratified
-      when /true|super|anti/
+      when /^(true|super|super4|anti)$/
         if stratified=="true"
           raise OpenTox::BadRequestError.new "prediction feature required for stratified splits" unless prediction_feature
+          LOGGER.warn "split features are ignored for stratified splits (use super instead)" if features
           features = [prediction_feature]
         else
           LOGGER.warn "prediction feature is ignored for super- or anti-stratified splits" if prediction_feature
-          features = nil
         end
         r_util = OpenTox::RUtil.new 
-        train, test = r_util.stratified_split( orig_dataset, meta, missing_values, split_ratio, @subjectid, random_seed, features, stratified=="anti" )
+        train, test = r_util.stratified_split( orig_dataset, meta, missing_values, split_ratio, @subjectid, random_seed, features, stratified )
         r_util.quit_r
         result = {:training_dataset_uri => train.uri, :test_dataset_uri => test.uri}
       when "false"
+        LOGGER.warn "split features are ignored for non-stratified splits (use super instead)" if features
         compounds = orig_dataset.compounds
         raise OpenTox::BadRequestError.new "Cannot split datset, num compounds in dataset < 2 ("+compounds.size.to_s+")" if compounds.size<2
         split = (compounds.size*split_ratio).to_i
         split = [split,1].max
         split = [split,compounds.size-2].min
         LOGGER.debug "splitting dataset "+orig_dataset_uri+
-                    " into train:0-"+split.to_s+" and test:"+(split+1).to_s+"-"+(compounds.size-1).to_s+
+                    " into train:0-"+(split-1).to_s+" and test:"+split.to_s+"-"+(compounds.size-1).to_s+
                     " (shuffled with seed "+random_seed.to_s+")"
         compounds.shuffle!( random_seed )
-        training_compounds = compounds[0..split]
-        test_compounds = compounds[(split+1)..-1]
+        training_compounds = compounds[0..(split-1)]
+        test_compounds = compounds[split..-1]
         task.progress(33) if task
   
         meta[DC.title] = "Training dataset split of "+orig_dataset.uri
