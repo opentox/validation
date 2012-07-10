@@ -75,7 +75,7 @@ module Validation
     attribute :classification_statistics_yaml
     attribute :regression_statistics_yaml
     attribute :finished    
-    attribute :prediction_data_yaml
+    #attribute :prediction_data_yaml
     attribute :median_confidence
     
     index :model_uri
@@ -88,7 +88,7 @@ module Validation
     index :test_dataset_uri
     index :finished
     
-    attr_accessor :subjectid
+    attr_accessor :subjectid, :prediction_data
     
     def self.create(params={})
       params[:date] = Time.new
@@ -111,13 +111,13 @@ module Validation
       self.regression_statistics_yaml = rs.to_yaml
     end
     
-    def prediction_data
-      YAML.load(self.prediction_data_yaml) if self.prediction_data_yaml
-    end
+    #def prediction_data
+    #  YAML.load(self.prediction_data_yaml) if self.prediction_data_yaml
+    #end
     
-    def prediction_data=(pd)
-      self.prediction_data_yaml = pd.to_yaml
-    end
+    #def prediction_data=(pd)
+    #  self.prediction_data_yaml = pd.to_yaml
+    #end
 
     def save
       super
