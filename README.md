@@ -6,4 +6,4 @@ OpenTox Validation
 [API documentation](http://rdoc.info/github/opentox/validation)
 --------------------------------------------------------------
 
-Copyright (c) 2009-2011 Martin Guetlein, Christoph Helma. See LICENSE for details.
+Copyright (c) 2009-2012 Martin Guetlein, Christoph Helma. See LICENSE for details.
