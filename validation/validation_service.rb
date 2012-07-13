@@ -111,13 +111,13 @@ module Validation
     end
     
     # validates an algorithm by building a model and validating this model
-    def validate_algorithm( algorithm_params=nil, task=nil )
+    def validate_algorithm( task=nil )
       raise "validation_type missing" unless self.validation_type
       raise OpenTox::BadRequestError.new "no algorithm uri: '"+self.algorithm_uri.to_s+"'" if self.algorithm_uri==nil or self.algorithm_uri.to_s.size<1
       
       params = { :dataset_uri => self.training_dataset_uri, :prediction_feature => self.prediction_feature }
-      if (algorithm_params!=nil)
-        algorithm_params.split(";").each do |alg_params|
+      if (self.algorithm_params!=nil)
+        self.algorithm_params.split(";").each do |alg_params|
           alg_param = alg_params.split("=",2)
           raise OpenTox::BadRequestError.new "invalid algorithm param: '"+alg_params.to_s+"'" unless alg_param.size==2 or alg_param[0].to_s.size<1 or alg_param[1].to_s.size<1
           LOGGER.warn "algorihtm param contains empty space, encode? "+alg_param[1].to_s if alg_param[1] =~ /\s/
@@ -210,9 +210,10 @@ module Validation
       algorithm_uri = self.algorithm_uri ? nil : model.metadata[OT.algorithm]
       predicted_variable = model.predicted_variable(self.subjectid)
       predicted_confidence = model.predicted_confidence(self.subjectid)
-      raise "cannot determine whether model '"+model.uri.to_s+"' performs classification or regression, "+
+      raise "cannot determine whether model '"+model.uri.to_s+"' performs classification or regression: '#{feature_type}', "+
           "please set rdf-type of predictedVariables feature '"+predicted_variable.to_s+
-          "' to NominalFeature or NumericFeature" if (feature_type.to_s!="classification" and feature_type.to_s!="regression")        
+          "' to NominalFeature or NumericFeature" if
+          (feature_type.to_s!="classification" and feature_type.to_s!="regression")        
       compute_prediction_data( feature_type, predicted_variable, predicted_confidence, 
         prediction_feature, algorithm_uri, task )
     end
@@ -300,9 +301,26 @@ module Validation
   
   class Crossvalidation
     
-    def perform_cv ( prediction_feature, algorithm_params=nil, task=nil )
-      create_cv_datasets( prediction_feature, OpenTox::SubTask.create(task, 0, 33) )
-      perform_cv_validations( algorithm_params, OpenTox::SubTask.create(task, 33, 100) )
+    def perform_cv ( task=nil )
+      create_cv_datasets( OpenTox::SubTask.create(task, 0, 33) )
+      perform_cv_validations( OpenTox::SubTask.create(task, 33, 100) )
+    end
+    
+    def clean_loo_files( delete_feature_datasets )
+      Validation.find( :crossvalidation_id => self.id, :validation_type => "crossvalidation" ).each do |v|
+        LOGGER.debug "loo-cleanup> delete training dataset "+v.training_dataset_uri
+        OpenTox::RestClientWrapper.delete v.training_dataset_uri,subjectid
+        if (delete_feature_datasets)
+          begin
+            model = OpenTox::Model::Generic.find(v.model_uri)
+            if model.metadata[OT.featureDataset]
+              LOGGER.debug "loo-cleanup> delete feature dataset "+model.metadata[OT.featureDataset]
+              OpenTox::RestClientWrapper.delete model.metadata[OT.featureDataset],subjectid
+            end
+          rescue
+          end
+        end
+      end
     end
     
     # deletes a crossvalidation, all validations are deleted as well
@@ -331,36 +349,35 @@ module Validation
     end
     
     # creates the cv folds
-    def create_cv_datasets( prediction_feature, task=nil )
+    def create_cv_datasets( task=nil )
       if self.loo=="true"
         orig_dataset = Lib::DatasetCache.find(self.dataset_uri,self.subjectid)
         self.num_folds = orig_dataset.compounds.size
         self.random_seed = 0
-        self.stratified = false
+        self.stratified = "false"
       else
         self.random_seed = 1 unless self.random_seed
         self.num_folds = 10 unless self.num_folds
-        self.stratified = false unless self.stratified
+        self.stratified = "false" unless self.stratified
       end
-      if copy_cv_datasets( prediction_feature )
+      if copy_cv_datasets()
         # dataset folds of a previous crossvalidaiton could be used 
         task.progress(100) if task
       else
-        create_new_cv_datasets( prediction_feature, task )
+        create_new_cv_datasets( task )
       end
     end
     
     # executes the cross-validation (build models and validates them)
-    def perform_cv_validations( algorithm_params, task=nil )
+    def perform_cv_validations( task=nil )
       
-      LOGGER.debug "perform cv validations "+algorithm_params.inspect
+      LOGGER.debug "perform cv validations"
       i = 0
       task_step = 100 / self.num_folds.to_f;
       @tmp_validations.each do | val |
         validation = Validation.create val
         validation.subjectid = self.subjectid
-        validation.validate_algorithm( algorithm_params, 
-          OpenTox::SubTask.create(task, i * task_step, ( i + 1 ) * task_step) )
+        validation.validate_algorithm( OpenTox::SubTask.create(task, i * task_step, ( i + 1 ) * task_step) )
         raise "validation '"+validation.validation_uri+"' for crossvaldation could not be finished" unless 
           validation.finished
         i += 1
@@ -377,14 +394,17 @@ module Validation
     private
     # copies datasets from an older crossvalidation on the same dataset and the same folds
     # returns true if successfull, false otherwise
-    def copy_cv_datasets( prediction_feature )
+    def copy_cv_datasets( )
+      # for downwards compatibilty: search prediction_feature=nil is ok
       cvs = Crossvalidation.find( { 
         :dataset_uri => self.dataset_uri, 
         :num_folds => self.num_folds, 
         :stratified => self.stratified, 
         :random_seed => self.random_seed,
         :loo => self.loo,
-        :finished => true} ).reject{ |cv| cv.id == self.id }
+        :finished => true} ).reject{ |cv| (cv.id == self.id || 
+                                          (cv.prediction_feature && 
+                                           cv.prediction_feature != self.prediction_feature)) }
       cvs.each do |cv|
         next if AA_SERVER and !OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"GET",self.subjectid)
         tmp_val = []
@@ -402,7 +422,8 @@ module Validation
                        :crossvalidation_id => self.id,
                        :crossvalidation_fold => v.crossvalidation_fold,
                        :prediction_feature => prediction_feature,
-                       :algorithm_uri => self.algorithm_uri }
+                       :algorithm_uri => self.algorithm_uri,
+                       :algorithm_params => self.algorithm_params }
         end
         if tmp_val.size == self.num_folds.to_i
           @tmp_validations = tmp_val
@@ -415,111 +436,81 @@ module Validation
     
     # creates cv folds (training and testdatasets)
     # stores uris in validation objects 
-    def create_new_cv_datasets( prediction_feature, task = nil )
+    def create_new_cv_datasets( task = nil )
       LOGGER.debug "creating datasets for crossvalidation"
       orig_dataset = Lib::DatasetCache.find(self.dataset_uri,self.subjectid)
       raise OpenTox::NotFoundError.new "Dataset not found: "+self.dataset_uri.to_s unless orig_dataset
       
-      if self.loo=="true"
-        shuffled_compounds = orig_dataset.compounds
-      else
-        shuffled_compounds = orig_dataset.compounds.shuffle( self.random_seed )
-      end
+      train_dataset_uris = []
+      test_dataset_uris = []
       
-      unless self.stratified    
+      meta = { DC.creator => self.crossvalidation_uri }
+      case stratified
+      when "false"
+        if self.loo=="true"
+          shuffled_compounds = orig_dataset.compounds
+        else
+          shuffled_compounds = orig_dataset.compounds.shuffle( self.random_seed )
+        end  
         split_compounds = shuffled_compounds.chunk( self.num_folds.to_i )
-      else
-        class_compounds = {} # "inactive" => compounds[], "active" => compounds[] .. 
-        accept_values = orig_dataset.accept_values(prediction_feature)
-        raise OpenTox::BadRequestError.new("cannot apply stratification (not implemented for regression), acceptValue missing for prediction-feature '"+
-          prediction_feature.to_s+"' in dataset '"+dataset_uri.to_s+"'") unless accept_values and accept_values.size>0
-        accept_values.each do |value|
-          class_compounds[value] = []
-          shuffled_compounds.each do |c|
-            #PENDING accept values are type string, data_entries may be boolean
-            class_compounds[value] << c if orig_dataset.data_entries[c][prediction_feature].collect{|v| v.to_s}.include?(value)
-          end
-        end
-        LOGGER.debug "stratified cv: different class values: "+class_compounds.keys.join(", ")
-        LOGGER.debug "stratified cv: num instances for each class value: "+class_compounds.values.collect{|c| c.size}.join(", ")
-      
-        split_class_compounds = [] # inactive_compounds[fold_i][], active_compounds[fold_i][], ..
-        class_compounds.values.each do |compounds|
-          split_class_compounds << compounds.chunk( self.num_folds.to_i )
-        end
-        LOGGER.debug "stratified cv: splits for class values: "+split_class_compounds.collect{ |c| c.collect{ |cc| cc.size }.join("/") }.join(", ")
-        
-        # we cannot just merge the splits of the different class_values of each fold
-        # this could lead to folds, which sizes differ for more than 1 compound
-        split_compounds = []
-        split_class_compounds.each do |split_comp|
-          # step 1: sort current split in ascending order
-          split_comp.sort!{|x,y| x.size <=> y.size }
-          # step 2: add splits
-          (0..self.num_folds.to_i-1).each do |i|
-            unless split_compounds[i]
-              split_compounds[i] = split_comp[i]
+        LOGGER.debug "cv: num instances for each fold: "+split_compounds.collect{|c| c.size}.join(", ")
+          
+        self.num_folds.to_i.times do |n|
+          test_compounds = []
+          train_compounds = []
+          self.num_folds.to_i.times do |nn|
+            compounds = split_compounds[nn]
+            if n == nn
+              compounds.each{ |compound| test_compounds << compound}
             else
-              split_compounds[i] += split_comp[i]
-            end
+              compounds.each{ |compound| train_compounds << compound}
+            end 
           end
-          # step 3: sort (total) split in descending order
-          split_compounds.sort!{|x,y| y.size <=> x.size }
+          raise "internal error, num test compounds not correct,"+
+            " is '#{test_compounds.size}', should be '#{(shuffled_compounds.size/self.num_folds.to_i)}'" unless 
+            (shuffled_compounds.size/self.num_folds.to_i - test_compounds.size).abs <= 1 
+          raise "internal error, num train compounds not correct, should be '"+(shuffled_compounds.size-test_compounds.size).to_s+
+            "', is '"+train_compounds.size.to_s+"'" unless shuffled_compounds.size - test_compounds.size == train_compounds.size
+          datasetname = 'dataset fold '+(n+1).to_s+' of '+self.num_folds.to_s        
+          meta[DC.title] = "training "+datasetname 
+          LOGGER.debug "training set: "+datasetname+"_train, compounds: "+train_compounds.size.to_s
+          train_dataset_uri = orig_dataset.split( train_compounds, orig_dataset.features.keys, 
+            meta, self.subjectid ).uri
+          train_dataset_uris << train_dataset_uri
+          meta[DC.title] = "test "+datasetname
+          LOGGER.debug "test set:     "+datasetname+"_test, compounds: "+test_compounds.size.to_s
+          test_features = orig_dataset.features.keys.dclone - [self.prediction_feature]
+          test_dataset_uri = orig_dataset.split( test_compounds, test_features, 
+            meta, self.subjectid ).uri
+          test_dataset_uris << test_dataset_uri
         end
+      when /true|super/
+        if stratified=="true"
+          features = [ self.prediction_feature ] 
+        else
+          features = nil
+        end
+        r_util = OpenTox::RUtil.new 
+        train_datasets, test_datasets = r_util.stratified_k_fold_split(orig_dataset,meta,
+          "NA",self.num_folds.to_i,@subjectid,self.random_seed, features)
+        r_util.quit_r
+        train_dataset_uris = train_datasets.collect{|d| d.uri}
+        test_dataset_uris = test_datasets.collect{|d| d.uri}
+      else
+        raise OpenTox::BadRequestError.new
       end
-      LOGGER.debug "cv: num instances for each fold: "+split_compounds.collect{|c| c.size}.join(", ")
-      
-      test_features = orig_dataset.features.keys.dclone - [prediction_feature]
       
       @tmp_validations = []
-      
-      (1..self.num_folds.to_i).each do |n|
-        
-        datasetname = 'cv'+self.id.to_s +
-               #'_d'+orig_dataset.name.to_s +
-               '_f'+n.to_s+'of'+self.num_folds.to_s+
-               '_r'+self.random_seed.to_s+
-               '_s'+self.stratified.to_s 
-        source = $url_provider.url_for('/crossvalidation',:full)
-        
-        test_compounds = []
-        train_compounds = []
-        
-        (1..self.num_folds.to_i).each do |nn|
-          compounds = split_compounds.at(nn-1)
-          
-          if n == nn
-            compounds.each{ |compound| test_compounds.push(compound)}
-          else
-            compounds.each{ |compound| train_compounds.push(compound)}
-          end 
-        end
-        
-        raise "internal error, num test compounds not correct" unless (shuffled_compounds.size/self.num_folds.to_i - test_compounds.size).abs <= 1 
-        raise "internal error, num train compounds not correct, should be '"+(shuffled_compounds.size-test_compounds.size).to_s+
-          "', is '"+train_compounds.size.to_s+"'" unless shuffled_compounds.size - test_compounds.size == train_compounds.size
-        
-        LOGGER.debug "training set: "+datasetname+"_train, compounds: "+train_compounds.size.to_s
-        #train_dataset_uri = orig_dataset.create_new_dataset( train_compounds, orig_dataset.features, datasetname + '_train', source ) 
-        train_dataset_uri = orig_dataset.split( train_compounds, orig_dataset.features.keys, 
-          { DC.title => datasetname + '_train', DC.creator => source }, self.subjectid ).uri
-        
-        LOGGER.debug "test set:     "+datasetname+"_test, compounds: "+test_compounds.size.to_s
-        #test_dataset_uri = orig_dataset.create_new_dataset( test_compounds, test_features, datasetname + '_test', source )
-        test_dataset_uri = orig_dataset.split( test_compounds, test_features, 
-          { DC.title => datasetname + '_test', DC.creator => source }, self.subjectid ).uri
-        
-        #make sure self.id is set
-        #self.save if self.new?
+      self.num_folds.to_i.times do |n|
         tmp_validation = { :validation_type => "crossvalidation",
-                           :training_dataset_uri => train_dataset_uri, 
-                           :test_dataset_uri => test_dataset_uri,
+                           :training_dataset_uri => train_dataset_uris[n], 
+                           :test_dataset_uri => test_dataset_uris[n],
                            :test_target_dataset_uri => self.dataset_uri,
-                           :crossvalidation_id => self.id, :crossvalidation_fold => n,
-                           :prediction_feature => prediction_feature,
-                           :algorithm_uri => self.algorithm_uri }
+                           :crossvalidation_id => self.id, :crossvalidation_fold => (n+1),
+                           :prediction_feature => self.prediction_feature,
+                           :algorithm_uri => self.algorithm_uri,
+                           :algorithm_params => self.algorithm_params}
         @tmp_validations << tmp_validation
-        
         task.progress( n / self.num_folds.to_f * 100 ) if task
       end
     end
@@ -618,7 +609,7 @@ module Validation
     
     # splits a dataset into test and training dataset
     # returns map with training_dataset_uri and test_dataset_uri
-    def self.train_test_dataset_split( orig_dataset_uri, prediction_feature, subjectid, stratified=false, split_ratio=nil, random_seed=nil, task=nil )
+    def self.train_test_dataset_split( orig_dataset_uri, prediction_feature, subjectid, stratified="false", split_ratio=nil, random_seed=nil, task=nil )
       split_ratio=0.67 unless split_ratio
       split_ratio = split_ratio.to_f
       random_seed=1 unless random_seed
@@ -634,15 +625,25 @@ module Validation
           "' not found in dataset, features are: \n"+
           orig_dataset.features.keys.inspect unless orig_dataset.features.include?(prediction_feature)
       else
-        LOGGER.warn "no prediciton feature given, all features included in test dataset"
+        LOGGER.warn "no prediciton feature given, all features will be included in test dataset"
       end
       
-      if stratified
+      meta = { DC.creator => $url_provider.url_for('/training_test_split',:full) }
+      
+      case stratified
+      when /true|super/
+        if stratified=="true"
+          raise OpenTox::BadRequestError.new "prediction feature required for stratified splits" unless prediction_feature
+          features = [prediction_feature]
+        else
+          LOGGER.warn "prediction feature is ignored for super-stratified splits" if prediction_feature
+          features = nil
+        end
         r_util = OpenTox::RUtil.new 
-        split_sets = r_util.stratified_split( orig_dataset, "NA", df, split_ratio, random_seed )
+        train, test = r_util.stratified_split( orig_dataset, meta, "NA", split_ratio, @subjectid, random_seed, features )
         r_util.quit_r
-        result = {:training_dataset_uri => split_sets[0], :test_dataset_uri => split_sets[1]}
-      else
+        result = {:training_dataset_uri => train.uri, :test_dataset_uri => test.uri}
+      when "false"
         compounds = orig_dataset.compounds
         raise OpenTox::BadRequestError.new "Cannot split datset, num compounds in dataset < 2 ("+compounds.size.to_s+")" if compounds.size<2
         split = (compounds.size*split_ratio).to_i
@@ -656,22 +657,18 @@ module Validation
         test_compounds = compounds[(split+1)..-1]
         task.progress(33) if task
   
+        meta[DC.title] = "Training dataset split of "+orig_dataset.uri
         result = {}
         result[:training_dataset_uri] = orig_dataset.split( training_compounds,
-          orig_dataset.features.keys, 
-          { DC.title => "Training dataset split of "+orig_dataset.title.to_s, 
-            DC.creator => $url_provider.url_for('/training_test_split',:full) },
-          subjectid ).uri
+          orig_dataset.features.keys, meta, subjectid ).uri
         task.progress(66) if task
   
+        meta[DC.title] = "Test dataset split of "+orig_dataset.uri
         result[:test_dataset_uri] = orig_dataset.split( test_compounds,
-          orig_dataset.features.keys.dclone - [prediction_feature], 
-          { DC.title => "Test dataset split of "+orig_dataset.title.to_s, 
-            DC.creator => $url_provider.url_for('/training_test_split',:full) },
-          subjectid ).uri
+          orig_dataset.features.keys.dclone - [prediction_feature], meta, subjectid ).uri
         task.progress(100) if task  
         
-        if !stratified and ENV['RACK_ENV'] =~ /test|debug/
+        if ENV['RACK_ENV'] =~ /test|debug/
           raise OpenTox::NotFoundError.new "Training dataset not found: '"+result[:training_dataset_uri].to_s+"'" unless 
             Lib::DatasetCache.find(result[:training_dataset_uri],subjectid)
           test_data = Lib::DatasetCache.find result[:test_dataset_uri],subjectid
@@ -680,8 +677,9 @@ module Validation
           raise "Test dataset num coumpounds != "+(compounds.size-split-1).to_s+", instead: "+
             test_data.compounds.size.to_s+"\n"+test_data.to_yaml unless test_data.compounds.size==(compounds.size-1-split)
         end
-        
         LOGGER.debug "split done, training dataset: '"+result[:training_dataset_uri].to_s+"', test dataset: '"+result[:test_dataset_uri].to_s+"'"
+      else
+        raise OpenTox::BadRequestError.new "stratified != false|true|super, is #{stratified}"
       end
       result
     end

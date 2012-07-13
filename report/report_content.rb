@@ -63,20 +63,17 @@ class Reports::ReportContent
     end
   end
   
-  def add_predictions( validation_set, 
-                        validation_attributes=[],
+  def add_predictions( validation_set,
+                        add_validation_uris,   
                         section_title="Predictions",
                         section_text=nil,
                         table_title="Predictions")
-
-    #PENING
-    raise "validation attributes not implemented in get prediction array" if  validation_attributes.size>0
-    
     section_table = @xml_report.add_section(@current_section, section_title)
     if validation_set.validations[0].get_predictions
       @xml_report.add_paragraph(section_table, section_text) if section_text
+      v_uris = validation_set.validations.collect{|v| Array.new(v.num_instances.to_i,v.validation_uri)} if add_validation_uris
       @xml_report.add_table(section_table, table_title, Lib::OTPredictions.to_array(validation_set.validations.collect{|v| v.get_predictions}, 
-        true, true))
+        true, true, v_uris))
     else
       @xml_report.add_paragraph(section_table, "No prediction info available.")
     end

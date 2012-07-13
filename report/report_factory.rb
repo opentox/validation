@@ -9,7 +9,7 @@ VAL_ATTR_CLASS = [ :num_instances, :num_unpredicted, :accuracy, :weighted_accura
   :area_under_roc, :f_measure, :true_positive_rate, :true_negative_rate, :positive_predictive_value, :negative_predictive_value ]
 VAL_ATTR_REGR = [ :num_instances, :num_unpredicted, :root_mean_squared_error, 
   :weighted_root_mean_squared_error, :mean_absolute_error, :weighted_mean_absolute_error, :r_square, :weighted_r_square,
-  :sample_correlation_coefficient ]
+  :sample_correlation_coefficient, :concordance_correlation_coefficient ]
 
 #VAL_ATTR_BOX_PLOT_CLASS = [ :accuracy, :average_area_under_roc, 
 #  :area_under_roc, :f_measure, :true_positive_rate, :true_negative_rate ]
@@ -113,6 +113,9 @@ module Reports::ReportFactory
       report.add_confidence_plot(validation_set, :root_mean_squared_error, nil)
       report.add_confidence_plot(validation_set, :r_square, nil)
       report.align_last_two_images "Confidence Plots"
+      report.add_confidence_plot(validation_set, :sample_correlation_coefficient, nil)
+      report.add_confidence_plot(validation_set, :concordance_correlation_coefficient, nil)
+      report.align_last_two_images "More Confidence Plots"
     end
     task.progress(70) if task
     report.add_train_test_plot( validation_set, false, OpenTox::SubTask.create(task,70,80) )
@@ -121,7 +124,7 @@ module Reports::ReportFactory
     report.end_section
 
     report.add_result(validation_set, Validation::ALL_PROPS, "All Results", "All Results")
-    report.add_predictions( validation_set )
+    report.add_predictions( validation_set, false )
     task.progress(100) if task
     report
   end
@@ -175,7 +178,8 @@ module Reports::ReportFactory
       report.end_section
       report.add_result(validation_set, 
         [:validation_uri, :validation_report_uri]+VAL_ATTR_CV+VAL_ATTR_CLASS-[:num_folds, :dataset_uri, :algorithm_uri],
-        "Results","Results")
+        "Results","Results") if 
+        (cv_set.unique_value(:num_folds).to_i < cv_set.unique_value(:num_instances).to_i)
     when "regression"
       report.add_result(cv_set, [:crossvalidation_uri]+VAL_ATTR_CV+VAL_ATTR_REGR-[:crossvalidation_fold],res_titel, res_titel, res_text)
       report.add_section("Plots")
@@ -189,12 +193,14 @@ module Reports::ReportFactory
       report.end_section
       report.add_result(validation_set, 
         [:validation_uri, :validation_report_uri]+VAL_ATTR_CV+VAL_ATTR_REGR-[:num_folds, :dataset_uri, :algorithm_uri], 
-        "Results","Results")
+        "Results","Results") if 
+        (cv_set.unique_value(:num_folds).to_i < cv_set.unique_value(:num_instances).to_i)
     end
     task.progress(90) if task
       
-    report.add_result(validation_set, Validation::ALL_PROPS, "All Results", "All Results")
-    report.add_predictions( validation_set ) #, [:crossvalidation_fold] )
+    report.add_result(validation_set, Validation::ALL_PROPS, "All Results", "All Results") if
+      (cv_set.unique_value(:num_folds).to_i < cv_set.unique_value(:num_instances).to_i)
+    report.add_predictions( validation_set, true )
     task.progress(100) if task
     report
   end

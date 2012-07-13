@@ -1,4 +1,15 @@
 
+class Numeric
+  def to_human
+    return "0" if self==0
+    units = %w{B KB MB GB TB}
+    e = (Math.log(self)/Math.log(1024)).floor
+    s = "%.1f" % (to_f / 1024**e)
+    s.sub(/\.?0*$/, units[e])
+  end
+end
+
+    
 module ValidationExamples
   
   class Util
@@ -335,6 +346,57 @@ module ValidationExamples
       end
     end
     
+    def compute_dataset_size
+      if @validation_uri =~ /crossvalidation/
+        cv = OpenTox::Crossvalidation.find(@validation_uri,@subjectid)
+        count = 0
+        size = 0
+        target = nil
+        
+        cv.metadata[OT.validation].each do |v|
+          val = OpenTox::Validation.find(v)
+          dataset = {}
+          dataset[:test] = val.metadata[OT.testDataset]
+          dataset[:training] = val.metadata[OT.trainingDataset]
+          #dataset[:target] = val.metadata[OT.testTargetDataset]
+          raise if (target!=nil and target!=val.metadata[OT.testTargetDataset])
+          target = val.metadata[OT.testTargetDataset]
+            
+          dataset[:prediction] = val.metadata[OT.predictionDataset]
+          m =  val.metadata[OT.model]
+          model = OpenTox::Model::Generic.find(m)
+          dataset[:feature] = model.metadata[OT.featureDataset]
+          
+          puts v
+          val_size = 0
+          dataset.each do |k,v|
+            s = size(v)
+            val_size += s 
+            puts k.to_s+" "+v+" "+s.to_human
+          end
+          puts val_size.to_human
+          puts ""
+          size += val_size
+          
+          count += 1
+          #break if (count>2)
+        end
+        
+        puts "total "+size.to_human+" (count: "+count.to_s+")"
+        puts "avg "+(size/count.to_f).to_human
+        
+        puts ""
+        puts "orig file: "+target+" "+size(target).to_human
+      end
+    end
+    
+    private
+    def size(dataset)
+       f = "/home/martin/opentox-ruby/www/opentox/dataset/data/#{dataset.split("/")[-1]}.json"
+       File.exist?(f) ? File.new(f).size : 0
+    end
+    
+    public
     
     def verify_yaml
       raise "cannot very validation, validation_uri is null" unless @validation_uri
@@ -443,4 +505,22 @@ module ValidationExamples
       "crossvalidation"
     end
   end
+  
+  class LooCrossValidation < ValidationExample
+    def params
+      [:algorithm_uri, :dataset_uri, :prediction_feature]
+    end
+    
+    def opt_params
+      [ :algorithm_params ]
+    end
+    
+    def report_type
+      "crossvalidation"
+    end
+    
+    def validation_type
+      "crossvalidation/loo"
+    end
+  end  
 end

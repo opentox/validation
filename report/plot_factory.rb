@@ -4,7 +4,8 @@ ENV['RANK_PLOTTER_JAR'] = "RankPlotter/RankPlotter.jar" unless ENV['RANK_PLOTTER
 
 CONF_PLOT_RANGE = { :accuracy => [0.45,1.05], :true_positive_rate => [0.45,1.05],:true_negative_rate => [0.45,1.05],
   :false_positive_rate => [0.45,1.05], :false_negative_rate => [0.45,1.05], :positive_predictive_value => [0.45,1.05],
-  :negative_predictive_value => [0.45,1.05], :r_square => [0, 1.05],  :sample_correlation_coefficient => [0, 1.05] }
+  :negative_predictive_value => [0.45,1.05], :r_square => [0, 1.05],  :sample_correlation_coefficient => [0, 1.05],
+  :concordance_correlation_coefficient => [0, 1.05] }
 
 class Array
   def swap!(i,j)
@@ -124,7 +125,7 @@ module Reports
       else
         Reports::r_util.feature_value_plot(out_files, validation_set.validations[0].training_feature_dataset_uri,
           validation_set.validations[0].test_feature_dataset_uri, "Training Data", "Test Data",
-          nil, true, validation_set.validations[0].subjectid, waiting_task )
+          nil, validation_set.validations[0].subjectid, waiting_task )
       end
     end
     

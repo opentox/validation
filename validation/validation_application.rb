@@ -6,8 +6,16 @@ end
 require 'lib/dataset_cache.rb'
 require 'validation/validation_service.rb'
 
+helpers do
+  def check_stratified(params)
+    params[:stratified] = "false" unless params[:stratified]
+    raise OpenTox::BadRequestError.new "stratified != true|false|super, is #{params[:stratified]}" unless
+      params[:stratified]=~/true|false|super/
+  end
+end
+
 get '/crossvalidation/?' do
-  LOGGER.info "list all crossvalidations"
+  LOGGER.info "list all crossvalidations "+params.inspect
   model_uri = params.delete("model") || params.delete("model_uri")
   if model_uri
     model = OpenTox::Model::Generic.find(model_uri, @subjectid)
@@ -46,17 +54,20 @@ post '/crossvalidation/?' do
   raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
   raise OpenTox::BadRequestError.new "illegal param-value num_folds: '"+params[:num_folds].to_s+"', must be integer >1" unless params[:num_folds]==nil or 
     params[:num_folds].to_i>1
-    
+  check_stratified(params)
+  
   task = OpenTox::Task.create( "Perform crossvalidation", url_for("/crossvalidation", :full) ) do |task| #, params
     cv_params = { :dataset_uri => params[:dataset_uri],  
                   :algorithm_uri => params[:algorithm_uri],
+                  :algorithm_params => params[:algorithm_params],
+                  :prediction_feature => params[:prediction_feature],
+                  :stratified => params[:stratified],
                   :loo => "false",
                   :subjectid => @subjectid }
     [ :num_folds, :random_seed ].each{ |sym| cv_params[sym] = params[sym] if params[sym] }
-    cv_params[:stratified] = (params[:stratified].size>0 && params[:stratified]!="false" && params[:stratified]!="0") if params[:stratified]
     cv = Validation::Crossvalidation.create cv_params
     cv.subjectid = @subjectid
-    cv.perform_cv( params[:prediction_feature], params[:algorithm_params], OpenTox::SubTask.create(task,0,95))
+    cv.perform_cv( OpenTox::SubTask.create(task,0,95) )
     # computation of stats is cheap as dataset are already loaded into the memory
     Validation::Validation.from_cv_statistics( cv.id, @subjectid, OpenTox::SubTask.create(task,95,100) )
     cv.crossvalidation_uri
@@ -87,16 +98,19 @@ post '/crossvalidation/loo/?' do
   raise OpenTox::BadRequestError.new "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
   raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
   raise OpenTox::BadRequestError.new "illegal param: num_folds, stratified, random_seed not allowed for loo-crossvalidation" if params[:num_folds] or 
-    params[:stratifed] or params[:random_seed]
+    params[:stratified] or params[:random_seed]
   task = OpenTox::Task.create( "Perform loo-crossvalidation", url_for("/crossvalidation/loo", :full) ) do |task| #, params
-    cv_params = { :dataset_uri => params[:dataset_uri],  
+    cv_params = { :dataset_uri => params[:dataset_uri],
+                  :algorithm_params => params[:algorithm_params],
+                  :prediction_feature => params[:prediction_feature],  
                   :algorithm_uri => params[:algorithm_uri],
                   :loo => "true" }
     cv = Validation::Crossvalidation.create cv_params
     cv.subjectid = @subjectid
-    cv.perform_cv( params[:prediction_feature], params[:algorithm_params], OpenTox::SubTask.create(task,0,95))
+    cv.perform_cv( OpenTox::SubTask.create(task,0,95))
     # computation of stats is cheap as dataset are already loaded into the memory
     Validation::Validation.from_cv_statistics( cv.id, @subjectid, OpenTox::SubTask.create(task,95,100) )
+    cv.clean_loo_files( !(params[:algorithm_params] && params[:algorithm_params] =~ /feature_dataset_uri/) )
     cv.crossvalidation_uri
   end
   return_task(task)
@@ -343,12 +357,13 @@ post '/training_test_validation/?' do
     task = OpenTox::Task.create( "Perform training-test-validation", url_for("/", :full) ) do |task| #, params
       v = Validation::Validation.create :validation_type => "training_test_validation", 
                         :algorithm_uri => params[:algorithm_uri],
+                        :algorithm_params => params[:algorithm_params],
                         :training_dataset_uri => params[:training_dataset_uri], 
                         :test_dataset_uri => params[:test_dataset_uri],
                         :test_target_dataset_uri => params[:test_target_dataset_uri],
                         :prediction_feature => params[:prediction_feature]
       v.subjectid = @subjectid
-      v.validate_algorithm( params[:algorithm_params], task ) 
+      v.validate_algorithm( task ) 
       v.validation_uri
     end
     return_task(task)
@@ -402,10 +417,11 @@ post '/bootstrapping' do
                      :test_target_dataset_uri => params[:dataset_uri],
                      :prediction_feature => params[:prediction_feature],
                      :algorithm_uri => params[:algorithm_uri],
+                     :algorithm_params => params[:algorithm_params],
                      :training_dataset_uri => params[:training_dataset_uri], 
                      :test_dataset_uri => params[:test_dataset_uri]
     v.subjectid = @subjectid
-    v.validate_algorithm( params[:algorithm_params], OpenTox::SubTask.create(task,33,100))
+    v.validate_algorithm( OpenTox::SubTask.create(task,33,100))
     v.validation_uri
   end
   return_task(task)
@@ -452,18 +468,19 @@ post '/training_test_split' do
   raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri].to_s.size>0
   raise OpenTox::BadRequestError.new "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
   raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
+  check_stratified(params)
   task = OpenTox::Task.create( "Perform training test split validation", url_for("/training_test_split", :full) )  do |task| #, params
-    strat = (params[:stratified].size>0 && params[:stratified]!="false" && params[:stratified]!="0") if params[:stratified]
     params.merge!( Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], 
-      @subjectid,  strat, params[:split_ratio], params[:random_seed], OpenTox::SubTask.create(task,0,33)))
+      @subjectid,  params[:stratified], params[:split_ratio], params[:random_seed], OpenTox::SubTask.create(task,0,33)))
     v = Validation::Validation.create  :validation_type => "training_test_split", 
                      :training_dataset_uri => params[:training_dataset_uri], 
                      :test_dataset_uri => params[:test_dataset_uri],
                      :test_target_dataset_uri => params[:dataset_uri],
                      :prediction_feature => params[:prediction_feature],
-                     :algorithm_uri => params[:algorithm_uri]
+                     :algorithm_uri => params[:algorithm_uri],
+                     :algorithm_params => params[:algorithm_params]
     v.subjectid = @subjectid
-    v.validate_algorithm( params[:algorithm_params], OpenTox::SubTask.create(task,33,100))
+    v.validate_algorithm( OpenTox::SubTask.create(task,33,100))
     v.validation_uri
   end
   return_task(task)
@@ -545,10 +562,10 @@ end
 post '/plain_training_test_split' do
   LOGGER.info "creating pure training test split "+params.inspect
   raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri]
+  check_stratified(params)
   task = OpenTox::Task.create( "Create data-split", url_for("/plain_training_test_split", :full) ) do |task|
-    strat = (params[:stratified].size>0 && params[:stratified]!="false" && params[:stratified]!="0") if params[:stratified]
     result = Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], @subjectid,
-       strat, params[:split_ratio], params[:random_seed])
+      params[:stratified], params[:split_ratio], params[:random_seed], task)
     content_type "text/uri-list"
     result[:training_dataset_uri]+"\n"+result[:test_dataset_uri]+"\n"
   end

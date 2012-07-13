@@ -274,6 +274,22 @@ module ValidationExamples
     end
   end
   
+  ########################################################################################################  
+
+  class HamsterLooCrossvalidation < LooCrossValidation
+    def initialize
+      @dataset_file = File.new("data/hamster_carcinogenicity.csv","r")
+    end
+  end
+  
+  class LazarHamsterLooCrossvalidation < HamsterLooCrossvalidation
+      def initialize
+        @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
+        @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+        super
+      end
+    end
+    
   ########################################################################################################
   
   class LazarHamsterMiniCrossvalidation < CrossValidation
@@ -828,6 +844,8 @@ module ValidationExamples
       "22e" =>  [ AmbitVsNtuaTrainingTest ],
       "22f" =>  [ AnotherAmbitJ48TrainingTest ],
       "22g" =>  [ TumTrainingTest ],
+        
+      "23a" => [ LazarHamsterLooCrossvalidation ],
       
     }
   
