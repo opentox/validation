@@ -9,8 +9,8 @@ require 'validation/validation_service.rb'
 helpers do
   def check_stratified(params)
     params[:stratified] = "false" unless params[:stratified]
-    raise OpenTox::BadRequestError.new "stratified != true|false|super|super4|anti, is #{params[:stratified]}" unless
-      params[:stratified]=~/^(true|false|super|super4|anti)$/
+    raise OpenTox::BadRequestError.new "stratified != true|false|super|super4|super5|anti, is #{params[:stratified]}" unless
+      params[:stratified]=~/^(true|false|super|super4|super5|anti)$/
   end
 end
 
@@ -586,7 +586,8 @@ post '/plain_training_test_split' do
     split_features = nil
     split_features = params[:split_features].split(";") if params[:split_features]
     result = Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], @subjectid,
-      params[:stratified], params[:split_ratio], params[:random_seed], params[:missing_values], task, split_features)
+      params[:stratified], params[:split_ratio], params[:random_seed], params[:missing_values], task, split_features, 
+        params[:store_split_clusters])
     content_type "text/uri-list"
     res = result[:training_dataset_uri]+"\n"+result[:test_dataset_uri]+"\n"
     LOGGER.info "plain training test split done #{res.to_s.gsub("\n"," \\n ")}"      
