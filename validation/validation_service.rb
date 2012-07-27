@@ -273,6 +273,8 @@ module Validation
       #self.prediction_data = nil
       #self.save
       
+      Lib::DatasetCache.disable
+      
       raise OpenTox::BadRequestError.new "only supported for classification" if prediction!=nil and classification_statistics==nil
       raise OpenTox::BadRequestError.new "illegal confidence value #{min_confidence}" unless 
         min_confidence==nil or (min_confidence.is_a?(Numeric) and min_confidence>=0 and min_confidence<=1)
