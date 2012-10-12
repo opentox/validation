@@ -502,7 +502,7 @@ module Validation
             meta, self.subjectid ).uri
           test_dataset_uris << test_dataset_uri
         end
-      when /^(true|super|super4|super5)$/
+      when /^(true|super|super4|super6)$/
         raise "DO NOT USED SUPER-STRATIFICATION FOR VAL-EXPERIMENTS AND CV, IF SO SOLVE _MISSING_VAULE_NA_ PROBLEM" if stratified=~/super/
         if stratified=="true"
           features = [ self.prediction_feature ] 
@@ -653,7 +653,7 @@ module Validation
       meta = { DC.creator => $url_provider.url_for('/training_test_split',:full) }
       
       case stratified
-      when /^(true|super|super4|super5|contra)$/
+      when /^(true|super|super4|super6|contra)$/
         raise "store split clusters not available for true stratified splits" if store_split_clusters and stratified=="true"
         if stratified=="true"
           raise OpenTox::BadRequestError.new "prediction feature required for stratified splits" unless prediction_feature
