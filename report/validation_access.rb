@@ -158,6 +158,9 @@ class Reports::ValidationDB
     if features_found
       LOGGER.debug "all training-features found in test-datset"
       uri = test_dataset.uri
+    elsif validation.model_uri=~/superservice/
+      uri = OpenTox::RestClientWrapper.post(validation.model_uri+"/test_dataset_features",
+        {:dataset_uri=>validation.test_dataset_uri}).to_s
     else
       m = OpenTox::Model::Generic.find(validation.model_uri, subjectid)
       feat_gen = nil

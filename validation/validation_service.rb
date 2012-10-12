@@ -653,15 +653,21 @@ module Validation
       meta = { DC.creator => $url_provider.url_for('/training_test_split',:full) }
       
       case stratified
-      when /^(true|super|super4|super5|anti)$/
+      when /^(true|super|super4|super5|contra)$/
         raise "store split clusters not available for true stratified splits" if store_split_clusters and stratified=="true"
         if stratified=="true"
           raise OpenTox::BadRequestError.new "prediction feature required for stratified splits" unless prediction_feature
           LOGGER.warn "split features are ignored for stratified splits (use super instead)" if features
           features = [prediction_feature]
+        elsif stratified=="contra"
+          raise OpenTox::BadRequestError.new "prediction feature required for anti-stratified splits" unless prediction_feature
+          LOGGER.debug "prediction feature is removed for anti-stratified splits"
+          features = orig_dataset.features.keys-[prediction_feature] 
+          raise unless features.size==orig_dataset.features.size-1
         else
           LOGGER.warn "prediction feature is ignored for super- or anti-stratified splits" if prediction_feature
         end
+        LOGGER.debug "Using "+features.size.to_s+"/"+orig_dataset.features.size.to_s+" features for splitting" if features
         r_util = OpenTox::RUtil.new 
         train, test = r_util.stratified_split( orig_dataset, meta, missing_values, split_ratio, 
           @subjectid, random_seed, features, stratified, store_split_clusters )
@@ -705,7 +711,7 @@ module Validation
         end
         LOGGER.debug "split done, training dataset: '"+result[:training_dataset_uri].to_s+"', test dataset: '"+result[:test_dataset_uri].to_s+"'"
       else
-        raise OpenTox::BadRequestError.new "stratified != false|true|super, is #{stratified}"
+        raise OpenTox::BadRequestError.new "stratified != false|true|super|contra, is #{stratified}"
       end
       result
     end

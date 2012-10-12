@@ -9,8 +9,8 @@ require 'validation/validation_service.rb'
 helpers do
   def check_stratified(params)
     params[:stratified] = "false" unless params[:stratified]
-    raise OpenTox::BadRequestError.new "stratified != true|false|super|super4|super5|anti, is #{params[:stratified]}" unless
-      params[:stratified]=~/^(true|false|super|super4|super5|anti)$/
+    raise OpenTox::BadRequestError.new "stratified != true|false|super|super4|super5|contra, is #{params[:stratified]}" unless
+      params[:stratified]=~/^(true|false|super|super4|super5|contra)$/
   end
 end
 
@@ -744,6 +744,47 @@ end
 #  content_type "text/plain"
 #  return validation.send(params[:attribute])
 #end
+
+
+def get_splits(id)
+  require "#{ENV['HOME']}/workspace/ValidationExperiments/dataset_split.rb"
+  validation = Validation::Validation[id]
+  raise OpenTox::NotFoundError.new "Validation '#{id}' not found." unless validation
+  Exp::DatasetSplit.find({:train_dataset_uri => validation.training_dataset_uri,:test_dataset_uri => validation.test_dataset_uri,})
+end
+
+def get_split(id,id2)
+  get_splits(id).each do |s|
+    return s if id2.to_s==s.id.to_s
+  end
+  raise "not found: dataset split with id #{id2}" unless split 
+end
+
+get '/:id/split' do
+  splits = get_splits(params[:id])
+  base_uri = "http://local-ot/validation/#{params[:id]}/split/"
+  uris = splits.collect{|s| base_uri+s.id}
+  if request.env['HTTP_ACCEPT'] =~ /text\/html/
+    content_type "text/html"
+    OpenTox.text_to_html uris.join("\n")
+  else
+    content_type "text/uri-list"
+    uris.join("\n")
+  end
+end
+
+get '/:id/split/:id2' do
+  split = get_split(params[:id],params[:id2])
+  content_type "text/html"
+  split.inspect
+  OpenTox.text_to_html ["http://local-ot/validation/#{params[:id]}/split/#{params[:id2]}/viz",split].to_yaml
+end
+
+get '/:id/split/:id2/viz' do
+  split = get_split(params[:id],params[:id2])
+  content_type("image/svg+xml")
+  result = body(File.new(split.svg_path))
+end
 
 get '/:id/migrate_median_confidence' do
   LOGGER.debug "migrate median confidence"

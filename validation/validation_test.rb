@@ -60,6 +60,10 @@ class ValidationTest < Test::Unit::TestCase
     begin
       $test_case = self
       
+      get '2568/split'
+      puts last_response.body
+      exit
+      
 #      dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/603206?pagesize=250&page=0"
 #      test_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/603206?pagesize=250&page=1"
 #      #prediction_feature = "http://apps.ideaconsult.net:8080/ambit2/feature/528321"
@@ -85,16 +89,16 @@ class ValidationTest < Test::Unit::TestCase
 #        {:validation_uris=>"http://local-ot/validation/389,http://local-ot/validation/390,http://local-ot/validation/391,http://local-ot/validation/392",
 #         :identifier=>"split1,split1,split2,split2"}
       
-      post "/training_test_validation",{:prediction_feature=>"http://local-ot/dataset/9264/feature/endpoint", 
-        :training_dataset_uri=>"http://local-ot/dataset/119127", 
-        :algorithm_uri=>"http://local-ot/weka/RandomForest", 
-        :test_dataset_uri=>"http://local-ot/dataset/119128",
-        :test_target_dataset_uri=>"http://local-ot/dataset/9264",  
-        :algorithm_params=>""}
-      uri = last_response.body
-      rep = wait_for_task(uri)
-      puts rep
-      exit
+#      post "/training_test_validation",{:prediction_feature=>"http://local-ot/dataset/9264/feature/endpoint", 
+#        :training_dataset_uri=>"http://local-ot/dataset/119127", 
+#        :algorithm_uri=>"http://local-ot/weka/RandomForest", 
+#        :test_dataset_uri=>"http://local-ot/dataset/119128",
+#        :test_target_dataset_uri=>"http://local-ot/dataset/9264",  
+#        :algorithm_params=>""}
+#      uri = last_response.body
+#      rep = wait_for_task(uri)
+#      puts rep
+#      exit
 #        
 #        #post "/report/validation",{:validation_uris=>"http://local-ot/validation/22849",:min_confidence=>0.5}
 #      get "/22849",{:min_confidence=>0.5}
@@ -108,10 +112,12 @@ class ValidationTest < Test::Unit::TestCase
 #      #dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/603306?feature_uris[]=http://apps.ideaconsult.net:8080/ambit2/feature/764036"
 #      #dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/603204"
       
-      #dataset_uri = "http://local-ot/dataset/9264"
-      #post "/plain_training_test_split",{:dataset_uri=>dataset_uri, :stratified=>"super", :split_ratio=>0.25}
+      dataset_uri = "http://local-ot/dataset/12084"
+      prediction_feature = "http://local-ot/dataset/12084/feature/bbrc/1"
+      post "/plain_training_test_split",{:dataset_uri=>dataset_uri, :stratified=>"contra", :split_ratio=>0.25, :missing_values=>"0",
+        :prediction_feature => prediction_feature}
       
-      get '31355/median_confidence'
+      #get '31355/median_confidence'
       puts last_response.body
       exit
       

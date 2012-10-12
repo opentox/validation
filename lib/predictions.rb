@@ -1,4 +1,6 @@
 
+require "rubygems"
+
 require "lib/prediction_data.rb"
 require "statsample"
 
@@ -813,66 +815,87 @@ module Lib
       require "rubygems"
       require "opentox-ruby"
       
-      max_deviation = rand * 0.9
-      avg_deviation = max_deviation * 0.5
+      max_deviation = rand * 0.5
       
-      p = []
-      a = []
-      c = []
-      (100 + rand(1000)).times do |i|
-        r = rand
-        deviation = rand * max_deviation
-        a << r
-        p << r + ((rand<0.5 ? -1 : 1) * deviation)
-        #c << 0.5
-        if (deviation > avg_deviation)
-          c << 0.4
-        else
-          c << 0.6
+      weired_index = 0
+      
+      10.times do  
+      
+        p = []
+        a = []
+        500.times do |i|
+          r = rand
+          deviation = rand * max_deviation
+          a << r
+          p << r + ((rand<0.5 ? -1 : 1) * deviation)
         end
-        #puts a[-1].to_s+" "+p[-1].to_s
-      end
-      puts "num values "+p.size.to_s
-      
-      #a = [1.0,2.0, 3.0,4.0, 5.0]
-      #p = [1.5,2.25,3.0,3.75,4.5]
-      
-      #a = [1.0,2.0,3.0,4.0,5.0]
-      #p = [1.5,2.5,3.5,4.5,5.5]
+        puts "num values "+p.size.to_s
+        c = Array.new(p.size,nil)
+        data = { :predicted_values => p, :actual_values => a, :confidence_values => c,
+          :feature_type => "regression", :accept_values => nil }
+        pred = Predictions.new(data)
+        puts "ccc                 "+"%.3f" % pred.concordance_correlation_coefficient.to_s
+        puts "rmse                "+"%.3f" % pred.root_mean_squared_error.to_s
+        ccc_1 = pred.concordance_correlation_coefficient
+        rmse_1 = pred.root_mean_squared_error
 
-      #p = a.collect{|v| v-0.5} 
-      #p = a.collect{|v| v+0.5}
+        p = []
+        a = []
+        2500.times do |i|
+          r = rand
+          deviation = rand * max_deviation
+          a << r
+          p << r + ((rand<0.5 ? -1 : 1) * deviation)
+        end
+        puts "num values "+p.size.to_s
+        c = Array.new(p.size,nil)
+        data = { :predicted_values => p, :actual_values => a, :confidence_values => c,
+          :feature_type => "regression", :accept_values => nil }
+        pred = Predictions.new(data)
+        puts "ccc                 "+"%.3f" % pred.concordance_correlation_coefficient.to_s
+        puts "rmse                "+"%.3f" % pred.root_mean_squared_error.to_s
+        ccc_2 = pred.concordance_correlation_coefficient
+        rmse_2 = pred.root_mean_squared_error
+        
+        ccc_d = ccc_1 - ccc_2
+        rmse_d = rmse_1 - rmse_2
+        
+        dev = 0.0005
+        
+        puts "ccc-d                "+"%.3f" % ccc_d
+        puts "rmse-d               "+"%.3f" % rmse_d
+        
+        if ccc_d.abs>dev or rmse_d.abs>dev
+          
+           if ((ccc_d>0 and rmse_d<0) or (ccc_d<0 and rmse_d>0)) #ccc_d.abs>dev and rmse_d.abs>dev and  
+             puts "weired"
+             weired_index += 1
+           else
+             puts "not weired"
+             weired_index -= 1
+           end
+           puts weired_index
+        else
+          #puts "only small"
+        end 
+        
+      end
       
-      #p = [2.0,2.5,3.0,3.5,4.0]
-      
-      c = Array.new(p.size,nil)
-      
-      data = { :predicted_values => p, :actual_values => a, :confidence_values => c,
-        :feature_type => "regression", :accept_values => nil }
-            
-      pred = Predictions.new(data)
-      puts "internal"
-      #puts "r-square old        "+pred.r_square_old.to_s
-      puts "cor                 "+pred.sample_correlation_coefficient.to_s
-      #puts "weighted cor        "+pred.weighted_sample_correlation_coefficient.to_s
-      puts "r-square            "+pred.r_square.to_s
-      puts "ccc                 "+pred.concordance_correlation_coefficient.to_s
-      
-      puts "R"
-      rutil = OpenTox::RUtil.new
-      
-      rutil.r.assign "v1",a
-      rutil.r.assign "v2",p
-      puts "r cor               "+rutil.r.pull("cor(v1,v2)").to_s
-      rutil.r.eval "fit <- lm(v1 ~ v2)"
-      rutil.r.eval "sum <- summary(fit)"
-      puts "r r-square          "+rutil.r.pull("sum$r.squared").to_s
-      puts "r adjusted-r-square "+rutil.r.pull("sum$adj.r.squared").to_s
-      rutil.r.eval "save.image(\"/tmp/image.R\")"
-      #rutil.r.eval "require(epiR)"
-      #rutil.r.eval "tmp.ccc <- epi.ccc(v1,v2)"
-      #puts "r ccc               "+rutil.r.pull("tmp.ccc$rho.c$est").to_s
-      rutil.quit_r
+#      puts "R"
+#      rutil = OpenTox::RUtil.new
+#      
+#      rutil.r.assign "v1",a
+#      rutil.r.assign "v2",p
+#      puts "r cor               "+rutil.r.pull("cor(v1,v2)").to_s
+#      rutil.r.eval "fit <- lm(v1 ~ v2)"
+#      rutil.r.eval "sum <- summary(fit)"
+#      puts "r r-square          "+rutil.r.pull("sum$r.squared").to_s
+#      puts "r adjusted-r-square "+rutil.r.pull("sum$adj.r.squared").to_s
+#      rutil.r.eval "save.image(\"/tmp/image.R\")"
+#      #rutil.r.eval "require(epiR)"
+#      #rutil.r.eval "tmp.ccc <- epi.ccc(v1,v2)"
+#      #puts "r ccc               "+rutil.r.pull("tmp.ccc$rho.c$est").to_s
+#      rutil.quit_r
     end
 
     def prediction_feature_value_map(proc)

@@ -25,7 +25,7 @@ module Reports
     def initialize(home_uri)
       raise "supposed to be a singleton" if defined?@@instance
       raise "plz specify home_uri" unless home_uri
-      LOGGER.info "init report service"
+      #LOGGER.info "init report service"
       @home_uri = home_uri
       @@instance = self
     end
