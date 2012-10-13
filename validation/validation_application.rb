@@ -9,8 +9,8 @@ require 'validation/validation_service.rb'
 helpers do
   def check_stratified(params)
     params[:stratified] = "false" unless params[:stratified]
-    raise OpenTox::BadRequestError.new "stratified != true|false|super|super4|super6|contra, is #{params[:stratified]}" unless
-      params[:stratified]=~/^(true|false|super|super4|super6|contra)$/
+    raise OpenTox::BadRequestError.new "stratified != true|false|super|super4|super5|super_bin|contra, is #{params[:stratified]}" unless
+      params[:stratified]=~/^(true|false|super|super4|super5|super_bin|contra)$/
   end
 end
 
