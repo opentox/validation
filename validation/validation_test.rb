@@ -114,7 +114,7 @@ class ValidationTest < Test::Unit::TestCase
       
       dataset_uri = "http://local-ot/dataset/12084"
       prediction_feature = "http://local-ot/dataset/12084/feature/bbrc/1"
-      post "/plain_training_test_split",{:dataset_uri=>dataset_uri, :stratified=>"contra", :split_ratio=>0.25, :missing_values=>"0",
+      post "/plain_training_test_split",{:dataset_uri=>dataset_uri, :stratified=>"contra_bin", :split_ratio=>0.25, :missing_values=>"0",
         :prediction_feature => prediction_feature}
       
       #get '31355/median_confidence'
