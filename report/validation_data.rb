@@ -111,6 +111,14 @@ module Reports
       @training_feature_dataset
     end
     
+    def bbrc_training_features
+      if @bbrc_training_features==nil
+        @bbrc_training_features = Reports.validation_access.bbrc_training_features( self, @subjectid )
+      end
+      @bbrc_training_features
+    end
+    
+    
     #hack this does create the features for the test dataset
     def test_feature_dataset_uri
       unless @test_feature_dataset

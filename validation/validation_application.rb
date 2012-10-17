@@ -14,6 +14,16 @@ helpers do
   end
 end
 
+get '/redis_ready' do
+  content_type "text/html"
+  begin
+    Validation::Validation.all.size
+    "true" 
+  rescue
+    "false"
+  end
+end
+
 get '/crossvalidation/?' do
   LOGGER.debug "list all crossvalidations "+params.inspect
   model_uri = params.delete("model") || params.delete("model_uri")
@@ -844,3 +854,5 @@ delete '/:id' do
   content_type "text/plain"
   validation.delete_validation
 end
+
+

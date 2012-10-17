@@ -123,8 +123,9 @@ module Reports
         Reports::r_util.double_hist_plot(out_files, train, test, numerical, numerical, "Training Data", "Test Data",
           "Prediction Feature Distribution", validation_set.validations.first.prediction_feature )
       else
+        binary = validation_set.validations[0].bbrc_training_features
         Reports::r_util.feature_value_plot(out_files, validation_set.validations[0].training_feature_dataset_uri,
-          validation_set.validations[0].test_feature_dataset_uri, "Training Data", "Test Data",
+          validation_set.validations[0].test_feature_dataset_uri, "Training Data", "Test Data", (binary ? "binary" : "numerical"),
           validation_set.validations[0].prediction_feature, validation_set.validations[0].subjectid, waiting_task )
       end
     end

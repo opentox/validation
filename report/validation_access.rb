@@ -239,6 +239,14 @@ class Reports::ValidationDB
     #get_model(validation).classification?
   end
   
+  def bbrc_training_features( validation, subjectid=nil )
+    training_features = Lib::DatasetCache.find( training_feature_dataset_uri(validation,subjectid), subjectid )
+    training_features.features.keys.each do |f|
+      return true if f =~ /bbrc/
+    end
+    false
+  end
+  
   def predicted_variable(validation, subjectid=nil)
     raise "cannot derive model depended props for merged validations" if Lib::MergeObjects.merged?(validation)
     raise "multiple models in this validation, cannot get one predicted variable (#{validation.model_uri})" if validation.model_uri.include?(";")
