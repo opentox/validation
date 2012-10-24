@@ -417,8 +417,7 @@ module Validation
         :num_folds => self.num_folds, 
         :stratified => self.stratified, 
         :random_seed => self.random_seed,
-        :loo => self.loo,
-        :finished => true} ).reject{ |cv| (cv.id == self.id || 
+        :loo => self.loo } ).reject{ |cv| (cv.id == self.id || 
                                           (cv.prediction_feature && 
                                            cv.prediction_feature != self.prediction_feature)) }
       cvs.each do |cv|
