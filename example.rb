@@ -96,7 +96,6 @@ class Example
       v = Validation::Validation.new :training_dataset_uri => split_params[:training_dataset_uri], 
                      :validation_type => "test_set_validation",
                      :test_dataset_uri => split_params[:test_dataset_uri],
-                     :test_target_dataset_uri => data_uri,
                      :prediction_feature => URI.decode(@@feature),
                      :algorithm_uri => @@alg
       v.validate_algorithm( @@alg_params, OpenTox::SubTask.new(task, 20, 40) ) 

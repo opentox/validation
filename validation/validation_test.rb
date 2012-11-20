@@ -59,6 +59,22 @@ class ValidationTest < Test::Unit::TestCase
   def test_it
     begin
       $test_case = self
+
+      post '/validate_datasets',{:test_dataset_uri=>"http://local-ot/dataset/14111",
+          :prediction_dataset_uri=>"http://local-ot/dataset/14113",
+          :prediction_feature=>"http://local-ot/dataset/14109/feature/Hamster%20Carcinogenicity",
+          :predicted_variable=>"http://local-ot/model/21/predicted/value",
+          :predicted_confidence=>"http://local-ot/model/21/predicted/confidence",
+          :classification=>"true"}
+            
+#D, [2012-11-07T12:38:11.291069 #31035] DEBUG -- : validation         :: loading prediction -- test-dataset:       ["http://local-ot/dataset/14099"]           :: /validation_service.rb:227:in `compute_prediction_data'
+#      D, [2012-11-07T12:38:11.291174 #31035] DEBUG -- : validation         :: loading prediction -- test-target-datset: ["http://local-ot/dataset/14097"]           :: /validation_service.rb:227:in `compute_prediction_data'
+#      D, [2012-11-07T12:38:11.291281 #31035] DEBUG -- : validation         :: loading prediction -- prediction-dataset: ["http://local-ot/dataset/14101"]           :: /validation_service.rb:227:in `compute_prediction_data'
+#      D, [2012-11-07T12:38:11.291398 #31035] DEBUG -- : validation         :: loading prediction -- predicted_variable: ["http://local-ot/model/19/predicted/value"]           :: /validation_service.rb:227:in `compute_prediction_data'
+#      D, [2012-11-07T12:38:11.291506 #31035] DEBUG -- : validation         :: loading prediction -- predicted_confidence: ["http://local-ot/model/19/predicted/confidence"]           :: /validation_service.rb:227:in `compute_prediction_data'
+#      D, [2012-11-07T12:38:11.291611 #31035] DEBUG -- : validation         :: loading prediction -- prediction_feature: http://local-ot/dataset/14097/feature/Hamster%20Carcinogenicity           :: /validation_service.rb:227:in `compute_prediction_data'        
+        
+      exit
       
 #      dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/603206?pagesize=250&page=0"
 #      test_dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/603206?pagesize=250&page=1"
@@ -117,7 +133,6 @@ class ValidationTest < Test::Unit::TestCase
 #      post "/validate_datasets",{
 #        :test_dataset_uri=>"http://local-ot/dataset/6907",
 #        :prediction_dataset_uri=>"http://local-ot/dataset/6909",
-#        :test_target_dataset_uri=>"http://local-ot/dataset/6905",
 #        :prediction_feature=>"http://local-ot/dataset/6905/feature/Hamster%20Carcinogenicity",
 #        #:model_uri=>"http://local-ot/model/1078",
 #        :predicted_variable=>"http://local-ot/dataset/6909/feature/prediction/Hamster%20Carcinogenicity/value",
@@ -351,7 +366,6 @@ end
   #    post "/validate_datasets",{
   #      :test_dataset_uri=>"http://apps.deaconsult.net:8080/ambit2/dataset/R3924",
   #      :prediction_dataset_uri=>"http://apps.ideaconsult.net:8080/ambit2/dataset/R3924?feature_uris[]=http%3A%2F%2Fapps.ideaconsult.net%3A8080%2Fambit2%2Fmodel%2F52%2Fpredicted",
-  #      #:test_target_dataset_uri=>"http://local-ot/dataset/202",
   #      :prediction_feature=>"http://apps.ideaconsult.net:8080/ambit2/feature/21715",
   #      :predicted_feature=>"http://apps.ideaconsult.net:8080/ambit2/feature/28944",
   #      :regression=>"true"}
@@ -363,7 +377,6 @@ end
   
       #get "/crossvalidation/19/predictions",nil,'HTTP_ACCEPT' => "application/x-yaml" #/statistics"
   #    post "",:model_uri=>"http://local-ot/model/1",:test_dataset_uri=>"http://local-ot/dataset/3",
-  #      :test_target_dataset_uri=>"http://local-ot/dataset/1"
   
   #    get "/crossvalidation/2",nil,'HTTP_ACCEPT' => "application/rdf+xml" 
      #puts last_response.body
@@ -384,7 +397,6 @@ end
   #    post "/validate_datasets",{
   #      :test_dataset_uri=>"http://local-ot/dataset/204",
   #      :prediction_dataset_uri=>"http://local-ot/dataset/206",
-  #      :test_target_dataset_uri=>"http://local-ot/dataset/202",
   #      :prediction_feature=>"http://ot-dev.in-silico.ch/toxcreate/feature#IRIS%20unit%20risk",
   #      :predicted_feature=>"http://ot-dev.in-silico.ch/toxcreate/feature#IRIS%20unit%20risk_lazar_regression",
   #      :regression=>"true"}
@@ -394,7 +406,6 @@ end
 #      post "/validate_datasets",{
 #        :test_dataset_uri=>"http://apps.ideaconsult.net:8080/ambit2/dataset/9?max=10",
 #        :prediction_dataset_uri=>"http://apps.ideaconsult.net:8080/ambit2/dataset/9?max=10",
-#        #:test_target_dataset_uri=>"http://local-ot/dataset/202",
 #        :prediction_feature=>"http://apps.ideaconsult.net:8080/ambit2/feature/21573",
 #        :predicted_feature=>"http://apps.ideaconsult.net:8080/ambit2/feature/21573",
 #        #:regression=>"true"}
@@ -406,7 +417,6 @@ end
   #     post "/validate_datasets",{
   #      :test_dataset_uri=>"http://local-ot/dataset/89",
   #       :prediction_dataset_uri=>"http://local-ot/dataset/91",
-  #       :test_target_dataset_uri=>"http://local-ot/dataset/87",
   #       :prediction_feature=>"http://local-ot/dataset/1/feature/hamster_carcinogenicity",
   #       :predicted_feature=>"",
   ##      :regression=>"true"}
@@ -419,7 +429,6 @@ end
 #     post "/validate_datasets",{
 #         :test_dataset_uri=>"http://local-ot/dataset/390",
 #         :prediction_dataset_uri=>"http://local-ot/dataset/392",
-#         :test_target_dataset_uri=>"http://local-ot/dataset/388",
 #         :prediction_feature=>"http://local-ot/dataset/388/feature/repdose_classification",
 #         :model_uri=>"http://local-ot/model/31"}
 #        #:regression=>"true"}
@@ -432,7 +441,6 @@ end
 #     post "/validate_datasets",{
 #         :test_dataset_uri=>"http://opentox.informatik.uni-freiburg.de/dataset/409",
 #         :prediction_dataset_uri=>"http://opentox.informatik.uni-freiburg.de/dataset/410",
-#         :test_target_dataset_uri=>"https://ambit.uni-plovdiv.bg:8443/ambit2/dataset/R401560",
 #         :prediction_feature=>"https://ambit.uni-plovdiv.bg:8443/ambit2/feature/22190",
 #         :predicted_feature=>"https://ambit.uni-plovdiv.bg:8443/ambit2/feature/218304",
 #         :regression=>"true",
@@ -453,7 +461,6 @@ end
 #     post "/validate_datasets",{
 #         :test_dataset_uri=>"http://local-ot/dataset/94",
 #         :prediction_dataset_uri=>'http://local-ot/dataset/96',
-#         :test_target_dataset_uri=>'http://local-ot/dataset/92',
 #         :prediction_feature=>'http://local-ot/dataset/92/feature/Hamster%20Carcinogenicity',
 #         :predicted_feature=>"",
 #         :classification=>"true",

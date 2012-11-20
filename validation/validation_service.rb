@@ -64,20 +64,20 @@ module Validation
     # PENDING: model and referenced datasets are deleted as well, keep it that way?
     def delete_validation( delete_all=true )
       if (delete_all)
-        to_delete = [:model_uri, :training_dataset_uri, :test_dataset_uri, :test_target_dataset_uri, :prediction_dataset_uri ]
+        to_delete = [:model_uri, :training_dataset_uri, :test_dataset_uri, :prediction_dataset_uri ]
         case self.validation_type
         when "test_set_validation"
-          to_delete -= [ :model_uri, :training_dataset_uri, :test_dataset_uri, :test_target_dataset_uri ]
+          to_delete -= [ :model_uri, :training_dataset_uri, :test_dataset_uri ]
         when "bootstrapping"
-          to_delete -= [ :test_target_dataset_uri ]
+          to_delete -= []
         when "training_test_validation"
-          to_delete -=  [ :training_dataset_uri, :test_dataset_uri, :test_target_dataset_uri ]
+          to_delete -=  [ :training_dataset_uri, :test_dataset_uri ]
         when "training_test_split"
-          to_delete -= [ :test_target_dataset_uri ]
+          to_delete -= []
         when "validate_datasets"
           to_delete = []
         when "crossvalidation"
-          to_delete -= [ :test_target_dataset_uri ]
+          to_delete -= []
         when "crossvalidation_statistics"
           to_delete = []
         else
@@ -189,12 +189,11 @@ module Validation
       models = cv_vals.collect{|v| OpenTox::Model::Generic.find(v.model_uri, subjectid)}
       feature_type = models.first.feature_type(subjectid)
       test_dataset_uris = cv_vals.collect{|v| v.test_dataset_uri}
-      test_target_dataset_uris = cv_vals.collect{|v| v.test_target_dataset_uri}
       prediction_feature = cv_vals.first.prediction_feature
       prediction_dataset_uris = cv_vals.collect{|v| v.prediction_dataset_uri}
       predicted_variables = models.collect{|m| m.predicted_variable(subjectid)}
       predicted_confidences = models.collect{|m| m.predicted_confidence(subjectid)}
-      p_data = Lib::PredictionData.create( feature_type, test_dataset_uris, test_target_dataset_uris, prediction_feature, 
+      p_data = Lib::PredictionData.create( feature_type, test_dataset_uris, prediction_feature, 
         prediction_dataset_uris, predicted_variables, predicted_confidences, subjectid, waiting_task )
       self.prediction_data = p_data.data
       p_data.data
@@ -225,7 +224,7 @@ module Validation
     
       LOGGER.debug "computing prediction stats"
       p_data = Lib::PredictionData.create( feature_type, 
-        self.test_dataset_uri, self.test_target_dataset_uri, self.prediction_feature, 
+        self.test_dataset_uri, self.prediction_feature, 
         self.prediction_dataset_uri, predicted_variable, predicted_confidence, self.subjectid,
         OpenTox::SubTask.create(task, 0, 80) )
       self.prediction_data = p_data.data
@@ -418,7 +417,6 @@ module Validation
           tmp_val << { :validation_type => "crossvalidation",
                        :training_dataset_uri => v.training_dataset_uri, 
                        :test_dataset_uri => v.test_dataset_uri,
-                       :test_target_dataset_uri => self.dataset_uri,
                        :crossvalidation_id => self.id,
                        :crossvalidation_fold => v.crossvalidation_fold,
                        :prediction_feature => prediction_feature,
@@ -448,39 +446,38 @@ module Validation
       case stratified
       when "false"
         if self.loo=="true"
-          shuffled_compounds = orig_dataset.compounds
+          shuffled_compound_indices = (0..(orig_dataset.compounds.size-1)).to_a
         else
-          shuffled_compounds = orig_dataset.compounds.shuffle( self.random_seed )
+          shuffled_compound_indices = (0..(orig_dataset.compounds.size-1)).to_a.shuffle( self.random_seed )
         end  
-        split_compounds = shuffled_compounds.chunk( self.num_folds.to_i )
-        LOGGER.debug "cv: num instances for each fold: "+split_compounds.collect{|c| c.size}.join(", ")
+        split_compound_indices = shuffled_compound_indices.chunk( self.num_folds.to_i )
+        LOGGER.debug "cv: num instances for each fold: "+split_compound_indices.collect{|c| c.size}.join(", ")
           
         self.num_folds.to_i.times do |n|
-          test_compounds = []
-          train_compounds = []
+          test_compound_indices = []
+          train_compound_indices = []
           self.num_folds.to_i.times do |nn|
-            compounds = split_compounds[nn]
+            compound_indices = split_compound_indices[nn]
             if n == nn
-              compounds.each{ |compound| test_compounds << compound}
+              compound_indices.each{ |compound| test_compound_indices << compound}
             else
-              compounds.each{ |compound| train_compounds << compound}
+              compound_indices.each{ |compound| train_compound_indices << compound}
             end 
           end
           raise "internal error, num test compounds not correct,"+
-            " is '#{test_compounds.size}', should be '#{(shuffled_compounds.size/self.num_folds.to_i)}'" unless 
-            (shuffled_compounds.size/self.num_folds.to_i - test_compounds.size).abs <= 1 
-          raise "internal error, num train compounds not correct, should be '"+(shuffled_compounds.size-test_compounds.size).to_s+
-            "', is '"+train_compounds.size.to_s+"'" unless shuffled_compounds.size - test_compounds.size == train_compounds.size
+            " is '#{test_compound_indices.size}', should be '#{(shuffled_compound_indices.size/self.num_folds.to_i)}'" unless 
+            (shuffled_compound_indices.size/self.num_folds.to_i - test_compound_indices.size).abs <= 1 
+          raise "internal error, num train compounds not correct, should be '"+(shuffled_compound_indices.size-test_compound_indices.size).to_s+
+            "', is '"+train_compound_indices.size.to_s+"'" unless shuffled_compound_indices.size - test_compound_indices.size == train_compound_indices.size
           datasetname = 'dataset fold '+(n+1).to_s+' of '+self.num_folds.to_s        
           meta[DC.title] = "training "+datasetname 
-          LOGGER.debug "training set: "+datasetname+"_train, compounds: "+train_compounds.size.to_s
-          train_dataset_uri = orig_dataset.split( train_compounds, orig_dataset.features.keys, 
+          LOGGER.debug "training set: "+datasetname+"_train, compounds: "+train_compound_indices.size.to_s
+          train_dataset_uri = orig_dataset.split( train_compound_indices, orig_dataset.features.keys, 
             meta, self.subjectid ).uri
           train_dataset_uris << train_dataset_uri
           meta[DC.title] = "test "+datasetname
-          LOGGER.debug "test set:     "+datasetname+"_test, compounds: "+test_compounds.size.to_s
-          test_features = orig_dataset.features.keys.dclone - [self.prediction_feature]
-          test_dataset_uri = orig_dataset.split( test_compounds, test_features, 
+          LOGGER.debug "test set:     "+datasetname+"_test, compounds: "+test_compound_indices.size.to_s
+          test_dataset_uri = orig_dataset.split( test_compound_indices, orig_dataset.features.keys, 
             meta, self.subjectid ).uri
           test_dataset_uris << test_dataset_uri
         end
@@ -505,7 +502,6 @@ module Validation
         tmp_validation = { :validation_type => "crossvalidation",
                            :training_dataset_uri => train_dataset_uris[n], 
                            :test_dataset_uri => test_dataset_uris[n],
-                           :test_target_dataset_uri => self.dataset_uri,
                            :crossvalidation_id => self.id, :crossvalidation_fold => (n+1),
                            :prediction_feature => self.prediction_feature,
                            :algorithm_uri => self.algorithm_uri,
@@ -537,25 +533,20 @@ module Validation
         LOGGER.warn "no prediciton feature given, all features included in test dataset"
       end
       
-      compounds = orig_dataset.compounds
-      raise OpenTox::NotFoundError.new "Cannot split datset, num compounds in dataset < 2 ("+compounds.size.to_s+")" if compounds.size<2
-      
-      compounds.each do |c|
-        raise OpenTox::NotFoundError.new "Bootstrapping not yet implemented for duplicate compounds" if
-          orig_dataset.data_entries[c][prediction_feature].size > 1
-      end
+      compound_indices = (0..(orig_dataset.compounds.size-1)).to_a
+      raise OpenTox::NotFoundError.new "Cannot split datset, num compounds in dataset < 2 ("+compound_indices.size.to_s+")" if compound_indices.size<2
       
       srand random_seed.to_i
       while true
-        training_compounds = []
-        compounds.size.times do
-          training_compounds << compounds[rand(compounds.size)]
+        training_compound_indices = []
+        compound_indices.size.times do
+          training_compound_indices << compound_indices[rand(compound_indices.size)]
         end
-        test_compounds = []
-        compounds.each do |c|
-          test_compounds << c unless training_compounds.include?(c)
+        test_compound_indices = []
+        compound_indices.each do |idx|
+          test_compound_indices << idx unless training_compound_indices.include?(idx)
         end
-        if test_compounds.size > 0
+        if test_compound_indices.size > 0
           break
         else
           srand rand(10000)
@@ -563,47 +554,26 @@ module Validation
       end
       
       LOGGER.debug "bootstrapping on dataset "+orig_dataset_uri+
-                    " into training ("+training_compounds.size.to_s+") and test ("+test_compounds.size.to_s+")"+
-                    ", duplicates in training dataset: "+test_compounds.size.to_s
+                    " into training ("+training_compound_indices.size.to_s+") and test ("+test_compound_indices.size.to_s+")"+
+                    ", duplicates in training dataset: "+test_compound_indices.size.to_s
       task.progress(33) if task
       
       result = {}
-#      result[:training_dataset_uri] = orig_dataset.create_new_dataset( training_compounds,
-#        orig_dataset.features, 
-#        "Bootstrapping training dataset of "+orig_dataset.title.to_s, 
-#        $sinatra.url_for('/bootstrapping',:full) )
-      result[:training_dataset_uri] = orig_dataset.split( training_compounds,
+      result[:training_dataset_uri] = orig_dataset.split( training_compound_indices,
         orig_dataset.features.keys, 
         { DC.title => "Bootstrapping training dataset of "+orig_dataset.title.to_s,
           DC.creator => $url_provider.url_for('/bootstrapping',:full) },
         subjectid ).uri
       task.progress(66) if task
 
-#      result[:test_dataset_uri] = orig_dataset.create_new_dataset( test_compounds,
-#        orig_dataset.features.dclone - [prediction_feature], 
-#        "Bootstrapping test dataset of "+orig_dataset.title.to_s, 
-#        $sinatra.url_for('/bootstrapping',:full) )
-      result[:test_dataset_uri] = orig_dataset.split( test_compounds,
-        orig_dataset.features.keys.dclone - [prediction_feature],
+      result[:test_dataset_uri] = orig_dataset.split( test_compound_indices,
+        orig_dataset.features.keys,
         { DC.title => "Bootstrapping test dataset of "+orig_dataset.title.to_s,
           DC.creator => $url_provider.url_for('/bootstrapping',:full)} ,
         subjectid ).uri
       task.progress(100) if task
       
-      if ENV['RACK_ENV'] =~ /test|debug/
-        training_dataset = Lib::DatasetCache.find result[:training_dataset_uri],subjectid
-        raise OpenTox::NotFoundError.new "Training dataset not found: '"+result[:training_dataset_uri].to_s+"'" unless training_dataset
-        training_dataset.load_all
-        value_count = 0
-        training_dataset.compounds.each do |c|
-          value_count += training_dataset.data_entries[c][prediction_feature].size
-        end
-        raise  "training compounds error" unless value_count==training_compounds.size
-        raise OpenTox::NotFoundError.new "Test dataset not found: '"+result[:test_dataset_uri].to_s+"'" unless 
-          Lib::DatasetCache.find result[:test_dataset_uri], subjectid
-      end
       LOGGER.debug "bootstrapping done, training dataset: '"+result[:training_dataset_uri].to_s+"', test dataset: '"+result[:test_dataset_uri].to_s+"'"
-      
       return result
     end    
     
@@ -620,12 +590,17 @@ module Validation
       orig_dataset = Lib::DatasetCache.find orig_dataset_uri, subjectid
       orig_dataset.load_all subjectid
       raise OpenTox::NotFoundError.new "Dataset not found: "+orig_dataset_uri.to_s unless orig_dataset
+      
       if prediction_feature
-        raise OpenTox::NotFoundError.new "Prediction feature '"+prediction_feature.to_s+
-          "' not found in dataset, features are: \n"+
-          orig_dataset.features.keys.inspect unless orig_dataset.features.include?(prediction_feature)
-      else
-        LOGGER.warn "no prediciton feature given, all features will be included in test dataset"
+        if stratified==/true/
+          raise OpenTox::NotFoundError.new "Prediction feature '"+prediction_feature.to_s+
+            "' not found in dataset, features are: \n"+orig_dataset.features.keys.inspect unless orig_dataset.features.include?(prediction_feature)
+        else
+          LOGGER.warn "prediction_feature argument is ignored for non-stratified splits" if prediction_feature
+          prediction_feature=nil
+        end
+      elsif stratified==/true/
+        raise OpenTox::BadRequestError.new "prediction feature required for stratified splits" unless prediction_feature
       end
       
       meta = { DC.creator => $url_provider.url_for('/training_test_split',:full) }
@@ -633,10 +608,8 @@ module Validation
       case stratified
       when /true|super/
         if stratified=="true"
-          raise OpenTox::BadRequestError.new "prediction feature required for stratified splits" unless prediction_feature
           features = [prediction_feature]
         else
-          LOGGER.warn "prediction feature is ignored for super-stratified splits" if prediction_feature
           features = nil
         end
         r_util = OpenTox::RUtil.new 
@@ -644,39 +617,36 @@ module Validation
         r_util.quit_r
         result = {:training_dataset_uri => train.uri, :test_dataset_uri => test.uri}
       when "false"
-        compounds = orig_dataset.compounds
-        raise OpenTox::BadRequestError.new "Cannot split datset, num compounds in dataset < 2 ("+compounds.size.to_s+")" if compounds.size<2
-        split = (compounds.size*split_ratio).to_i
+        compound_indices = (0..(orig_dataset.compounds.size-1)).to_a
+        raise OpenTox::BadRequestError.new "Cannot split datset, num compounds in dataset < 2 ("+compound_indices.size.to_s+")" if compound_indices.size<2
+        split = (compound_indices.size*split_ratio).round
         split = [split,1].max
-        split = [split,compounds.size-2].min
+        split = [split,compound_indices.size-2].min
         LOGGER.debug "splitting dataset "+orig_dataset_uri+
-                    " into train:0-"+split.to_s+" and test:"+(split+1).to_s+"-"+(compounds.size-1).to_s+
+                    " into train:0-"+split.to_s+" and test:"+(split+1).to_s+"-"+(compound_indices.size-1).to_s+
                     " (shuffled with seed "+random_seed.to_s+")"
-        compounds.shuffle!( random_seed )
-        training_compounds = compounds[0..split]
-        test_compounds = compounds[(split+1)..-1]
+        compound_indices.shuffle!( random_seed )
+        training_compound_indices = compound_indices[0..(split-1)]
+        test_compound_indices = compound_indices[split..-1]
         task.progress(33) if task
   
         meta[DC.title] = "Training dataset split of "+orig_dataset.uri
         result = {}
-        result[:training_dataset_uri] = orig_dataset.split( training_compounds,
-          orig_dataset.features.keys, meta, subjectid ).uri
+        train_data = orig_dataset.split( training_compound_indices,
+          orig_dataset.features.keys, meta, subjectid )
+        raise "Train dataset num coumpounds != "+(orig_dataset.compounds.size*split_ratio).round.to_s+", instead: "+train_data.compounds.size.to_s unless 
+          train_data.compounds.size==(orig_dataset.compounds.size*split_ratio).round
+        result[:training_dataset_uri] = train_data.uri
         task.progress(66) if task
   
         meta[DC.title] = "Test dataset split of "+orig_dataset.uri
-        result[:test_dataset_uri] = orig_dataset.split( test_compounds,
-          orig_dataset.features.keys.dclone - [prediction_feature], meta, subjectid ).uri
+        test_data = orig_dataset.split( test_compound_indices,
+          orig_dataset.features.keys, meta, subjectid )
+        raise "Test dataset num coumpounds != "+(orig_dataset.compounds.size*(1-split_ratio)).round.to_s+", instead: "+test_data.compounds.size.to_s unless 
+          test_data.compounds.size==(orig_dataset.compounds.size*(1-split_ratio)).round
+        result[:test_dataset_uri] = test_data.uri
         task.progress(100) if task  
         
-        if ENV['RACK_ENV'] =~ /test|debug/
-          raise OpenTox::NotFoundError.new "Training dataset not found: '"+result[:training_dataset_uri].to_s+"'" unless 
-            Lib::DatasetCache.find(result[:training_dataset_uri],subjectid)
-          test_data = Lib::DatasetCache.find result[:test_dataset_uri],subjectid
-          raise OpenTox::NotFoundError.new "Test dataset not found: '"+result[:test_dataset_uri].to_s+"'" unless test_data 
-          test_data.load_compounds subjectid
-          raise "Test dataset num coumpounds != "+(compounds.size-split-1).to_s+", instead: "+
-            test_data.compounds.size.to_s+"\n"+test_data.to_yaml unless test_data.compounds.size==(compounds.size-1-split)
-        end
         LOGGER.debug "split done, training dataset: '"+result[:training_dataset_uri].to_s+"', test dataset: '"+result[:test_dataset_uri].to_s+"'"
       else
         raise OpenTox::BadRequestError.new "stratified != false|true|super, is #{stratified}"

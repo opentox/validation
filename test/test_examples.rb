@@ -203,11 +203,9 @@ module ValidationExamples
 
   class HamsterTrainingTest < TrainingTestValidation
     def initialize
-#      @test_target_dataset_file = File.new("data/hamster_carcinogenicity.yaml","r")
 #      @training_dataset_file = File.new("data/hamster_carcinogenicity.train.yaml","r")
 #      @test_dataset_file = File.new("data/hamster_carcinogenicity.test.yaml","r")
       
-      @test_target_dataset_file = File.new("data/hamster_carcinogenicity.csv","r")
       @training_dataset_file = File.new("data/hamster_carcinogenicity.train.csv","r")
       @test_dataset_file = File.new("data/hamster_carcinogenicity.test.csv","r")
       
@@ -667,11 +665,9 @@ module ValidationExamples
    
   class HamsterTrainingTest < TrainingTestValidation
     def initialize
-#      @test_target_dataset_file = File.new("data/hamster_carcinogenicity.yaml","r")
 #      @training_dataset_file = File.new("data/hamster_carcinogenicity.train.yaml","r")
 #      @test_dataset_file = File.new("data/hamster_carcinogenicity.test.yaml","r")
       
-      @test_target_dataset_file = File.new("data/hamster_carcinogenicity.csv","r")
       @training_dataset_file = File.new("data/hamster_carcinogenicity.train.csv","r")
       @test_dataset_file = File.new("data/hamster_carcinogenicity.test.csv","r")
       

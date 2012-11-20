@@ -106,14 +106,13 @@ module Reports
         train = []
         test = []
         validation_set.validations.each do |v|
-        [[v.test_dataset_uri, test, v.test_target_dataset_uri],
-         [v.training_dataset_uri, train, v.training_dataset_uri]].each do |uri,array,uri2|
+        [[v.test_dataset_uri, test],
+         [v.training_dataset_uri, train]].each do |uri,array|
             d = Lib::DatasetCache.find(uri, validation_set.validations[0].subjectid)
-            d2 = Lib::DatasetCache.find((uri2 ? uri2 : uri), validation_set.validations[0].subjectid)
             d.compounds.each do |c|
-              d2.data_entries[c][v.prediction_feature].each do |val|
+              d.data_entries[c][v.prediction_feature].each do |val|
                 array << val 
-              end if d2.data_entries[c] and d2.data_entries[c][v.prediction_feature]
+              end if d.data_entries[c] and d.data_entries[c][v.prediction_feature]
             end
           end
         end

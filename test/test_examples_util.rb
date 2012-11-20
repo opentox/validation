@@ -238,8 +238,6 @@ module ValidationExamples
                   :model_uri,
                   :test_dataset_uri,
                   :test_dataset_file,
-                  :test_target_dataset_uri,
-                  :test_target_dataset_file,
                   :training_dataset_uri,
                   :training_dataset_file,
                   :dataset_uri,
@@ -258,7 +256,6 @@ module ValidationExamples
                   
     def upload_files
       [[:test_dataset_uri, :test_dataset_file], 
-       [:test_target_dataset_uri, :test_target_dataset_file],
        [:training_dataset_uri, :training_dataset_file],
        [:dataset_uri, :dataset_file]].each do |a|
          uri = a[0]
@@ -438,7 +435,7 @@ module ValidationExamples
     end
     
     def opt_params
-      [ :prediction_feature, :test_target_dataset_uri ]
+      [ :prediction_feature ]
     end
     
     def validation_type
@@ -452,7 +449,7 @@ module ValidationExamples
     end
     
     def opt_params
-      [ :algorithm_params, :test_target_dataset_uri ]
+      [ :algorithm_params ]
     end
     
     def validation_type

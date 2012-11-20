@@ -1,6 +1,7 @@
 
 module Lib
   
+  
   class PredictionData
     
     CHECK_VALUES = ENV['RACK_ENV'] =~ /debug|test/
@@ -53,17 +54,14 @@ module Lib
       @compounds
     end
     
-    def self.create( feature_type, test_dataset_uris, test_target_dataset_uris, 
-      prediction_feature, prediction_dataset_uris, predicted_variables, predicted_confidences, 
-      subjectid=nil, task=nil )      
+    def self.create( feature_type, test_dataset_uris, prediction_feature, prediction_dataset_uris, 
+      predicted_variables, predicted_confidences, subjectid=nil, task=nil )      
       
       test_dataset_uris = [test_dataset_uris] unless test_dataset_uris.is_a?(Array)
-      test_target_dataset_uris = [test_target_dataset_uris] unless test_target_dataset_uris.is_a?(Array)
       prediction_dataset_uris = [prediction_dataset_uris] unless prediction_dataset_uris.is_a?(Array)
       predicted_variables = [predicted_variables] unless predicted_variables.is_a?(Array)
       predicted_confidences = [predicted_confidences] unless predicted_confidences.is_a?(Array)
       LOGGER.debug "loading prediction -- test-dataset:       "+test_dataset_uris.inspect
-      LOGGER.debug "loading prediction -- test-target-datset: "+test_target_dataset_uris.inspect
       LOGGER.debug "loading prediction -- prediction-dataset: "+prediction_dataset_uris.inspect
       LOGGER.debug "loading prediction -- predicted_variable: "+predicted_variables.inspect
       LOGGER.debug "loading prediction -- predicted_confidence: "+predicted_confidences.inspect
@@ -84,7 +82,6 @@ module Lib
       test_dataset_uris.size.times do |i|
         
         test_dataset_uri = test_dataset_uris[i]
-        test_target_dataset_uri = test_target_dataset_uris[i]
         prediction_dataset_uri = prediction_dataset_uris[i]
         predicted_variable = predicted_variables[i]
         predicted_confidence = predicted_confidences[i]
@@ -94,35 +91,18 @@ module Lib
         test_dataset = Lib::DatasetCache.find test_dataset_uri,subjectid
         raise "test dataset not found: '"+test_dataset_uri.to_s+"'" unless test_dataset
       
-        if test_target_dataset_uri == nil || test_target_dataset_uri.strip.size==0 || test_target_dataset_uri==test_dataset_uri
-          test_target_dataset_uri = test_dataset_uri
-          test_target_dataset = test_dataset
-          raise "prediction_feature not found in test_dataset, specify a test_target_dataset\n"+
-                "prediction_feature: '"+prediction_feature.to_s+"'\n"+
-                "test_dataset: '"+test_target_dataset_uri.to_s+"'\n"+
-                "available features are: "+test_target_dataset.features.inspect if test_target_dataset.features.keys.index(prediction_feature)==nil
-        else
-          test_target_dataset = Lib::DatasetCache.find test_target_dataset_uri,subjectid
-          raise "test target datset not found: '"+test_target_dataset_uri.to_s+"'" unless test_target_dataset
-          if CHECK_VALUES
-            test_dataset.compounds.each do |c|
-              raise "test compound not found on test class dataset "+c.to_s unless test_target_dataset.compounds.include?(c)
-            end
-          end
-          raise "prediction_feature not found in test_target_dataset\n"+
-                "prediction_feature: '"+prediction_feature.to_s+"'\n"+
-                "test_target_dataset: '"+test_target_dataset_uri.to_s+"'\n"+
-                "available features are: "+test_target_dataset.features.inspect if test_target_dataset.features.keys.index(prediction_feature)==nil
-        end
+        raise "prediction_feature not found in test_dataset\n"+
+              "prediction_feature: '"+prediction_feature.to_s+"'\n"+
+              "test_dataset: '"+test_dataset_uri.to_s+"'\n"+
+              "available features are: "+test_dataset.features.inspect if test_dataset.features.keys.index(prediction_feature)==nil
         
-        compounds = test_dataset.compounds
-        LOGGER.debug "test dataset size: "+compounds.size.to_s
-        raise "test dataset is empty "+test_dataset_uri.to_s unless compounds.size>0
+        LOGGER.debug "test dataset size: "+test_dataset.compounds.size.to_s
+        raise "test dataset is empty "+test_dataset_uri.to_s unless test_dataset.compounds.size>0
         
         if feature_type=="classification"
-          av = test_target_dataset.accept_values(prediction_feature)
+          av = test_dataset.accept_values(prediction_feature)
           raise "'"+OT.acceptValue.to_s+"' missing/invalid for feature '"+prediction_feature.to_s+"' in dataset '"+
-            test_target_dataset_uri.to_s+"', acceptValues are: '"+av.inspect+"'" if av==nil or av.length<2
+            test_dataset_uri.to_s+"', acceptValues are: '"+av.inspect+"'" if av==nil or av.length<2
           if accept_values==nil
             accept_values=av
           else
@@ -131,20 +111,15 @@ module Lib
         end
         
         actual_values = []
-        tmp_compounds = []  
-        compounds.each do |c|
+        test_dataset.compounds.size.times do |c_idx|
           case feature_type
           when "classification"
-            vals = classification_vals(test_target_dataset, c, prediction_feature, accept_values)
+            actual_values << classification_val(test_dataset, c_idx, prediction_feature, accept_values)
           when "regression"
-            vals = regression_vals(test_target_dataset, c, prediction_feature)
+            actual_values << numeric_val(test_dataset, c_idx, prediction_feature)
           end
-          vals.each do |v|
-            actual_values << v
-            tmp_compounds << c
-          end
+          #raise "WTF #{c_idx} #{test_dataset.compounds[c_idx]} #{actual_values[-1]} #{actual_values[-2]}" if c_idx>0 and test_dataset.compounds[c_idx]==test_dataset.compounds[c_idx-1] and actual_values[-1]!=actual_values[-2]
         end
-        compounds = tmp_compounds
         task.progress( task_status += task_step ) if task # loaded actual values
       
         prediction_dataset = Lib::DatasetCache.find prediction_dataset_uri,subjectid
@@ -160,41 +135,42 @@ module Lib
                 "prediction_dataset: '"+prediction_dataset_uri.to_s+"'\n"+
                 "available features are: "+prediction_dataset.features.inspect if predicted_confidence and prediction_dataset.features.keys.index(predicted_confidence)==nil and prediction_dataset.compounds.size>0
 
-        raise "more predicted than test compounds, #test: "+compounds.size.to_s+" < #prediction: "+
+        raise "more predicted than test compounds, #test: "+test_dataset.compounds.size.to_s+" < #prediction: "+
           prediction_dataset.compounds.size.to_s+", test-dataset: "+test_dataset_uri.to_s+", prediction-dataset: "+
-           prediction_dataset_uri if compounds.size < prediction_dataset.compounds.size
+           prediction_dataset_uri if test_dataset.compounds.size < prediction_dataset.compounds.size
         if CHECK_VALUES
           prediction_dataset.compounds.each do |c| 
             raise "predicted compound not found in test dataset:\n"+c+"\ntest-compounds:\n"+
-              compounds.collect{|c| c.to_s}.join("\n") if compounds.index(c)==nil
+              test_dataset.compounds.collect{|c| c.to_s}.join("\n") unless test_dataset.compounds.include?(c)
           end
         end
         
         predicted_values = []
         confidence_values = []
-        count = 0
-        compounds.each do |c|
-          if prediction_dataset.compounds.index(c)==nil
+        
+        test_dataset.compounds.size.times do |test_c_idx|
+          c = test_dataset.compounds[test_c_idx]
+          pred_c_idx = prediction_dataset.compound_index(test_dataset,test_c_idx)
+          if pred_c_idx==nil
+            raise "internal error: mapping failed" if prediction_dataset.compounds.include?(c)
             predicted_values << nil
             confidence_values << nil
           else
+            raise "internal error: mapping failed" unless c==prediction_dataset.compounds[pred_c_idx]  
             case feature_type
             when "classification"
-              vals = classification_vals(prediction_dataset, c, predicted_variable, accept_values)
+              predicted_values << classification_val(prediction_dataset, pred_c_idx, predicted_variable, accept_values)
             when "regression"
-              vals = regression_vals(prediction_dataset, c, predicted_variable)
+              predicted_values << numeric_val(prediction_dataset, pred_c_idx, predicted_variable)
             end
-            raise "not yet implemented: more than one prediction for one compound" if vals.size>1
-            predicted_values << vals[0]
             if predicted_confidence
-              confidence_values << confidence_val(prediction_dataset, c, predicted_confidence)
+              confidence_values << numeric_val(prediction_dataset, pred_c_idx, predicted_confidence)
             else
               confidence_values << nil
             end
           end
-          count += 1
         end
-        all_compounds += compounds
+        all_compounds += test_dataset.compounds
         all_predicted_values += predicted_values
         all_actual_values += actual_values
         all_confidence_values += confidence_values
@@ -237,61 +213,23 @@ module Lib
     end
     
     private
-    def self.regression_vals(dataset, compound, feature)
-      v_num = []
-      values(dataset, compound, feature).each do |v|
-        if v==nil or v.is_a?(Numeric)
-          v_num << v
-        else
-          begin
-            v_num << v.to_f
-          rescue
-            LOGGER.warn "no numeric value for regression: '"+v.to_s+"'"
-            v_num << nil
-          end
-        end
-      end
-      v_num
-    end
-    
-    def self.confidence_val(dataset, compound, confidence)
-      v = values(dataset, compound, confidence)
-      raise "not yet implemented: duplicate conf value" if v.size>1
+    def self.numeric_val(dataset, compound_index, feature)
+      v = dataset.data_entry_value(compound_index, feature)
       begin
-        v = v[0]
         v = v.to_f unless v==nil or v.is_a?(Numeric)
         v
       rescue
-        LOGGER.warn "no numeric value for confidence '"+v.to_s+"'"
+        LOGGER.warn "no numeric value for feature '#{feature}' : '#{v}'"
         nil
       end
     end
     
-    def self.classification_vals(dataset, compound, feature, accept_values)
-      v_indices = []
-      values(dataset, compound, feature).each do |v|
-        i = accept_values.index(v)
-        raise "illegal class_value of prediction (value is '"+v.to_s+"'), accept values are "+
-          accept_values.inspect unless v==nil or i!=nil
-        v_indices << i
-      end
-      v_indices
+    def self.classification_val(dataset, compound_index, feature, accept_values)
+      v = dataset.data_entry_value(compound_index, feature)
+      i = accept_values.index(v)
+      raise "illegal class_value of prediction (value is '"+v.to_s+"'), accept values are "+
+        accept_values.inspect unless v==nil or i!=nil
+      i
     end
-    
-    def self.values(dataset, compound, feature)
-      return [nil] if dataset.data_entries[compound]==nil
-      if feature==nil
-        v = dataset.data_entries[compound].values[0]
-      else
-        v = dataset.data_entries[compound][feature]
-      end
-      return [nil] if v==nil
-      # sanitiy checks
-      raise "no array "+v.class.to_s+" : '"+v.to_s+"'" unless v.is_a?(Array)
-      v.each{|vv| raise "array-elem is array" if vv.is_a?(Array)} 
-      # replace empty strings with nil
-      v_mod = v.collect{|vv| (vv.to_s().size==0 ? nil : vv)}
-      v_mod
-    end    
   end
 end

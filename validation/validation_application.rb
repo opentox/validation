@@ -308,7 +308,6 @@ post '/test_set_validation' do
       v = Validation::Validation.create :validation_type => "test_set_validation", 
                        :model_uri => params[:model_uri], 
                        :test_dataset_uri => params[:test_dataset_uri],
-                       :test_target_dataset_uri => params[:test_target_dataset_uri],
                        :prediction_feature => params[:prediction_feature]
       v.subjectid = @subjectid
       v.validate_model( task )
@@ -340,7 +339,6 @@ get '/test_set_validation' do
     post_command = OpenTox::PostCommand.new request.url,"Perform test-set-validation"
     post_command.attributes << OpenTox::PostAttribute.new("model_uri")
     post_command.attributes << OpenTox::PostAttribute.new("test_dataset_uri")
-    post_command.attributes << OpenTox::PostAttribute.new("test_target_dataset_uri",false,nil,"Specify if target endpoint values are not available in test dataset.")
     post_command.attributes << OpenTox::PostAttribute.new("prediction_feature",false,nil,"Default is 'dependentVariables' of the model.")
     content_type "text/html"
     OpenTox.text_to_html uri_list,@subjectid,related_links,description,post_command
@@ -360,7 +358,6 @@ post '/training_test_validation/?' do
                         :algorithm_params => params[:algorithm_params],
                         :training_dataset_uri => params[:training_dataset_uri], 
                         :test_dataset_uri => params[:test_dataset_uri],
-                        :test_target_dataset_uri => params[:test_target_dataset_uri],
                         :prediction_feature => params[:prediction_feature]
       v.subjectid = @subjectid
       v.validate_algorithm( task ) 
@@ -392,7 +389,6 @@ get '/training_test_validation' do
     post_command.attributes << OpenTox::PostAttribute.new("algorithm_uri")
     post_command.attributes << OpenTox::PostAttribute.new("training_dataset_uri")
     post_command.attributes << OpenTox::PostAttribute.new("test_dataset_uri")
-    post_command.attributes << OpenTox::PostAttribute.new("test_target_dataset_uri",false,nil,"Specify if target endpoint values are not available in test dataset.")
     post_command.attributes << OpenTox::PostAttribute.new("prediction_feature")
     post_command.attributes << OpenTox::PostAttribute.new("algorithm_params",false,nil,"Params used for model building, separate with ';', example: param1=v1;param2=v2")
     content_type "text/html"
@@ -414,7 +410,6 @@ post '/bootstrapping' do
       params[:random_seed], OpenTox::SubTask.create(task,0,33)) )
     LOGGER.info "params after bootstrapping: "+params.inspect
     v = Validation::Validation.create :validation_type => "bootstrapping", 
-                     :test_target_dataset_uri => params[:dataset_uri],
                      :prediction_feature => params[:prediction_feature],
                      :algorithm_uri => params[:algorithm_uri],
                      :algorithm_params => params[:algorithm_params],
@@ -470,12 +465,11 @@ post '/training_test_split' do
   raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
   check_stratified(params)
   task = OpenTox::Task.create( "Perform training test split validation", url_for("/training_test_split", :full) )  do |task| #, params
-    params.merge!( Validation::Util.train_test_dataset_split(params[:dataset_uri], params[:prediction_feature], 
+    params.merge!( Validation::Util.train_test_dataset_split(params[:dataset_uri], (params[:stratified].to_s=~/true/ ? params[:prediction_feature] : nil), 
       @subjectid,  params[:stratified], params[:split_ratio], params[:random_seed], OpenTox::SubTask.create(task,0,33)))
     v = Validation::Validation.create  :validation_type => "training_test_split", 
                      :training_dataset_uri => params[:training_dataset_uri], 
                      :test_dataset_uri => params[:test_dataset_uri],
-                     :test_target_dataset_uri => params[:dataset_uri],
                      :prediction_feature => params[:prediction_feature],
                      :algorithm_uri => params[:algorithm_uri],
                      :algorithm_params => params[:algorithm_params]
@@ -543,7 +537,6 @@ post '/cleanup_datasets/?' do
   end
   Validation::Validation.all.each do |val|
     used_datasets << val.training_dataset_uri
-    used_datasets << val.test_target_dataset_uri
     used_datasets << val.test_dataset_uri
     used_datasets << val.prediction_dataset_uri
   end
@@ -595,7 +588,8 @@ post '/validate_datasets' do
       feature_type = "regression" if params.delete("regression")!=nil
       v = Validation::Validation.create params  
       v.subjectid = @subjectid
-      v.compute_validation_stats(feature_type,predicted_variable,predicted_confidence,nil,nil,false,task)
+      v.compute_prediction_data(feature_type,predicted_variable,predicted_confidence,v.prediction_feature,nil,task)
+      v.compute_validation_stats()#feature_type,predicted_variable,predicted_confidence,nil,nil,false,task)
     end
     v.validation_uri
   end
