@@ -4,7 +4,7 @@ ENV['JAVA_HOME'] = "/usr/bin" unless ENV['JAVA_HOME']
 ENV['PATH'] = ENV['JAVA_HOME']+":"+ENV['PATH'] unless ENV['PATH'].split(":").index(ENV['JAVA_HOME'])
 ENV['SAXON_JAR'] = "saxonhe9-2-0-3j/saxon9he.jar" unless ENV['SAXON_JAR']
 
-OT_STYLESHEET = File.join(CONFIG[:services]["opentox-validation"],"resources/simple_ot_stylesheet.css")
+OT_STYLESHEET = File.join($validation[:uri],"resources/simple_ot_stylesheet.css")
 
 # = Reports::ReportFormat
 # 

@@ -1,5 +1,5 @@
-#require "rubygems"
-#require "rinruby"
+#require "./rubygems"
+#require "./rinruby"
 
 module Reports
  

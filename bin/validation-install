@@ -1,0 +1,127 @@
+#!/bin/sh
+
+# Installs Opentox Webservice.
+# Author: Christoph Helma, Andreas Maunz, Martin Gütlein
+
+SELF=$(basename $0 -install)
+[ "`id -u`" = "0" ] && echo "This script must be run as non-root." 1>&2 && exit 1
+
+SILENT=false
+if [ -n "$1" ]
+then
+    if [ "$1" = "silent" ]
+    then
+        SILENT=true
+    fi
+fi
+
+if [ $SILENT = false ]; then
+  echo
+  echo "Welcome to service installation (<Return> to continue)."
+  read delete_me
+fi
+
+# check wd is root of service
+DIR=`pwd`
+if echo $DIR | grep "$SELF/bin" >/dev/null 2>&1 ; then cd ..; fi
+SELF_DIR=`pwd`  
+
+
+# # # Boot the script
+
+# load base config, helper funs, environment
+OT_CONFIG_DIR="$HOME/.opentox"
+! [ -f "$OT_CONFIG_DIR/config/install/config.sh" ] && echo "config.sh not found." 1>&2 && exit 1 || . $OT_CONFIG_DIR/config/install/config.sh
+! [ -f "$OT_PREFIX/install/utils.sh" ] && echo "utils.sh not found." 1>&2 && exit 1 || . $OT_PREFIX/install/utils.sh
+[ -f $OT_CONFIG_DIR/opentox-ui.sh ] && . $OT_CONFIG_DIR/opentox-ui.sh # should have been done by user already
+RUBY_DIR="$HOME/.rbenv/versions/$RUBY_NUM_VER"
+
+
+# # # Install
+
+check_utils "rbenv find"
+check_log $SELF
+
+if [ "$OT_BRANCH" = "development" ]; then
+  cmd="test -d $OT_PREFIX/opentox-server" && run_cmd "$cmd" "Opentox-server"
+  cmd="test -d $OT_PREFIX/opentox-client" && run_cmd "$cmd" "Opentox-client"
+fi
+
+
+# log directory for this service
+[ -d $OT_CONFIG_DIR/config/$SELF ] || cmd="mkdir -p $OT_CONFIG_DIR/config/$SELF" && run_cmd "$cmd" "Config directory"
+
+# Adjust ruby version here!
+RUBY_NUM_VER="1.9.3-p194"
+
+# ruby
+install_ruby
+
+# self
+echo
+install_with_bundler
+
+# config
+[ -f $OT_CONFIG_DIR/config/$SELF.rb ] || touch $OT_CONFIG_DIR/config/$SELF.rb
+if ! cat "$OT_CONFIG_DIR/config/$SELF.rb" | grep "four_store">/dev/null 2>&1; then echo '$four_store = { :uri => "http://localhost:9088", :user => "", :password => "" }' >> $OT_CONFIG_DIR/config/$SELF.rb; fi
+if ! cat "$OT_CONFIG_DIR/config/$SELF.rb" | grep "aa">/dev/null 2>&1; then echo '$aa = { :uri => nil }' >> $OT_CONFIG_DIR/config/$SELF.rb; fi
+if ! cat "$OT_DEFAULT_CONF" | grep "$SELF">/dev/null 2>&1; then echo '$validation = { :uri => "http://localhost:8087/validation" }' >> $OT_DEFAULT_CONF; fi
+
+#install redis
+WGET="`which wget`"
+if [ ! -e "$WGET" ]; then
+  echo "'wget' missing. Install 'wget' first. Aborting..."
+  exit 1
+fi
+REDIS_VER="2.4.4"
+REDIS_DEST="$SELF_DIR/redis-$REDIS_VER"
+REDIS_SERVER_CONF="$REDIS_DEST/redis.conf"
+LOG="redis-log.txt"
+echo
+echo "Redis (log: '$LOG', dir: '$REDIS_DEST'):"
+REDIS_DONE=false
+mkdir "$REDIS_DEST" >/dev/null 2>&1
+if [ ! -d "$REDIS_DEST" ]; then
+  echo "Install directory '$REDIS_DEST' is not available! Aborting..."
+  exit 1
+else
+  if ! rmdir "$REDIS_DEST" >/dev/null 2>&1; then # if not empty this will fail
+    REDIS_DONE=true
+  fi
+fi
+if ! $REDIS_DONE; then
+  echo "vm.overcommit_memory = 1" | sudo tee -a /etc/sysctl.conf >>$LOG 2>&1
+  URI="http://redis.googlecode.com/files/redis-$REDIS_VER.tar.gz"
+  if ! [ -d "redis-$REDIS_VER" ]; then
+    cmd="$WGET $URI" && run_cmd "$cmd" "Download"
+    cmd="tar zxf redis-$REDIS_VER.tar.gz" && run_cmd "$cmd" "Unpack"
+  fi
+  cd redis-$REDIS_VER >>$LOG 2>&1
+  cmd="make" && run_cmd "$cmd" "Make"
+  if ! grep "daemonize yes" $REDIS_SERVER_CONF >>$LOG 2>&1 ; then 
+    echo "daemonize yes" > $REDIS_SERVER_CONF 2>$LOG
+  fi
+  if ! grep "dir `pwd`" $REDIS_SERVER_CONF >>$LOG 2>&1 ; then 
+    echo "dir `pwd`" >> $REDIS_SERVER_CONF 2>$LOG
+  fi
+  if ! grep "save 900 1" $REDIS_SERVER_CONF >>$LOG 2>&1 ; then 
+    echo "save 900 1" >> $REDIS_SERVER_CONF 2>$LOG
+  fi
+else
+  echo "redis already installed"  
+fi
+if [ ! -f $REDIS_CONF ]; then
+  echo "if ! echo \"\$PATH\" | grep \"$REDIS_DEST\">/dev/null 2>&1; then export PATH=$REDIS_DEST/src:\$PATH; fi" >> "$REDIS_CONF"
+  echo "Redis configuration has been stored in '$REDIS_CONF'."
+  #if ! grep ". \"$REDIS_CONF\"" $OT_UI_CONF; then
+  #  echo ". \"$REDIS_CONF\"" >> $OT_UI_CONF
+  #fi
+fi
+
+
+if [ $SILENT = false ]; then
+  notify
+fi
+
+# return to wd
+cd "$DIR"

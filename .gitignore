@@ -8,3 +8,7 @@ reports
 public/server.log
 nightly/nightly_report.html
 nightly/nightly_report.xml
+Gemfile.lock
+redis-2.4.4
+redis-2.4.4 redis-2.4.4.tar.gz
+redis-2.4.4.tar.gz

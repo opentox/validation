@@ -1,6 +1,6 @@
 
-require "lib/prediction_data.rb"
-require "lib/predictions.rb"
+require "./lib/prediction_data.rb"
+require "./lib/predictions.rb"
 
 module Lib
   

@@ -1,5 +1,5 @@
 
-require "lib/format_util.rb"
+require "./lib/format_util.rb"
 
 module Validation
   

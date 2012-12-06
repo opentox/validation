@@ -1,4 +1,4 @@
-require "lib/validation_db.rb"
+require "./lib/validation_db.rb"
 
 # = Reports::ValidationDB
 # 
@@ -187,8 +187,8 @@ class Reports::ValidationDB
   def get_predictions(validation, filter_params, subjectid, task)
     # we need compound info, cannot reuse stored prediction data
     data = Lib::PredictionData.create( validation.feature_type, validation.test_dataset_uri, 
-      validation.test_target_dataset_uri, validation.prediction_feature, validation.prediction_dataset_uri, 
-      validation.predicted_variable, validation.predicted_confidence, subjectid, OpenTox::SubTask.create(task, 0, 80 ) )
+      validation.prediction_feature, validation.prediction_dataset_uri, validation.predicted_variable, 
+      validation.predicted_confidence, subjectid, OpenTox::SubTask.create(task, 0, 80 ) )
     data = Lib::PredictionData.filter_data( data.data, data.compounds, 
       filter_params[:min_confidence], filter_params[:min_num_predictions], filter_params[:max_num_predictions] ) if filter_params!=nil
     task.progress(100) if task
@@ -197,14 +197,13 @@ class Reports::ValidationDB
   
   def get_accept_values( validation, subjectid=nil )
     # PENDING So far, one has to load the whole dataset to get the accept_value from ambit
-    test_target_datasets = validation.test_target_dataset_uri
-    test_target_datasets = validation.test_dataset_uri unless test_target_datasets
+    test_datasets = validation.test_dataset_uri
     res = nil
-    test_target_datasets.split(";").each do |test_target_dataset|
-      d = Lib::DatasetCache.find( test_target_dataset, subjectid )
-      raise "cannot get test target dataset for accept values, dataset: "+test_target_dataset.to_s unless d
+    test_datasets.split(";").each do |test_dataset|
+      d = Lib::DatasetCache.find( test_dataset, subjectid )
+      raise "cannot get test target dataset for accept values, dataset: "+test_dataset.to_s unless d
       accept_values = d.accept_values(validation.prediction_feature)
-      raise "cannot get accept values from dataset "+test_target_dataset.to_s+" for feature "+
+      raise "cannot get accept values from dataset "+test_dataset.to_s+" for feature "+
         validation.prediction_feature+":\n"+d.features[validation.prediction_feature].to_yaml unless accept_values!=nil
       raise "different accept values" if res && res!=accept_values
       res = accept_values

@@ -1,6 +1,6 @@
 
 REPORT_DIR = File.join(Dir.pwd,'/reports')
-require "lib/format_util.rb"
+require "./lib/format_util.rb"
 
 # = Reports::ReportPersistance
 #

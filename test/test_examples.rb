@@ -1,5 +1,5 @@
 
-require 'test/test_examples_util.rb'
+require './test/test_examples_util.rb'
 
 class Class
   def humanize
@@ -26,8 +26,8 @@ module ValidationExamples
 
   class LazarIrisCrossvalidation < IrisCrossvalidation
     def initialize
-      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer")
+      @algorithm_uri = File.join($algorithm[:uri],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer")
       super
     end
   end
@@ -43,8 +43,8 @@ module ValidationExamples
   
   class LazarIrisSplit < IrisSplit
     def initialize
-      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer")
+      @algorithm_uri = File.join($algorithm[:uri],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer")
       super
     end
   end
@@ -68,8 +68,8 @@ module ValidationExamples
     
   class LazarEPAFHMSplit < EPAFHMSplit
     def initialize
-      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+      @algorithm_uri = File.join($algorithm[:uri],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer/bbrc")
       super
     end
   end
@@ -77,7 +77,7 @@ module ValidationExamples
   class LazarLastEPAFHMSplit < LazarEPAFHMSplit
     def initialize
       super
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/last")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer/last")
     end
   end
 
@@ -124,8 +124,8 @@ module ValidationExamples
 
   class LazarEPAFHMCrossvalidation < EPAFHMCrossvalidation
     def initialize
-      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+      @algorithm_uri = File.join($algorithm[:uri],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer/bbrc")
       super
     end
   end
@@ -144,8 +144,8 @@ module ValidationExamples
   
   class LazarHamsterSplit < HamsterSplit
     def initialize
-      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+      @algorithm_uri = File.join($algorithm[:uri],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer/bbrc")
       super
     end
   end
@@ -153,7 +153,7 @@ module ValidationExamples
   class LazarLastHamsterSplit < LazarHamsterSplit
     def initialize
       super
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/last")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer/last")
     end
   end
 
@@ -186,8 +186,8 @@ module ValidationExamples
   
   class LazarHamsterBootstrapping < HamsterBootstrapping
     def initialize
-      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+      @algorithm_uri = File.join($algorithm[:uri],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer/bbrc")
       super
     end
   end
@@ -203,11 +203,9 @@ module ValidationExamples
 
   class HamsterTrainingTest < TrainingTestValidation
     def initialize
-#      @test_target_dataset_file = File.new("data/hamster_carcinogenicity.yaml","r")
 #      @training_dataset_file = File.new("data/hamster_carcinogenicity.train.yaml","r")
 #      @test_dataset_file = File.new("data/hamster_carcinogenicity.test.yaml","r")
       
-      @test_target_dataset_file = File.new("data/hamster_carcinogenicity.csv","r")
       @training_dataset_file = File.new("data/hamster_carcinogenicity.train.csv","r")
       @test_dataset_file = File.new("data/hamster_carcinogenicity.test.csv","r")
       
@@ -226,8 +224,8 @@ module ValidationExamples
   
   class LazarHamsterTrainingTest < HamsterTrainingTest
     def initialize
-      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+      @algorithm_uri = File.join($algorithm[:uri],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer/bbrc")
       super
     end
   end
@@ -261,8 +259,8 @@ module ValidationExamples
 
   class LazarHamsterCrossvalidation < HamsterCrossvalidation
     def initialize
-      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+      @algorithm_uri = File.join($algorithm[:uri],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer/bbrc")
       super
     end
   end
@@ -270,7 +268,7 @@ module ValidationExamples
   class LazarLastHamsterCrossvalidation < LazarHamsterCrossvalidation
     def initialize
       super
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/last")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer/last")
     end
   end
   
@@ -284,8 +282,8 @@ module ValidationExamples
   
   class LazarHamsterLooCrossvalidation < HamsterLooCrossvalidation
       def initialize
-        @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-        @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+        @algorithm_uri = File.join($algorithm[:uri],"lazar")
+        @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer/bbrc")
         super
       end
     end
@@ -294,8 +292,8 @@ module ValidationExamples
   
   class LazarHamsterMiniCrossvalidation < CrossValidation
     def initialize
-      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+      @algorithm_uri = File.join($algorithm[:uri],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer/bbrc")
       @dataset_file = File.new("data/hamster_carcinogenicity.mini.csv","r")
       @num_folds = 2
     end
@@ -303,8 +301,8 @@ module ValidationExamples
   
   class ISSCANStratifiedCrossvalidation < CrossValidation
     def initialize
-      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+      @algorithm_uri = File.join($algorithm[:uri],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer/bbrc")
       @dataset_file = File.new("data/ISSCAN_v3a_canc-red.csv","r")
       @stratified = true
       @num_folds = 10
@@ -313,8 +311,8 @@ module ValidationExamples
   
   class ISSCAN2StratifiedCrossvalidation < CrossValidation
     def initialize
-      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+      @algorithm_uri = File.join($algorithm[:uri],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer/bbrc")
       @dataset_file = File.new("data/ISSCAN_v3a_sal.csv","r")
       @stratified = true
       @num_folds = 10
@@ -340,8 +338,8 @@ module ValidationExamples
   
   class LazarISTHamsterCrossvalidation < ISTHamsterCrossvalidation
     def initialize
-      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer")
+      @algorithm_uri = File.join($algorithm[:uri],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer")
       super
     end
   end
@@ -544,8 +542,8 @@ module ValidationExamples
   
   class LazarVsNtuaCrossvalidation < CrossValidation
     def initialize
-      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+      @algorithm_uri = File.join($algorithm[:uri],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer/bbrc")
       @dataset_uri = "http://apps.ideaconsult.net:8080/ambit2/dataset/R545"
       @prediction_feature="http://apps.ideaconsult.net:8080/ambit2/feature/22200"
       @num_folds=3
@@ -667,11 +665,9 @@ module ValidationExamples
    
   class HamsterTrainingTest < TrainingTestValidation
     def initialize
-#      @test_target_dataset_file = File.new("data/hamster_carcinogenicity.yaml","r")
 #      @training_dataset_file = File.new("data/hamster_carcinogenicity.train.yaml","r")
 #      @test_dataset_file = File.new("data/hamster_carcinogenicity.test.yaml","r")
       
-      @test_target_dataset_file = File.new("data/hamster_carcinogenicity.csv","r")
       @training_dataset_file = File.new("data/hamster_carcinogenicity.train.csv","r")
       @test_dataset_file = File.new("data/hamster_carcinogenicity.test.csv","r")
       
@@ -698,8 +694,8 @@ module ValidationExamples
   
   class LazarRepdoseSplit < RepdoseSplit
     def initialize
-      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+      @algorithm_uri = File.join($algorithm[:uri],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer/bbrc")
       super
     end
   end
@@ -721,8 +717,8 @@ module ValidationExamples
   
   class LazarRepdoseCrossValidation < RepdoseCrossValidation
     def initialize
-      @algorithm_uri = File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-      @algorithm_params = "feature_generation_uri="+File.join(CONFIG[:services]["opentox-algorithm"],"fminer/bbrc")
+      @algorithm_uri = File.join($algorithm[:uri],"lazar")
+      @algorithm_params = "feature_generation_uri="+File.join($algorithm[:uri],"fminer/bbrc")
       super
     end
   end

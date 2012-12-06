@@ -1,5 +1,5 @@
 
-require "lib/prediction_data.rb"
+require "./lib/prediction_data.rb"
 
 module Lib
 
@@ -805,8 +805,8 @@ module Lib
     end
     
     def self.test_r_square
-      require "rubygems"
-      require "opentox-ruby"
+      #require "rubygems"
+      #require "opentox-ruby"
       
       max_deviation = rand * 0.9
       avg_deviation = max_deviation * 0.5

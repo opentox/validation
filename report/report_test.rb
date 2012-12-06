@@ -1,9 +1,9 @@
 require "fileutils"
 ENV['RACK_ENV'] = 'test'
-require 'report/report_application.rb'
+require './report/report_application.rb'
 require 'test/unit'
 require 'rack/test'
-require "lib/test_util.rb"
+require "./lib/test_util.rb"
 LOGGER = Logger.new(STDOUT)
 LOGGER.datetime_format = "%Y-%m-%d %H:%M:%S "
 
@@ -129,12 +129,12 @@ end
 #class Reports::ReportServiceTest < Test::Unit::TestCase
 #  include Lib::TestUtil
 #
-#  WS_VAL = CONFIG[:services]["opentox-validation"]
-#  WS_DATA=CONFIG[:services]["opentox-dataset"]
+#  WS_VAL = $validation[:uri]
+#  WS_DATA=$dataset[:uri]
 #  FILE=File.new("data/hamster_carcinogenicity.owl","r")
 #  
-#  WS_CLASS_ALG=File.join(CONFIG[:services]["opentox-algorithm"],"lazar")
-#  WS_FEATURE_ALG=File.join(CONFIG[:services]["opentox-algorithm"],"fminer")
+#  WS_CLASS_ALG=File.join($algorithm[:uri],"lazar")
+#  WS_FEATURE_ALG=File.join($algorithm[:uri],"fminer")
 #  
 #  #WS_CLASS_ALG_2="local-ot:4008/algorithm"
 #  #WS_FEATURE_ALG_2=nil

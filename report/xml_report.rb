@@ -2,7 +2,7 @@
 #    require g
 #end
 
-require "report/xml_report_util.rb"
+require "./report/xml_report_util.rb"
 
 ENV['DOCBOOK_DIRECTORY'] = "docbook-xml-4.5" unless ENV['DOCBOOK_DIRECTORY']
 ENV['REPORT_DTD'] = "docbookx.dtd" unless ENV['REPORT_DTD']

@@ -17,7 +17,7 @@ module ValidationExamples
     @@dataset_uris = {}
     @@prediction_features = {}
 
-    def self.upload_dataset(file, subjectid=nil, dataset_service=CONFIG[:services]["opentox-dataset"]) #, file_type="application/x-yaml")
+    def self.upload_dataset(file, subjectid=nil, dataset_service=$dataset[:uri]) #, file_type="application/x-yaml")
       raise "File not found: "+file.path.to_s unless File.exist?(file.path)
       if @@dataset_uris[file.path.to_s]==nil
         LOGGER.debug "uploading file: "+file.path.to_s
@@ -26,7 +26,7 @@ module ValidationExamples
           #data_uri = OpenTox::RestClientWrapper.post(dataset_service,{:content_type => file_type},data).to_s.chomp
           #@@dataset_uris[file.path.to_s] = data_uri
           #LOGGER.debug "uploaded dataset: "+data_uri
-          d = OpenTox::Dataset.create(CONFIG[:services]["opentox-dataset"], subjectid)
+          d = OpenTox::Dataset.create($dataset[:uri], subjectid)
           d.load_yaml(data)
           d.save( subjectid )
           @@dataset_uris[file.path.to_s] = d.uri
@@ -36,7 +36,7 @@ module ValidationExamples
           @@prediction_features[file.path.to_s] = d.features.keys[0]
           @@dataset_uris[file.path.to_s] = d.uri
         elsif (file.path =~ /rdf$/)
-          d = OpenTox::Dataset.create(CONFIG[:services]["opentox-dataset"], subjectid)
+          d = OpenTox::Dataset.create($dataset[:uri], subjectid)
           d.load_rdfxml_file(file, subjectid)
           d.save(subjectid)
           @@dataset_uris[file.path.to_s] = d.uri
@@ -77,7 +77,7 @@ module ValidationExamples
         $test_case.post uri,params
         return wait($test_case.last_response.body)
       else
-        return OpenTox::RestClientWrapper.post(File.join(CONFIG[:services]["opentox-validation"],uri),params,nil,waiting_task).to_s
+        return OpenTox::RestClientWrapper.post(File.join($validation[:uri],uri),params,nil,waiting_task).to_s
       end
     end
     
@@ -90,7 +90,7 @@ module ValidationExamples
         return wait($test_case.last_response.body)
       else
         params[:accept] = accept_header
-        return OpenTox::RestClientWrapper.get(File.join(CONFIG[:services]["opentox-validation"],uri),params)
+        return OpenTox::RestClientWrapper.get(File.join($validation[:uri],uri),params)
       end
     end
 
@@ -100,7 +100,7 @@ module ValidationExamples
         $test_case.delete uri,{:subjectid => SUBJECTID},'HTTP_ACCEPT' => accept_header 
         return wait($test_case.last_response.body)
       else
-        return OpenTox::RestClientWrapper.delete(File.join(CONFIG[:services]["opentox-validation"],uri),{:accept => accept_header,:subjectid => SUBJECTID})
+        return OpenTox::RestClientWrapper.delete(File.join($validation[:uri],uri),{:accept => accept_header,:subjectid => SUBJECTID})
       end
     end
     
@@ -238,8 +238,6 @@ module ValidationExamples
                   :model_uri,
                   :test_dataset_uri,
                   :test_dataset_file,
-                  :test_target_dataset_uri,
-                  :test_target_dataset_file,
                   :training_dataset_uri,
                   :training_dataset_file,
                   :dataset_uri,
@@ -258,7 +256,6 @@ module ValidationExamples
                   
     def upload_files
       [[:test_dataset_uri, :test_dataset_file], 
-       [:test_target_dataset_uri, :test_target_dataset_file],
        [:training_dataset_uri, :training_dataset_file],
        [:dataset_uri, :dataset_file]].each do |a|
          uri = a[0]
@@ -438,7 +435,7 @@ module ValidationExamples
     end
     
     def opt_params
-      [ :prediction_feature, :test_target_dataset_uri ]
+      [ :prediction_feature ]
     end
     
     def validation_type
@@ -452,7 +449,7 @@ module ValidationExamples
     end
     
     def opt_params
-      [ :algorithm_params, :test_target_dataset_uri ]
+      [ :algorithm_params ]
     end
     
     def validation_type

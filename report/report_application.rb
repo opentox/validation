@@ -1,4 +1,4 @@
-require "report/environment.rb"
+require "./report/environment.rb"
 
 def perform
   @@report_service = Reports::ReportService.instance( url_for("/report", :full) ) unless defined?@@report_service  

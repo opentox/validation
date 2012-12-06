@@ -2,13 +2,12 @@
 #[ 'rubygems', 'datamapper' ].each do |lib|
 #  require lib
 #end
-require "lib/merge.rb"
+require "./lib/merge.rb"
 
 module Validation
 
   VAL_PROPS_GENERAL = [ :validation_uri, :validation_type, :model_uri, :algorithm_uri, :algorithm_params,
-                :training_dataset_uri, :prediction_feature, :test_dataset_uri, :test_target_dataset_uri, 
-                :prediction_dataset_uri, :date ] 
+                :training_dataset_uri, :prediction_feature, :test_dataset_uri, :prediction_dataset_uri, :date ] 
   VAL_PROPS_SUM = [ :num_instances, :num_without_class, :num_unpredicted ]
   VAL_PROPS_AVG = [:real_runtime, :percent_without_class, :percent_unpredicted ]
   VAL_PROPS = VAL_PROPS_GENERAL + VAL_PROPS_SUM + VAL_PROPS_AVG
@@ -59,7 +58,6 @@ module Validation
     attribute :algorithm_uri
     attribute :algorithm_params
     attribute :training_dataset_uri
-    attribute :test_target_dataset_uri
     attribute :test_dataset_uri
     attribute :prediction_dataset_uri
     attribute :prediction_feature
