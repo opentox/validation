@@ -1,25 +1,39 @@
 
+ENV['RACK_ENV'] = 'development'
+
 require "rubygems"
-require "sinatra"
+require "ohm"
+
+SERVICE = "validation"
+require 'bundler'
+Bundler.require
+
+#exit
+
+#puts Ohm.connect(:thread_safe => true, :port => 6379)
+#exit
+
+#require "rubygems"
+#require "sinatra"
 before {
-  request.env['HTTP_HOST']="local-ot/validation"
+  request.env['HTTP_HOST']="localhost:8087/validation"
   request.env["REQUEST_URI"]=request.env["PATH_INFO"]
 }
 
 require "uri"
 require "yaml"
-ENV['RACK_ENV'] = 'production'
+
 require './application.rb'
 require 'test/unit'
 require 'rack/test'
 require './lib/test_util.rb'
 require './test/test_examples.rb'
 
-LOGGER = OTLogger.new(STDOUT)
-LOGGER.datetime_format = "%Y-%m-%d %H:%M:%S "
-LOGGER.formatter = Logger::Formatter.new
+$logger = OTLogger.new(STDOUT)
+$logger.datetime_format = "%Y-%m-%d %H:%M:%S "
+$logger.formatter = Logger::Formatter.new
 
-if AA_SERVER
+if $aa[:uri]
   #TEST_USER = "mgtest"
   #TEST_PW = "mgpasswd"
   TEST_USER = "guest"
@@ -33,13 +47,15 @@ else
 end
 
 #Rack::Test::DEFAULT_HOST = "local-ot" #"/validation"
+
+BASE = "http://localhost:8087/validation"
+
 module Sinatra
   
   set :raise_errors, false
   set :show_exceptions, false
 
   module UrlForHelper
-    BASE = "http://local-ot/validation"
     def url_for url_fragment, mode=:path_only
       case mode
       when :path_only
@@ -49,23 +65,131 @@ module Sinatra
       "#{BASE}#{url_fragment}"
     end
   end
+  
 end
 
+
+$url_provider = Object.new
+def $url_provider.url_for(url_fragment, mode=:path_only) 
+  "#{BASE}#{url_fragment}"
+end 
 
 class ValidationTest < Test::Unit::TestCase
   include Rack::Test::Methods
   include Lib::TestUtil
+
+  def data_info(dataset_uri,title,feat=nil)
+    data = OpenTox::Dataset.find(dataset_uri)
+    puts "dataset: #{title}, #compounds #{data.compounds.size}, #features #{data.features.size}"
+    if feat
+      data.compounds.size.times do |c_idx|
+        puts "#{c_idx} #{data.compounds[c_idx]} #{feat.collect{|f| data.data_entry_value(c_idx,f)}.join(", ")}" 
+      end
+    end
+  end
   
   def test_it
-    begin
-      $test_case = self
+    
+    
+     params={:validation_uris=>"http://localhost:8087/validation/crossvalidation/5"}
+     res = OpenTox::RestClientWrapper.post 'http://localhost:8087/validation/report/crossvalidation',params
+     puts res
+     exit
+     
+     prediction_feature = "http://localhost:8084/feature/426cf674-0019-4ec2-8c4d-9431b75e907a"
+     data = "http://localhost:8083/dataset/461c6ab1-272e-493f-83f7-a37e64b0f5fe";
+     alg = "http://localhost:8081/algorithm/lazar"
+     alg_params = {:feature_generation_uri=>"http://localhost:8081/algorithm/fminer/bbrc"}
+     alg_params_str = ""
+     alg_params.each do |key,val|
+       alg_params_str << ";" if alg_params_str.size>0
+       alg_params_str << key.to_s+"="+val
+     end
+     params={:algorithm_uri=>alg,:dataset_uri=>data, :prediction_feature=>prediction_feature, :algorithm_params=>alg_params_str, :num_folds=>3}
+     res = OpenTox::RestClientWrapper.post 'http://localhost:8087/validation/crossvalidation',params
+     puts res
+     exit
+    
+     params={:validation_uris=>"http://localhost:8087/validation/50"}
+     res = OpenTox::RestClientWrapper.post 'http://localhost:8087/validation/report/validation',params
+     puts res
+     exit       
+    
+     prediction_feature = "http://localhost:8084/feature/426cf674-0019-4ec2-8c4d-9431b75e907a"
+     train = "http://localhost:8083/dataset/aec242bd-64c6-4fba-9277-659d1328661d";
+     #data_info(train,"training",[prediction_feature])
+     test = "http://localhost:8083/dataset/23ae2c24-9bff-43d0-bf6d-15f05f22241d"
+     #data_info(test,"test",[prediction_feature])
+     alg = "http://localhost:8081/algorithm/lazar"
+     alg_params = {:feature_generation_uri=>"http://localhost:8081/algorithm/fminer/bbrc"}
+    
+     single_steps = false
+     if (single_steps)
+       build_model = false
+       if (build_model)
+         params = {:dataset_uri=>train, 
+           :prediction_feature=>prediction_feature}
+         alg_params.each{ |k,v| params[k] = v }
+         model = OpenTox::Algorithm.new(alg).run(params)
+       else
+         model = "http://localhost:8085/model/ffb80776-2b11-468a-ace9-753b2ce3ec5b"
+       end 
+       puts "model #{model}"
+       m = OpenTox::Model.new(model)
+       m.get
+       predicted_feature = m.predicted_variable
+       puts "predicted: #{predicted_feature}"
+       confidence_feature = m.predicted_confidence 
+       puts "confidence: #{confidence_feature}"
+       
+       apply_model = false
+       if (apply_model)          
+         params = {:dataset_uri=>test, 
+                 :prediction_feature=>prediction_feature}
+         pred = OpenTox::Model.new(model).run(params)
+       else
+         pred = "http://localhost:8083/dataset/354ccada-3b0c-4ceb-9acf-a0f7dc9c5e09"
+       end  
+       puts "prediction dataset: #{pred}"
+       #data_info(pred,"prediction",[prediction_feature,predicted_feature,confidence_feature])
+       
+       v = Validation::Validation.create({:validation_type=>"training_test_split",
+         :model_uri=>model,
+         :training_dataset_uri=>train,
+         :test_dataset_uri=>test,
+         :prediction_dataset_uri=>pred,
+         :prediction_feature=>prediction_feature})
+         
+       puts "compute pred data"
+       data = v.compute_prediction_data_with_model(m)
+       #puts data.to_yaml
+       
+       puts "compute stats"
+       v.compute_validation_stats
+     else
+       alg_params_str = ""
+       alg_params.each do |key,val|
+         alg_params_str << ";" if alg_params_str.size>0
+         alg_params_str << key.to_s+"="+val
+       end
+       params={:algorithm_uri=>alg,:training_dataset_uri=>train, :test_dataset_uri=>test, :prediction_feature=>prediction_feature, :algorithm_params=>alg_params_str}
+       res = OpenTox::RestClientWrapper.post 'http://localhost:8087/validation/training_test_validation',params
+       puts res
+     end
+     exit
+     
+    #begin
+      #$test_case = self
 
-      post '/validate_datasets',{:test_dataset_uri=>"http://local-ot/dataset/14111",
-          :prediction_dataset_uri=>"http://local-ot/dataset/14113",
-          :prediction_feature=>"http://local-ot/dataset/14109/feature/Hamster%20Carcinogenicity",
-          :predicted_variable=>"http://local-ot/model/21/predicted/value",
-          :predicted_confidence=>"http://local-ot/model/21/predicted/confidence",
-          :classification=>"true"}
+      #run_test("1a")
+      #exit 
+      
+      # post '/validate_datasets',{:test_dataset_uri=>"http://local-ot/dataset/14111",
+          # :prediction_dataset_uri=>"http://local-ot/dataset/14113",
+          # :prediction_feature=>"http://local-ot/dataset/14109/feature/Hamster%20Carcinogenicity",
+          # :predicted_variable=>"http://local-ot/model/21/predicted/value",
+          # :predicted_confidence=>"http://local-ot/model/21/predicted/confidence",
+          # :classification=>"true"}
             
 #D, [2012-11-07T12:38:11.291069 #31035] DEBUG -- : validation         :: loading prediction -- test-dataset:       ["http://local-ot/dataset/14099"]           :: /validation_service.rb:227:in `compute_prediction_data'
 #      D, [2012-11-07T12:38:11.291174 #31035] DEBUG -- : validation         :: loading prediction -- test-target-datset: ["http://local-ot/dataset/14097"]           :: /validation_service.rb:227:in `compute_prediction_data'
@@ -234,12 +358,12 @@ class ValidationTest < Test::Unit::TestCase
       #puts last_response.body
       
   
-    rescue => ex
-      rep = OpenTox::ErrorReport.create(ex, "")
-      puts rep.to_yaml
-    ensure
-      #OpenTox::Authorization.logout(SUBJECTID) if AA_SERVER
-    end
+    #rescue => ex
+    #  rep = OpenTox::ErrorReport.create(ex, "")
+    #  puts rep.to_yaml
+    #ensure
+    #  #OpenTox::Authorization.logout(SUBJECTID) if $aa[:uri]
+    #end
   end
 
   def app
@@ -248,7 +372,7 @@ class ValidationTest < Test::Unit::TestCase
   
   def run_test(select=nil, overwrite={}, delete=false )
     
-    if AA_SERVER && SUBJECTID && delete
+    if $aa[:uri] && SUBJECTID && delete
       policies_before = OpenTox::Authorization.list_policy_uris(SUBJECTID)
     end
     
@@ -268,7 +392,7 @@ class ValidationTest < Test::Unit::TestCase
           ex.check_requirements
           ex.validate
             
-          LOGGER.debug "validation done '"+ex.validation_uri.to_s+"'"
+          $logger.debug "validation done '"+ex.validation_uri.to_s+"'"
         end
         
         #ex.compute_dataset_size
@@ -298,16 +422,16 @@ class ValidationTest < Test::Unit::TestCase
       end
     end
     
-    if AA_SERVER && SUBJECTID && delete
+    if $aa[:uri] && SUBJECTID && delete
       policies_after= OpenTox::Authorization.list_policy_uris(SUBJECTID)
       diff = policies_after.size - policies_before.size
       if (diff != 0)
         policies_before.each do |k,v|
           policies_after.delete(k)
         end
-        LOGGER.warn diff.to_s+" policies NOT deleted:\n"+policies_after.collect{|k,v| k.to_s+" => "+v.to_s}.join("\n")
+        $logger.warn diff.to_s+" policies NOT deleted:\n"+policies_after.collect{|k,v| k.to_s+" => "+v.to_s}.join("\n")
       else
-        LOGGER.debug "all policies deleted"
+        $logger.debug "all policies deleted"
       end
     end      
   end

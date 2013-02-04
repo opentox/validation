@@ -59,7 +59,7 @@ module Reports
     def self.create_regression_plot( out_files, validation_set, name_attribute, logscale=true )
       
       out_files = [out_files] unless out_files.is_a?(Array)
-      LOGGER.debug "Creating regression plot, out-file:"+out_files.to_s
+      $logger.debug "Creating regression plot, out-file:"+out_files.to_s
       
       omit_count = 0
       names = []
@@ -141,7 +141,7 @@ module Reports
         x_label="False positive rate", y_label="True Positive Rate" )
       
       out_files = [out_files] unless out_files.is_a?(Array)
-      LOGGER.debug "creating roc plot for '"+validation_set.size.to_s+"' validations, out-files:"+out_files.inspect
+      $logger.debug "creating roc plot for '"+validation_set.size.to_s+"' validations, out-files:"+out_files.inspect
       
       data = []
       if split_set_attribute
@@ -151,7 +151,7 @@ module Reports
             data << transform_roc_predictions(validation_set.filter({split_set_attribute => value}), class_value, false )
             data[-1].name = split_set_attribute.to_s.nice_attr+" "+value.to_s
           rescue
-            LOGGER.warn "could not create ROC plot for "+value.to_s
+            $logger.warn "could not create ROC plot for "+value.to_s
           end
         end
       else
@@ -189,7 +189,7 @@ module Reports
     def self.create_confidence_plot( out_files, validation_set, performance_attribute, performance_accept_value, split_set_attribute=nil, show_single_curves=false )
                             
       out_files = [out_files] unless out_files.is_a?(Array)
-      LOGGER.debug "creating confidence plot for '"+validation_set.size.to_s+"' validations, out-file:"+out_files.inspect
+      $logger.debug "creating confidence plot for '"+validation_set.size.to_s+"' validations, out-file:"+out_files.inspect
       
       if split_set_attribute
         attribute_values = validation_set.get_values(split_set_attribute)
@@ -203,7 +203,7 @@ module Reports
             confidence << data[:confidence][0]
             performance << data[:performance][0]
           rescue
-            LOGGER.warn "could not create confidence plot for "+value.to_s
+            $logger.warn "could not create confidence plot for "+value.to_s
           end
         end
         out_files.each do |out_file|
@@ -224,7 +224,7 @@ module Reports
     def self.create_box_plot( out_files, validation_set, title_attribute, value_attribute, class_value )
       
       out_files = [out_files] unless out_files.is_a?(Array)
-      LOGGER.debug "creating box plot, out-files:"+out_files.inspect
+      $logger.debug "creating box plot, out-files:"+out_files.inspect
       
       data = {}
       validation_set.validations.each do |v|
@@ -251,7 +251,7 @@ module Reports
     def self.create_bar_plot( out_files, validation_set, title_attribute, value_attributes )
   
       out_files = [out_files] unless out_files.is_a?(Array)
-      LOGGER.debug "creating bar plot, out-files:"+out_files.inspect
+      $logger.debug "creating bar plot, out-files:"+out_files.inspect
       
       data = []
       titles = []
@@ -297,8 +297,8 @@ module Reports
         data[i] = [titles[i]] + data[i]
       end
       
-      LOGGER.debug "bar plot labels: "+labels.inspect 
-      LOGGER.debug "bar plot data: "+data.inspect
+      $logger.debug "bar plot labels: "+labels.inspect 
+      $logger.debug "bar plot data: "+data.inspect
       
       out_files.each do |out_file|
         RubyPlot::plot_bars('Bar plot', labels, data, out_file)
@@ -343,7 +343,7 @@ module Reports
       cmd = "java -jar "+ENV['RANK_PLOTTER_JAR']+" "+tit+" -c '"+
         comparables_array.join(",")+"' -r '"+ranks_array.join(",")+"' "+conf+" "+show #+" > /home/martin/tmp/test.svg" 
       #puts "\nplotting: "+cmd
-      LOGGER.debug "Plotting ranks: "+cmd.to_s
+      $logger.debug "Plotting ranks: "+cmd.to_s
       
       res = ""
       IO.popen(cmd) do |f|
@@ -411,7 +411,7 @@ module Reports
               confidence << perf_conf_rates[:confidence]
               faint << true
             rescue
-              LOGGER.warn "could not get confidence vals for fold "+i.to_s
+              $logger.warn "could not get confidence vals for fold "+i.to_s
             end
           end
         end

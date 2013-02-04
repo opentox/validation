@@ -4,7 +4,7 @@ module Lib
   
   class PredictionData
     
-    CHECK_VALUES = ENV['RACK_ENV'] =~ /debug|test/
+    CHECK_VALUES = true #ENV['RACK_ENV'] =~ /debug|test/
     
     def self.filter_data( data, compounds, min_confidence, min_num_predictions, max_num_predictions, prediction_index=nil )
       
@@ -15,9 +15,9 @@ module Lib
         (min_confidence==nil and min_num_predictions!=nil)
       min_num_predictions = 0 if min_num_predictions==nil
       
-      LOGGER.debug("filtering predictions, conf:'"+min_confidence.to_s+"' min_num_predictions: '"+
+      $logger.debug("filtering predictions, conf:'"+min_confidence.to_s+"' min_num_predictions: '"+
         min_num_predictions.to_s+"' max_num_predictions: '"+max_num_predictions.to_s+"' ")
-      #LOGGER.debug("to filter:\nconf: "+data[:confidence_values].inspect)
+      #$logger.debug("to filter:\nconf: "+data[:confidence_values].inspect)
        
       orig_size = data[:predicted_values].size
       valid_indices = []
@@ -41,7 +41,7 @@ module Lib
         new_compounds = []
         valid_indices.each{|i| new_compounds << compounds[i]}
       end
-      LOGGER.debug("filtered predictions remaining: "+data[:predicted_values].size.to_s+"/"+orig_size.to_s)
+      $logger.debug("filtered predictions remaining: "+data[:predicted_values].size.to_s+"/"+orig_size.to_s)
       
       PredictionData.new(data, new_compounds)
     end
@@ -61,11 +61,11 @@ module Lib
       prediction_dataset_uris = [prediction_dataset_uris] unless prediction_dataset_uris.is_a?(Array)
       predicted_variables = [predicted_variables] unless predicted_variables.is_a?(Array)
       predicted_confidences = [predicted_confidences] unless predicted_confidences.is_a?(Array)
-      LOGGER.debug "loading prediction -- test-dataset:       "+test_dataset_uris.inspect
-      LOGGER.debug "loading prediction -- prediction-dataset: "+prediction_dataset_uris.inspect
-      LOGGER.debug "loading prediction -- predicted_variable: "+predicted_variables.inspect
-      LOGGER.debug "loading prediction -- predicted_confidence: "+predicted_confidences.inspect
-      LOGGER.debug "loading prediction -- prediction_feature: "+prediction_feature.to_s
+      $logger.debug "loading prediction -- test-dataset:       "+test_dataset_uris.inspect
+      $logger.debug "loading prediction -- prediction-dataset: "+prediction_dataset_uris.inspect
+      $logger.debug "loading prediction -- predicted_variable: "+predicted_variables.inspect
+      $logger.debug "loading prediction -- predicted_confidence: "+predicted_confidences.inspect
+      $logger.debug "loading prediction -- prediction_feature: "+prediction_feature.to_s
       raise "prediction_feature missing" unless prediction_feature
       
       all_compounds = []
@@ -93,14 +93,14 @@ module Lib
       
         raise "prediction_feature not found in test_dataset\n"+
               "prediction_feature: '"+prediction_feature.to_s+"'\n"+
-              "test_dataset: '"+test_dataset_uri.to_s+"'\n"+
-              "available features are: "+test_dataset.features.inspect if test_dataset.features.keys.index(prediction_feature)==nil
+              "test_dataset: '"+test_dataset_uri.to_s+"'\n"+  
+              "available features are: "+test_dataset.features.inspect if test_dataset.find_feature(prediction_feature)==nil
         
-        LOGGER.debug "test dataset size: "+test_dataset.compounds.size.to_s
+        $logger.debug "test dataset size: "+test_dataset.compounds.size.to_s
         raise "test dataset is empty "+test_dataset_uri.to_s unless test_dataset.compounds.size>0
         
         if feature_type=="classification"
-          av = test_dataset.accept_values(prediction_feature)
+          av = OpenTox::Feature.find(prediction_feature).accept_values
           raise "'"+OT.acceptValue.to_s+"' missing/invalid for feature '"+prediction_feature.to_s+"' in dataset '"+
             test_dataset_uri.to_s+"', acceptValues are: '"+av.inspect+"'" if av==nil or av.length<2
           if accept_values==nil
@@ -129,19 +129,20 @@ module Lib
         raise "predicted_variable not found in prediction_dataset\n"+
             "predicted_variable '"+predicted_variable.to_s+"'\n"+
             "prediction_dataset: '"+prediction_dataset_uri.to_s+"'\n"+
-            "available features are: "+prediction_dataset.features.inspect if prediction_dataset.features.keys.index(predicted_variable)==nil and prediction_dataset.compounds.size>0
+            "available features are: "+prediction_dataset.features.inspect if prediction_dataset.find_feature(predicted_variable)==nil and prediction_dataset.compounds.size>0
         raise "predicted_confidence not found in prediction_dataset\n"+
                 "predicted_confidence '"+predicted_confidence.to_s+"'\n"+
                 "prediction_dataset: '"+prediction_dataset_uri.to_s+"'\n"+
-                "available features are: "+prediction_dataset.features.inspect if predicted_confidence and prediction_dataset.features.keys.index(predicted_confidence)==nil and prediction_dataset.compounds.size>0
+                "available features are: "+prediction_dataset.features.inspect if predicted_confidence and prediction_dataset.find_feature(predicted_confidence)==nil and prediction_dataset.compounds.size>0
 
-        raise "more predicted than test compounds, #test: "+test_dataset.compounds.size.to_s+" < #prediction: "+
-          prediction_dataset.compounds.size.to_s+", test-dataset: "+test_dataset_uri.to_s+", prediction-dataset: "+
-           prediction_dataset_uri if test_dataset.compounds.size < prediction_dataset.compounds.size
+        #raise "more predicted than test compounds, #test: "+test_dataset.compounds.size.to_s+" < #prediction: "+
+        #  prediction_dataset.compounds.size.to_s+", test-dataset: "+test_dataset_uri.to_s+", prediction-dataset: "+
+        #   prediction_dataset_uri if test_dataset.compounds.size < prediction_dataset.compounds.size
         if CHECK_VALUES
-          prediction_dataset.compounds.each do |c| 
+          prediction_dataset.compounds.size.times do |c_idx| 
+            c = prediction_dataset.compounds[c_idx]
             raise "predicted compound not found in test dataset:\n"+c+"\ntest-compounds:\n"+
-              test_dataset.compounds.collect{|c| c.to_s}.join("\n") unless test_dataset.compounds.include?(c)
+              test_dataset.compounds.collect{|c| c.to_s}.join("\n") if prediction_dataset.data_entry_value(c_idx,predicted_variable)!=nil and test_dataset.compounds.include?(c)
           end
         end
         
@@ -149,14 +150,14 @@ module Lib
         confidence_values = []
         
         test_dataset.compounds.size.times do |test_c_idx|
-          c = test_dataset.compounds[test_c_idx]
+          c = test_dataset.compounds[test_c_idx].uri
           pred_c_idx = prediction_dataset.compound_index(test_dataset,test_c_idx)
           if pred_c_idx==nil
-            raise "internal error: mapping failed" if prediction_dataset.compounds.include?(c)
+            raise "internal error: mapping failed" if prediction_dataset.compounds.collect{|c| c.uri}.include?(c)
             predicted_values << nil
             confidence_values << nil
           else
-            raise "internal error: mapping failed" unless c==prediction_dataset.compounds[pred_c_idx]  
+            raise "internal error: mapping failed" unless c==prediction_dataset.compounds[pred_c_idx].uri  
             case feature_type
             when "classification"
               predicted_values << classification_val(prediction_dataset, pred_c_idx, predicted_variable, accept_values)
@@ -170,7 +171,7 @@ module Lib
             end
           end
         end
-        all_compounds += test_dataset.compounds
+        all_compounds += test_dataset.compounds.collect{|c| c.uri}
         all_predicted_values += predicted_values
         all_actual_values += actual_values
         all_confidence_values += confidence_values
@@ -219,7 +220,7 @@ module Lib
         v = v.to_f unless v==nil or v.is_a?(Numeric)
         v
       rescue
-        LOGGER.warn "no numeric value for feature '#{feature}' : '#{v}'"
+        $logger.warn "no numeric value for feature '#{feature}' : '#{v}'"
         nil
       end
     end

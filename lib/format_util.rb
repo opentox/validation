@@ -24,11 +24,11 @@ class String
   
   def to_owl_uri
     if DC_KEYS.include?(self)
-      return DC.send(self)
+      DC[self].to_s
     elsif RDF_KEYS.include?(self)
-      return RDF.send(self)
+      RDF[self].to_s
     else
-      return OT.send(self)
+      OT[self].to_s
     end
   end
 end

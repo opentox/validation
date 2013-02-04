@@ -18,22 +18,26 @@ module ValidationExamples
     @@prediction_features = {}
 
     def self.upload_dataset(file, subjectid=nil, dataset_service=$dataset[:uri]) #, file_type="application/x-yaml")
+      
       raise "File not found: "+file.path.to_s unless File.exist?(file.path)
       if @@dataset_uris[file.path.to_s]==nil
-        LOGGER.debug "uploading file: "+file.path.to_s
+        $logger.debug "uploading file: "+file.path.to_s
         if (file.path =~ /yaml$/)
           data = File.read(file.path)
-          #data_uri = OpenTox::RestClientWrapper.post(dataset_service,{:content_type => file_type},data).to_s.chomp
+          #data_uri = OpenTox::RestClientWrapper.post_wait(dataset_service,{:content_type => file_type},data).to_s.chomp
           #@@dataset_uris[file.path.to_s] = data_uri
-          #LOGGER.debug "uploaded dataset: "+data_uri
+          #$logger.debug "uploaded dataset: "+data_uri
           d = OpenTox::Dataset.create($dataset[:uri], subjectid)
           d.load_yaml(data)
           d.save( subjectid )
           @@dataset_uris[file.path.to_s] = d.uri
         elsif (file.path =~ /csv$/)
-          d = OpenTox::Dataset.create_from_csv_file(file.path, subjectid)
-          raise "num features not 1 (="+d.features.keys.size.to_s+"), what to predict??" if d.features.keys.size != 1
-          @@prediction_features[file.path.to_s] = d.features.keys[0]
+          d = OpenTox::Dataset.new nil, subjectid
+          d.upload file.path
+          d.get
+          #d = OpenTox::Dataset.create_from_csv_file(file.path, subjectid)
+          raise "num features not 1 (="+d.features.size.to_s+"), what to predict??" if d.features.size != 1
+          @@prediction_features[file.path.to_s] = d.features[0].uri
           @@dataset_uris[file.path.to_s] = d.uri
         elsif (file.path =~ /rdf$/)
           d = OpenTox::Dataset.create($dataset[:uri], subjectid)
@@ -43,10 +47,11 @@ module ValidationExamples
         else
           raise "unknown file type: "+file.path.to_s
         end
-        LOGGER.debug "uploaded dataset: "+d.uri
+        $logger.debug "uploaded dataset: "+d.uri
       else
-        LOGGER.debug "file already uploaded: "+@@dataset_uris[file.path.to_s]
+        $logger.debug "file already uploaded: "+@@dataset_uris[file.path.to_s]
       end
+      
       return @@dataset_uris[file.path.to_s]
     end
     
@@ -70,15 +75,19 @@ module ValidationExamples
       #end
     end
     
-    def self.validation_post(uri, params, subjectid, waiting_task=nil )
+    def self.validation_post(uri, params, subjectid, waiting_task=nil, accept_header='application/rdf+xml' )
       
       params[:subjectid] = subjectid if subjectid
       if $test_case
-        $test_case.post uri,params
-        return wait($test_case.last_response.body)
+        $test_case.post '/validation'+uri,params,'HTTP_ACCEPT' => accept_header 
+        uri =  wait($test_case.last_response.body)
       else
-        return OpenTox::RestClientWrapper.post(File.join($validation[:uri],uri),params,nil,waiting_task).to_s
+        params[:accept] = accept_header
+        uri = OpenTox::RestClientWrapper.post(File.join($validation[:uri],uri),params,{},waiting_task).to_s
+        uri = OpenTox.wait_for_task(uri)
       end
+      raise "validation post result not a validation uri: #{uri}" unless uri.validation_uri?
+      uri
     end
     
     def self.validation_get(uri, subjectid, accept_header='application/rdf+xml')
@@ -86,18 +95,18 @@ module ValidationExamples
       params[:subjectid] = subjectid if subjectid
       if $test_case
         #puts "getting "+uri+","+accept_header
-        $test_case.get uri,params,'HTTP_ACCEPT' => accept_header 
+        $test_case.get '/validation'+uri,params,'HTTP_ACCEPT' => accept_header 
         return wait($test_case.last_response.body)
       else
         params[:accept] = accept_header
-        return OpenTox::RestClientWrapper.get(File.join($validation[:uri],uri),params)
+        return OpenTox::RestClientWrapper.get(File.join($validation[:uri],uri),nil,params)
       end
     end
 
     def self.validation_delete(uri, accept_header='application/rdf+xml')
       
       if $test_case
-        $test_case.delete uri,{:subjectid => SUBJECTID},'HTTP_ACCEPT' => accept_header 
+        $test_case.delete '/validation'+uri,{:subjectid => SUBJECTID},'HTTP_ACCEPT' => accept_header 
         return wait($test_case.last_response.body)
       else
         return OpenTox::RestClientWrapper.delete(File.join($validation[:uri],uri),{:accept => accept_header,:subjectid => SUBJECTID})
@@ -110,7 +119,7 @@ module ValidationExamples
         task = OpenTox::Task.find(uri.to_s.chomp)
         task.wait_for_completion
         #raise "task failed: "+uri.to_s+", description: '"+task.description.to_s+"'" if task.error?
-        LOGGER.error "task failed :\n"+task.to_yaml if task.error?
+        $logger.error "task failed :\n"+task.to_yaml if task.error?
         uri = task.result_uri
       end
       uri
@@ -323,7 +332,7 @@ module ValidationExamples
       #rescue => ex
         #puts "could not validate: "+ex.message
         #@validation_error = ex.message
-        #LOGGER.error ex.message
+        #$logger.error ex.message
       #end
     end
     

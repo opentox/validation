@@ -72,7 +72,7 @@ class Reports::FileReportPersistance < Reports::ReportPersistance
   def initialize()
     FileUtils.mkdir REPORT_DIR unless File.directory?(REPORT_DIR)
     raise "report cannot be found nor created" unless File.directory?(REPORT_DIR)
-    LOGGER.debug "reports are stored in "+REPORT_DIR 
+    $logger.debug "reports are stored in "+REPORT_DIR 
   end
   
   def list_reports(type, filter_params=nil)
@@ -126,7 +126,7 @@ class Reports::FileReportPersistance < Reports::ReportPersistance
   
   protected
   def new_report_with_id(report_content, type, force_id=nil)
-    LOGGER.debug "storing new report of type "+type.to_s 
+    $logger.debug "storing new report of type "+type.to_s 
     
     type_dir = type_directory(type)
     raise "type dir '"+type_dir+"' cannot be found nor created" unless File.directory?(type_dir)
@@ -252,7 +252,7 @@ module Reports
     
     def list_reports(type, filter_params={})
       filter_params[:report_type] = type
-      LOGGER.debug "find reports for params: "+filter_params.inspect
+      $logger.debug "find reports for params: "+filter_params.inspect
       reports = Lib::OhmUtil.find( ReportData, filter_params )
       reports.collect{ |r| r.id }
     end
@@ -292,9 +292,9 @@ module Reports
       if (subjectid)
         begin
           res = OpenTox::Authorization.delete_policies_from_uri(report.report_uri, subjectid)
-          LOGGER.debug "Deleted validation policy: #{res}"
+          $logger.debug "Deleted validation policy: #{res}"
         rescue
-          LOGGER.warn "Policy delete error for validation: #{report.report_uri}"
+          $logger.warn "Policy delete error for validation: #{report.report_uri}"
         end
       end
       super      

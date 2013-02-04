@@ -4,6 +4,9 @@
 #end
 require "./lib/merge.rb"
 
+Ohm.connect(:thread_safe => true, :port => 6379)
+
+
 module Validation
 
   VAL_PROPS_GENERAL = [ :validation_uri, :validation_type, :model_uri, :algorithm_uri, :algorithm_params,
@@ -87,6 +90,7 @@ module Validation
     attr_accessor :subjectid
     
     def self.create(params={})
+      Ohm.connect(:thread_safe => true, :port => 6379)
       params[:date] = Time.new
       super params
     end
@@ -123,11 +127,11 @@ module Validation
     public
     def validation_uri
       raise "no id" if self.id==nil
-      $url_provider.url_for("/"+self.id.to_s, :full)
+      $url_provider.url_for("/validation/"+self.id.to_s, :full)
     end
     
     def crossvalidation_uri
-      $url_provider.url_for("/crossvalidation/"+self.crossvalidation_id.to_s, :full) if self.crossvalidation_id
+      $url_provider.url_for("/validation/crossvalidation/"+self.crossvalidation_id.to_s, :full) if self.crossvalidation_id
     end
     
     def self.classification_property?( property )
@@ -182,7 +186,7 @@ module Validation
     public
     def crossvalidation_uri
       raise "no id" if self.id==nil
-      $url_provider.url_for("/crossvalidation/"+self.id.to_s, :full) if self.id
+      $url_provider.url_for("/validation/crossvalidation/"+self.id.to_s, :full) if self.id
     end
     
     # convenience method to list all crossvalidations that are unique 
@@ -193,7 +197,7 @@ module Validation
       cvs = Crossvalidation.find( conditions )
       uniq = []
       cvs.each do |cv|
-        next if AA_SERVER and !OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"GET",subjectid)
+        next if $aa[:uri] and !OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"GET",subjectid)
         match = false
         uniq.each do |cv2|
           if cv.dataset_uri == cv2.dataset_uri and cv.num_folds == cv2.num_folds and 

@@ -25,7 +25,7 @@ module Reports
     def initialize(home_uri)
       raise "supposed to be a singleton" if defined?@@instance
       raise "plz specify home_uri" unless home_uri
-      LOGGER.info "init report service"
+      $logger.info "init report service"
       @home_uri = home_uri
       @@instance = self
     end
@@ -38,7 +38,7 @@ module Reports
     #
     def get_report_types
       
-      LOGGER.info "list all report types"
+      $logger.info "list all report types"
       Reports::ReportFactory::REPORT_TYPES.collect{ |t| get_uri(t) }.join("\n")+"\n"
     end
     
@@ -49,7 +49,7 @@ module Reports
     #
     def get_all_reports(type, filter_params)
       
-      LOGGER.info "get all reports of type '"+type.to_s+"', filter_params: '"+filter_params.inspect+"'"
+      $logger.info "get all reports of type '"+type.to_s+"', filter_params: '"+filter_params.inspect+"'"
       check_report_type(type)
       @@persistance.list_reports(type, filter_params).collect{ |id| get_uri(type,id) }.join("\n")+"\n"
     end
@@ -63,13 +63,13 @@ module Reports
     def create_report(type, validation_uris, identifier=nil, params={}, subjectid=nil, task=nil)
       
       raise "params is no hash" unless params.is_a?(Hash)
-      LOGGER.info "create report of type '"+type.to_s+"'"
+      $logger.info "create report of type '"+type.to_s+"'"
       check_report_type(type)
       
       # step1: load validations
       raise OpenTox::BadRequestError.new("validation_uris missing") unless validation_uris
-      LOGGER.debug "validation_uri(s): '"+validation_uris.inspect+"'"
-      LOGGER.debug "identifier: '"+identifier.inspect+"'"
+      $logger.debug "validation_uri(s): '"+validation_uris.inspect+"'"
+      $logger.debug "identifier: '"+identifier.inspect+"'"
       raise "illegal num identifiers: "+identifier.size.to_s+" should be equal to num validation-uris ("+validation_uris.size.to_s+")" if
         identifier and identifier.size!=validation_uris.size
         
@@ -82,19 +82,19 @@ module Reports
       end
       validation_set = Reports::ValidationSet.new(validation_uris, identifier, filter_params, subjectid)
       raise OpenTox::BadRequestError.new("cannot get validations from validation_uris '"+validation_uris.inspect+"'") unless validation_set and validation_set.size > 0
-      LOGGER.debug "loaded "+validation_set.size.to_s+" validation/s"
+      $logger.debug "loaded "+validation_set.size.to_s+" validation/s"
       task.progress(10) if task
       
       #step 2: create report of type
       report_content = Reports::ReportFactory.create_report(type, validation_set, params,
         OpenTox::SubTask.create(task,10,90))
-      LOGGER.debug "report created"
+      $logger.debug "report created"
       Reports::quit_r
       Reports.validation_access.delete_tmp_resources(subjectid)
 
       #step 3: persist report if creation not failed
       id = @@persistance.new_report(report_content, type, create_meta_data(type, validation_set, validation_uris), self, subjectid)
-      LOGGER.debug "report persisted with id: '"+id.to_s+"'"
+      $logger.debug "report persisted with id: '"+id.to_s+"'"
       task.progress(100) if task
       
       #HACK - format to html right after creation, as dynamically create html may cause deadlocks 
@@ -110,7 +110,7 @@ module Reports
     # 
     def get_report( type, id, accept_header_value="text/xml", force_formating=false, params={} )
       
-      LOGGER.info "get report '"+id.to_s+"' of type '"+type.to_s+"' (accept-header-value: '"+
+      $logger.info "get report '"+id.to_s+"' of type '"+type.to_s+"' (accept-header-value: '"+
         accept_header_value.to_s+"', force-formating:"+force_formating.to_s+" params: '"+params.inspect+"')"
       check_report_type(type)
       format = Reports::ReportFormat.get_format(accept_header_value)
@@ -124,7 +124,7 @@ module Reports
     # 
     def get_report_resource( type, id, resource )
       
-      LOGGER.info "get resource '"+resource+"' for report '"+id.to_s+"' of type '"+type.to_s+"'"
+      $logger.info "get resource '"+resource+"' for report '"+id.to_s+"' of type '"+type.to_s+"'"
       check_report_type(type)
       return @@persistance.get_report_resource(type, id, resource)
     end
@@ -137,7 +137,7 @@ module Reports
     # 
     def delete_report( type, id, subjectid=nil )
       
-      LOGGER.info "delete report '"+id.to_s+"' of type '"+type.to_s+"'"
+      $logger.info "delete report '"+id.to_s+"' of type '"+type.to_s+"'"
       check_report_type(type)
       @@persistance.delete_report(type, id, subjectid)
     end
@@ -145,7 +145,7 @@ module Reports
     # no api-access for this method
     def delete_all_reports( type, subjectid=nil )
       
-      LOGGER.info "deleting all reports of type '"+type.to_s+"'"
+      $logger.info "deleting all reports of type '"+type.to_s+"'"
       check_report_type(type)
       @@persistance.list_reports(type).each{ |id| @@persistance.delete_report(type, id, subjectid) }
     end

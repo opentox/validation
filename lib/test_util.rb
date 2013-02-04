@@ -1,5 +1,26 @@
 
 require 'test/unit'
+require 'validation_util.rb'
+
+class String
+  def task_uri?
+    self.uri? && !self.match(/task/).nil?
+  end
+  
+  def validation_uri?
+    self.uri? && !self.match(/validation/).nil?
+  end
+  
+  def uri?
+    begin
+      u = URI::parse(self)
+      return (u.scheme!=nil and u.host!=nil)
+    rescue URI::InvalidURIError
+      return false
+    end
+  end
+  
+end  
 
 module Lib
   # test utitily, to be included rack unit tests
@@ -14,7 +35,7 @@ module Lib
         task = OpenTox::Task.find(uri)
         task.wait_for_completion
         #raise "task failed: "+uri.to_s+", error is:\n"+task.description if task.error?
-        LOGGER.error "task failed :\n"+task.to_yaml if task.error?
+        $logger.error "task failed :\n"+task.to_yaml if task.error?
         uri = task.result_uri
       end
       return uri

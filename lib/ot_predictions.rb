@@ -87,7 +87,7 @@ module Lib
       end
       
       if conf_column!=nil
-        LOGGER.debug "sort via confidence: "+res.collect{|n| n[conf_column]}.inspect
+        $logger.debug "sort via confidence: "+res.collect{|n| n[conf_column]}.inspect
         res = res.sort_by{ |n| n[conf_column] || 0 }.reverse
         if format
           res.each do |a|

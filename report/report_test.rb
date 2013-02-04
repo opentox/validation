@@ -4,8 +4,8 @@ require './report/report_application.rb'
 require 'test/unit'
 require 'rack/test'
 require "./lib/test_util.rb"
-LOGGER = Logger.new(STDOUT)
-LOGGER.datetime_format = "%Y-%m-%d %H:%M:%S "
+$logger = Logger.new(STDOUT)
+$logger.datetime_format = "%Y-%m-%d %H:%M:%S "
 
 class Reports::ApplicationTest < Test::Unit::TestCase
   include Rack::Test::Methods

@@ -70,11 +70,11 @@ module Reports::ReportFormat
     #cmd = "java -jar "+ENV['SAXON_JAR']+" -o:" + File.join(directory,html_filename.to_s)+
     #  " -s:"+File.join(directory,xml_filename.to_s)+" -xsl:"+ENV['REPORT_XSL']+" -versionmsg:off"+css.to_s
       
-    LOGGER.debug "Converting report to html: '"+cmd+"'"
+    $logger.debug "Converting report to html: '"+cmd+"'"
     IO.popen(cmd.to_s) do |f|
       while line = f.gets do
-        LOGGER.info "xsltproc> "+line
-        #LOGGER.info "saxon-xslt> "+line
+        $logger.info "xsltproc> "+line
+        #$logger.info "saxon-xslt> "+line
       end
     end
     raise "error during conversion" unless $?==0

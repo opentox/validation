@@ -10,7 +10,7 @@ module Reports
       
       raise "statistical-test: '"+test_method+"' does not exist" unless ReportStatisticalTest.respond_to?(test_method)
       grouped_validations = Reports::Util.group(validations, [group_attribute])
-      LOGGER.debug "perfom test '"+test_method.to_s+"' for '"+test_attribute.to_s+"' for #"+grouped_validations.size.to_s+" "+group_attribute.to_s
+      $logger.debug "perfom test '"+test_method.to_s+"' for '"+test_attribute.to_s+"' for #"+grouped_validations.size.to_s+" "+group_attribute.to_s
       
       titles = []
       matrix = []
@@ -39,7 +39,7 @@ module Reports
       
       array1 = validations1.collect{ |v| (v.send(attribute).is_a?(Hash) ? v.send(attribute)[class_value].to_f : v.send(attribute).to_f) }
       array2 = validations2.collect{ |v| (v.send(attribute).is_a?(Hash) ? v.send(attribute)[class_value].to_f : v.send(attribute).to_f) }
-      LOGGER.debug "paired-t-testing "+attribute.to_s+" "+array1.inspect+" vs "+array2.inspect
+      $logger.debug "paired-t-testing "+attribute.to_s+" "+array1.inspect+" vs "+array2.inspect
       Reports::r_util.paired_ttest(array1, array2, significance_level)
     end
     

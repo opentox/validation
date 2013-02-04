@@ -11,8 +11,15 @@ class Array
   # cuts an array into <num-pieces> chunks
   def chunk(pieces)
     q, r = length.divmod(pieces)
-    (0..pieces).map { |i| i * q + [r, i].min }.enum_cons(2) \
-    .map { |a, b| slice(a...b) }
+    res = self.each_slice(q).collect{|a| a}
+    if (r!=0)
+      leftover = res[pieces..-1].flatten
+      res = res[0..(pieces-1)]
+      leftover.size.times do |i|
+        res[i] << leftover[i]
+      end
+    end
+    res
   end
 
   # shuffles the elements of an array
@@ -35,7 +42,7 @@ module Validation
     def self.from_cv_statistics( cv_id, subjectid=nil, waiting_task=nil )
       v =  Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation_statistics" ).first
       unless v
-        crossvalidation = Crossvalidation.get(cv_id)
+        crossvalidation = Crossvalidation[cv_id]
         raise OpenTox::NotFoundError.new "Crossvalidation '#{cv_id}' not found." unless crossvalidation
         raise OpenTox::BadRequestError.new "Crossvalidation '"+cv_id.to_s+"' not finished" unless crossvalidation.finished
         vals = Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation" ).collect{|x| x}
@@ -86,12 +93,12 @@ module Validation
         Thread.new do # do deleting in background to not cause a timeout
           to_delete.each do |attr|
             uri = self.send(attr)
-            LOGGER.debug "also deleting "+attr.to_s+" : "+uri.to_s if uri
+            $logger.debug "also deleting "+attr.to_s+" : "+uri.to_s if uri
             begin
               OpenTox::RestClientWrapper.delete(uri, :subjectid => subjectid) if uri
-              sleep 1 if AA_SERVER # wait a second to not stress the a&a service too much
+              sleep 1 if $aa[:uri] # wait a second to not stress the a&a service too much
             rescue => ex
-              LOGGER.warn "could not delete "+uri.to_s+" : "+ex.message.to_s
+              $logger.warn "could not delete "+uri.to_s+" : "+ex.message.to_s
             end
           end
         end
@@ -101,9 +108,9 @@ module Validation
         Thread.new do
           begin
             res = OpenTox::Authorization.delete_policies_from_uri(validation_uri, subjectid)
-            LOGGER.debug "Deleted validation policy: #{res}"
+            $logger.debug "Deleted validation policy: #{res}"
           rescue
-            LOGGER.warn "Policy delete error for validation: #{validation_uri}"
+            $logger.warn "Policy delete error for validation: #{validation_uri}"
           end
         end
       end
@@ -120,14 +127,21 @@ module Validation
         self.algorithm_params.split(";").each do |alg_params|
           alg_param = alg_params.split("=",2)
           raise OpenTox::BadRequestError.new "invalid algorithm param: '"+alg_params.to_s+"'" unless alg_param.size==2 or alg_param[0].to_s.size<1 or alg_param[1].to_s.size<1
-          LOGGER.warn "algorihtm param contains empty space, encode? "+alg_param[1].to_s if alg_param[1] =~ /\s/
+          $logger.warn "algorihtm param contains empty space, encode? "+alg_param[1].to_s if alg_param[1] =~ /\s/
           params[alg_param[0].to_sym] = alg_param[1]
         end
       end
       
-      algorithm = OpenTox::Algorithm::Generic.new(algorithm_uri)
-      params[:subjectid] = subjectid
-      self.model_uri = algorithm.run(params, OpenTox::SubTask.create(task, 0, 33))
+      #$logger.warn "running alg"
+      #$logger.warn algorithm_uri
+      #$logger.warn params.inspect
+      self.model_uri = OpenTox::Algorithm.new(algorithm_uri).run(params)
+      #$logger.warn "algorithm run finished"
+      #$logger.warn "#{result}"
+      
+      #algorithm = OpenTox::Algorithm::Generic.new(algorithm_uri)
+      #params[:subjectid] = subjectid
+      #self.model_uri = algorithm.run(params, OpenTox::SubTask.create(task, 0, 33))
       
       #model = OpenTox::Model::PredictionModel.build(algorithm_uri, params, 
       #  OpenTox::SubTask.create(task, 0, 33) )
@@ -150,28 +164,27 @@ module Validation
     def validate_model( task=nil )
       
       raise "validation_type missing" unless self.validation_type
-      LOGGER.debug "validating model '"+self.model_uri+"'"
+      $logger.debug "validating model '"+self.model_uri+"'"
       
       #model = OpenTox::Model::PredictionModel.find(self.model_uri)
       #raise OpenTox::NotFoundError.new "model not found: "+self.model_uri.to_s unless model
-      model = OpenTox::Model::Generic.find(self.model_uri, self.subjectid)
+      model = OpenTox::Model.new(self.model_uri, self.subjectid)
+      model.get
       
       unless self.algorithm_uri
-        self.algorithm_uri = model.metadata[OT.algorithm]
+        self.algorithm_uri = model.metadata[OT.algorithm.to_s]
       end
       if self.prediction_feature.to_s.size==0
-        dependentVariables = model.metadata[OT.dependentVariables]
-        raise OpenTox::NotFoundError.new "model has no dependentVariables specified, please give prediction_feature for model validation" unless dependentVariables
-        self.prediction_feature = model.metadata[OT.dependentVariables]
+        dependentVariables = model.metadata[OT.dependentVariables.to_s]
+        raise "model has no dependentVariables specified, please give prediction_feature for model validation" unless dependentVariables
+        self.prediction_feature = model.metadata[OT.dependentVariables.to_s]
       end
       
       prediction_dataset_uri = ""
       benchmark = Benchmark.measure do 
         #prediction_dataset_uri = model.predict_dataset(self.test_dataset_uri, OpenTox::SubTask.create(task, 0, 50))
-        prediction_dataset_uri = model.run(
-          {:dataset_uri => self.test_dataset_uri, :subjectid => self.subjectid},
-          "text/uri-list",
-          OpenTox::SubTask.create(task, 0, 50))
+        prediction_dataset_uri = model.run({:dataset_uri => self.test_dataset_uri, :subjectid => self.subjectid})
+          #"text/uri-list",OpenTox::SubTask.create(task, 0, 50))
       end
 #      self.attributes = { :prediction_dataset_uri => prediction_dataset_uri,
 #             :real_runtime => benchmark.real }
@@ -186,7 +199,7 @@ module Validation
     end
     
     def compute_prediction_data_with_cv(cv_vals, waiting_task=nil)
-      models = cv_vals.collect{|v| OpenTox::Model::Generic.find(v.model_uri, subjectid)}
+      models = cv_vals.collect{|v| m = OpenTox::Model.new(v.model_uri, subjectid); m.get; m}
       feature_type = models.first.feature_type(subjectid)
       test_dataset_uris = cv_vals.collect{|v| v.test_dataset_uri}
       prediction_feature = cv_vals.first.prediction_feature
@@ -200,13 +213,15 @@ module Validation
     end
     
     def compute_prediction_data_with_model(model=nil, task=nil)
-      model = OpenTox::Model::Generic.find(self.model_uri, self.subjectid) if model==nil and self.model_uri
-      raise OpenTox::NotFoundError.new "model not found: "+self.model_uri.to_s unless model
-      
+      #model = OpenTox::Model::Generic.find(self.model_uri, self.subjectid) if model==nil and self.model_uri
+      #raise OpenTox::NotFoundError.new "model not found: "+self.model_uri.to_s unless model
+      model = OpenTox::Model.new(self.model_uri, self.subjectid) if model==nil
+      model.get
+            
       feature_type = model.feature_type(self.subjectid)
-      dependentVariables = model.metadata[OT.dependentVariables]
+      dependentVariables = model.metadata[OT.dependentVariables.to_s]
       prediction_feature = self.prediction_feature ? nil : dependentVariables
-      algorithm_uri = self.algorithm_uri ? nil : model.metadata[OT.algorithm]
+      algorithm_uri = self.algorithm_uri ? nil : model.metadata[OT.algorithm.to_s]
       predicted_variable = model.predicted_variable(self.subjectid)
       predicted_confidence = model.predicted_confidence(self.subjectid)
       raise "cannot determine whether model '"+model.uri.to_s+"' performs classification or regression: '#{feature_type}', "+
@@ -222,7 +237,7 @@ module Validation
       self.prediction_feature = prediction_feature if self.prediction_feature==nil && prediction_feature
       self.algorithm_uri = algorithm_uri if self.algorithm_uri==nil && algorithm_uri
     
-      LOGGER.debug "computing prediction stats"
+      $logger.debug "computing prediction stats"
       p_data = Lib::PredictionData.create( feature_type, 
         self.test_dataset_uri, self.prediction_feature, 
         self.prediction_dataset_uri, predicted_variable, predicted_confidence, self.subjectid,
@@ -307,14 +322,14 @@ module Validation
     
     def clean_loo_files( delete_feature_datasets )
       Validation.find( :crossvalidation_id => self.id, :validation_type => "crossvalidation" ).each do |v|
-        LOGGER.debug "loo-cleanup> delete training dataset "+v.training_dataset_uri
+        $logger.debug "loo-cleanup> delete training dataset "+v.training_dataset_uri
         OpenTox::RestClientWrapper.delete v.training_dataset_uri,subjectid
         if (delete_feature_datasets)
           begin
             model = OpenTox::Model::Generic.find(v.model_uri)
-            if model.metadata[OT.featureDataset]
-              LOGGER.debug "loo-cleanup> delete feature dataset "+model.metadata[OT.featureDataset]
-              OpenTox::RestClientWrapper.delete model.metadata[OT.featureDataset],subjectid
+            if model.metadata[OT.featureDataset.to_s]
+              $logger.debug "loo-cleanup> delete feature dataset "+model.metadata[OT.featureDataset.to_s]
+              OpenTox::RestClientWrapper.delete model.metadata[OT.featureDataset.to_s],subjectid
             end
           rescue
           end
@@ -328,9 +343,9 @@ module Validation
       Thread.new do # do deleting in background to not cause a timeout
         validations.each do |v|
           v.subjectid = self.subjectid
-          LOGGER.debug "deleting cv-validation "+v.validation_uri.to_s
+          $logger.debug "deleting cv-validation "+v.validation_uri.to_s
           v.delete_validation
-          sleep 1 if AA_SERVER # wait a second to not stress the a&a service too much
+          sleep 1 if $aa[:uri] # wait a second to not stress the a&a service too much
         end
       end
       self.delete
@@ -338,9 +353,9 @@ module Validation
         Thread.new do
           begin
             res = OpenTox::Authorization.delete_policies_from_uri(crossvalidation_uri, subjectid)
-            LOGGER.debug "Deleted crossvalidation policy: #{res}"
+            $logger.debug "Deleted crossvalidation policy: #{res}"
           rescue
-            LOGGER.warn "Policy delete error for crossvalidation: #{crossvalidation_uri}"
+            $logger.warn "Policy delete error for crossvalidation: #{crossvalidation_uri}"
           end
         end
       end
@@ -370,7 +385,7 @@ module Validation
     # executes the cross-validation (build models and validates them)
     def perform_cv_validations( task=nil )
       
-      LOGGER.debug "perform cv validations"
+      $logger.debug "perform cv validations"
       i = 0
       task_step = 100 / self.num_folds.to_f;
       @tmp_validations.each do | val |
@@ -380,7 +395,7 @@ module Validation
         raise "validation '"+validation.validation_uri+"' for crossvaldation could not be finished" unless 
           validation.finished
         i += 1
-        LOGGER.debug "fold "+i.to_s+" done: "+validation.validation_uri.to_s
+        $logger.debug "fold "+i.to_s+" done: "+validation.validation_uri.to_s
       end
       
 #      self.attributes = { :finished => true }
@@ -405,7 +420,7 @@ module Validation
                                           (cv.prediction_feature && 
                                            cv.prediction_feature != self.prediction_feature)) }
       cvs.each do |cv|
-        next if AA_SERVER and !OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"GET",self.subjectid)
+        next if $aa[:uri] and !OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"GET",self.subjectid)
         tmp_val = []
         Validation.find( :crossvalidation_id => cv.id, :validation_type => "crossvalidation" ).each do |v|
           break unless 
@@ -425,7 +440,7 @@ module Validation
         end
         if tmp_val.size == self.num_folds.to_i
           @tmp_validations = tmp_val
-          LOGGER.debug "copied dataset uris from cv "+cv.crossvalidation_uri.to_s #+":\n"+tmp_val.inspect
+          $logger.debug "copied dataset uris from cv "+cv.crossvalidation_uri.to_s #+":\n"+tmp_val.inspect
           return true
         end
       end
@@ -435,7 +450,7 @@ module Validation
     # creates cv folds (training and testdatasets)
     # stores uris in validation objects 
     def create_new_cv_datasets( task = nil )
-      LOGGER.debug "creating datasets for crossvalidation"
+      $logger.debug "creating datasets for crossvalidation"
       orig_dataset = Lib::DatasetCache.find(self.dataset_uri,self.subjectid)
       raise OpenTox::NotFoundError.new "Dataset not found: "+self.dataset_uri.to_s unless orig_dataset
       
@@ -451,7 +466,7 @@ module Validation
           shuffled_compound_indices = (0..(orig_dataset.compounds.size-1)).to_a.shuffle( self.random_seed )
         end  
         split_compound_indices = shuffled_compound_indices.chunk( self.num_folds.to_i )
-        LOGGER.debug "cv: num instances for each fold: "+split_compound_indices.collect{|c| c.size}.join(", ")
+        $logger.debug "cv: num instances for each fold: "+split_compound_indices.collect{|c| c.size}.join(", ")
           
         self.num_folds.to_i.times do |n|
           test_compound_indices = []
@@ -471,14 +486,12 @@ module Validation
             "', is '"+train_compound_indices.size.to_s+"'" unless shuffled_compound_indices.size - test_compound_indices.size == train_compound_indices.size
           datasetname = 'dataset fold '+(n+1).to_s+' of '+self.num_folds.to_s        
           meta[DC.title] = "training "+datasetname 
-          LOGGER.debug "training set: "+datasetname+"_train, compounds: "+train_compound_indices.size.to_s
-          train_dataset_uri = orig_dataset.split( train_compound_indices, orig_dataset.features.keys, 
-            meta, self.subjectid ).uri
+          $logger.debug "training set: "+datasetname+"_train, compounds: "+train_compound_indices.size.to_s
+          train_dataset_uri = orig_dataset.split( train_compound_indices, orig_dataset.features, meta, self.subjectid ).uri
           train_dataset_uris << train_dataset_uri
           meta[DC.title] = "test "+datasetname
-          LOGGER.debug "test set:     "+datasetname+"_test, compounds: "+test_compound_indices.size.to_s
-          test_dataset_uri = orig_dataset.split( test_compound_indices, orig_dataset.features.keys, 
-            meta, self.subjectid ).uri
+          $logger.debug "test set:     "+datasetname+"_test, compounds: "+test_compound_indices.size.to_s
+          test_dataset_uri = orig_dataset.split( test_compound_indices, orig_dataset.features, meta, self.subjectid ).uri
           test_dataset_uris << test_dataset_uri
         end
       when /true|super/
@@ -530,7 +543,7 @@ module Validation
           "' not found in dataset, features are: \n"+
           orig_dataset.features.inspect unless orig_dataset.features.include?(prediction_feature)
       else
-        LOGGER.warn "no prediciton feature given, all features included in test dataset"
+        $logger.warn "no prediciton feature given, all features included in test dataset"
       end
       
       compound_indices = (0..(orig_dataset.compounds.size-1)).to_a
@@ -553,33 +566,34 @@ module Validation
         end
       end
       
-      LOGGER.debug "bootstrapping on dataset "+orig_dataset_uri+
+      $logger.debug "bootstrapping on dataset "+orig_dataset_uri+
                     " into training ("+training_compound_indices.size.to_s+") and test ("+test_compound_indices.size.to_s+")"+
                     ", duplicates in training dataset: "+test_compound_indices.size.to_s
       task.progress(33) if task
       
       result = {}
-      result[:training_dataset_uri] = orig_dataset.split( training_compound_indices,
-        orig_dataset.features.keys, 
+      result[:training_dataset_uri] = orig_dataset.split( training_compound_indices, orig_dataset.features, 
         { DC.title => "Bootstrapping training dataset of "+orig_dataset.title.to_s,
-          DC.creator => $url_provider.url_for('/bootstrapping',:full) },
+          DC.creator => $url_provider.url_for('/validation/bootstrapping',:full) },
         subjectid ).uri
       task.progress(66) if task
 
-      result[:test_dataset_uri] = orig_dataset.split( test_compound_indices,
-        orig_dataset.features.keys,
+      result[:test_dataset_uri] = orig_dataset.split( test_compound_indices, orig_dataset.features,
         { DC.title => "Bootstrapping test dataset of "+orig_dataset.title.to_s,
-          DC.creator => $url_provider.url_for('/bootstrapping',:full)} ,
+          DC.creator => $url_provider.url_for('/validation/bootstrapping',:full)} ,
         subjectid ).uri
       task.progress(100) if task
       
-      LOGGER.debug "bootstrapping done, training dataset: '"+result[:training_dataset_uri].to_s+"', test dataset: '"+result[:test_dataset_uri].to_s+"'"
+      $logger.debug "bootstrapping done, training dataset: '"+result[:training_dataset_uri].to_s+"', test dataset: '"+result[:test_dataset_uri].to_s+"'"
       return result
     end    
     
     # splits a dataset into test and training dataset
     # returns map with training_dataset_uri and test_dataset_uri
-    def self.train_test_dataset_split( orig_dataset_uri, prediction_feature, subjectid, stratified="false", split_ratio=nil, random_seed=nil, task=nil )
+    def self.train_test_dataset_split( creator_uri, orig_dataset_uri, prediction_feature, subjectid, stratified="false", split_ratio=nil, random_seed=nil, task=nil )
+      
+      $logger.debug "train test split"
+      
       split_ratio=0.67 unless split_ratio
       split_ratio = split_ratio.to_f
       random_seed=1 unless random_seed
@@ -588,22 +602,21 @@ module Validation
       raise OpenTox::NotFoundError.new "Split ratio invalid: "+split_ratio.to_s unless split_ratio and split_ratio=split_ratio.to_f
       raise OpenTox::NotFoundError.new "Split ratio not >0 and <1 :"+split_ratio.to_s unless split_ratio>0 && split_ratio<1
       orig_dataset = Lib::DatasetCache.find orig_dataset_uri, subjectid
-      orig_dataset.load_all subjectid
       raise OpenTox::NotFoundError.new "Dataset not found: "+orig_dataset_uri.to_s unless orig_dataset
       
       if prediction_feature
         if stratified==/true/
           raise OpenTox::NotFoundError.new "Prediction feature '"+prediction_feature.to_s+
-            "' not found in dataset, features are: \n"+orig_dataset.features.keys.inspect unless orig_dataset.features.include?(prediction_feature)
+            "' not found in dataset, features are: \n"+orig_dataset.features.collect{|f| f.uri}.inspect unless orig_dataset.features.include?(prediction_feature)
         else
-          LOGGER.warn "prediction_feature argument is ignored for non-stratified splits" if prediction_feature
+          $logger.warn "prediction_feature argument is ignored for non-stratified splits" if prediction_feature
           prediction_feature=nil
         end
       elsif stratified==/true/
         raise OpenTox::BadRequestError.new "prediction feature required for stratified splits" unless prediction_feature
       end
       
-      meta = { DC.creator => $url_provider.url_for('/training_test_split',:full) }
+      meta = { DC.creator => creator_uri }
       
       case stratified
       when /true|super/
@@ -622,7 +635,7 @@ module Validation
         split = (compound_indices.size*split_ratio).round
         split = [split,1].max
         split = [split,compound_indices.size-2].min
-        LOGGER.debug "splitting dataset "+orig_dataset_uri+
+        $logger.debug "splitting dataset "+orig_dataset_uri+
                     " into train:0-"+split.to_s+" and test:"+(split+1).to_s+"-"+(compound_indices.size-1).to_s+
                     " (shuffled with seed "+random_seed.to_s+")"
         compound_indices.shuffle!( random_seed )
@@ -632,22 +645,22 @@ module Validation
   
         meta[DC.title] = "Training dataset split of "+orig_dataset.uri
         result = {}
-        train_data = orig_dataset.split( training_compound_indices,
-          orig_dataset.features.keys, meta, subjectid )
-        raise "Train dataset num coumpounds != "+(orig_dataset.compounds.size*split_ratio).round.to_s+", instead: "+train_data.compounds.size.to_s unless 
-          train_data.compounds.size==(orig_dataset.compounds.size*split_ratio).round
+        train_data = orig_dataset.split( training_compound_indices, orig_dataset.features, meta, subjectid )
+        est_num_train_compounds = (orig_dataset.compounds.size*split_ratio).round
+        raise "Train dataset num coumpounds != #{est_num_train_compounds}, instead: "+train_data.compounds.size.to_s unless 
+          train_data.compounds.size==est_num_train_compounds
         result[:training_dataset_uri] = train_data.uri
         task.progress(66) if task
   
         meta[DC.title] = "Test dataset split of "+orig_dataset.uri
-        test_data = orig_dataset.split( test_compound_indices,
-          orig_dataset.features.keys, meta, subjectid )
-        raise "Test dataset num coumpounds != "+(orig_dataset.compounds.size*(1-split_ratio)).round.to_s+", instead: "+test_data.compounds.size.to_s unless 
-          test_data.compounds.size==(orig_dataset.compounds.size*(1-split_ratio)).round
+        test_data = orig_dataset.split( test_compound_indices, orig_dataset.features, meta, subjectid )
+        est_num_test_compounds = orig_dataset.compounds.size-est_num_train_compounds
+        raise "Test dataset num coumpounds != #{est_num_test_compounds}, instead: "+test_data.compounds.size.to_s unless 
+          test_data.compounds.size==est_num_test_compounds
         result[:test_dataset_uri] = test_data.uri
         task.progress(100) if task  
         
-        LOGGER.debug "split done, training dataset: '"+result[:training_dataset_uri].to_s+"', test dataset: '"+result[:test_dataset_uri].to_s+"'"
+        $logger.debug "split done, training dataset: '"+result[:training_dataset_uri].to_s+"', test dataset: '"+result[:test_dataset_uri].to_s+"'"
       else
         raise OpenTox::BadRequestError.new "stratified != false|true|super, is #{stratified}"
       end

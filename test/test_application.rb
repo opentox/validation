@@ -2,7 +2,7 @@
 post '/test_validation/?' do
   validationExamples = ValidationExamples.select(params[:select])
   return "please \"select\" a single validation example:\n"+ValidationExamples.list if validationExamples.size!=1 or validationExamples[0].size!=1
-  task = OpenTox::Task.create("Test validation",url_for("/test_validation",:full)) do |task| 
+  task = OpenTox::Task.run("Test validation",url_for("/validation/test_validation",:full)) do |task| 
     v = validationExamples[0][0]
     ex = v.new
     ex.subjectid = @subjectid

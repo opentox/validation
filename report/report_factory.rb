@@ -229,7 +229,7 @@ module Reports::ReportFactory
     
     # groups results into sets with equal dataset 
     if (validation_set.num_different_values(:dataset_uri)>1)
-      LOGGER.debug "compare report -- num different datasets: "+validation_set.num_different_values(:dataset_uri).to_s
+      $logger.debug "compare report -- num different datasets: "+validation_set.num_different_values(:dataset_uri).to_s
       dataset_grouping = Reports::Util.group(validation_set.validations, [:dataset_uri])
       # check if equal values in each group exist
       Reports::Util.check_group_matching(dataset_grouping, [:crossvalidation_fold, :num_folds, :stratified, :random_seed])

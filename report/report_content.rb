@@ -167,7 +167,7 @@ class Reports::ReportContent
           image_title_2 += " ("+omit_count.to_s+" datapoints omitted)" if omit_count>0
           @xml_report.add_imagefigure(section_regr, image_title_2,  plot_png[:name], "PNG", 100, plot_svg[:name])
         rescue Exception => ex
-          LOGGER.error("Could not create regression plot: "+ex.message)
+          $logger.error("Could not create regression plot: "+ex.message)
           rm_tmp_file(plot_png[:name])
           rm_tmp_file(plot_svg[:name])
           @xml_report.add_paragraph(section_regr, "could not create regression plot: "+ex.message)
@@ -204,7 +204,7 @@ class Reports::ReportContent
       end
       @xml_report.add_imagefigure(section_plot, image_title,  plot_png[:name], "PNG", 100, plot_svg[:name])
     rescue Exception => ex
-      LOGGER.error("Could not create train test plot: "+ex.message)
+      $logger.error("Could not create train test plot: "+ex.message)
       rm_tmp_file(plot_png[:name]) if plot_png
       rm_tmp_file(plot_svg[:name]) if plot_svg
       @xml_report.add_paragraph(section_plot, "could not create train test plot: "+ex.message)
@@ -226,7 +226,7 @@ class Reports::ReportContent
     if prediction_set.size>0
       if prediction_set.size!=validation_set.size
         section_text += "\nWARNING: roc plot information not available for all validation results"
-        LOGGER.error "WARNING: roc plot information not available for all validation results:\n"+
+        $logger.error "WARNING: roc plot information not available for all validation results:\n"+
           "validation set size: "+validation_set.size.to_s+", prediction set size: "+prediction_set.size.to_s
       end
       @xml_report.add_paragraph(section_roc, section_text) if section_text
@@ -237,7 +237,7 @@ class Reports::ReportContent
         @xml_report.add_imagefigure(section_roc, image_title, plot_png[:name], "PNG", 100, plot_svg[:name])
       rescue Exception => ex
         msg = "WARNING could not create roc plot for class value '"+accept_value.to_s+"': "+ex.message
-        LOGGER.error(msg)
+        $logger.error(msg)
         rm_tmp_file(plot_png[:name])
         rm_tmp_file(plot_svg[:name])
         @xml_report.add_paragraph(section_roc, msg)
@@ -262,7 +262,7 @@ class Reports::ReportContent
     if prediction_set.size>0
       if prediction_set.size!=validation_set.size
         section_text += "\nWARNING: plot information not available for all validation results"
-        LOGGER.error "WARNING: plot information not available for all validation results:\n"+
+        $logger.error "WARNING: plot information not available for all validation results:\n"+
           "validation set size: "+validation_set.size.to_s+", prediction set size: "+prediction_set.size.to_s
       end
       @xml_report.add_paragraph(section_conf, section_text) if section_text and section_text.size>0
@@ -275,7 +275,7 @@ class Reports::ReportContent
         @xml_report.add_imagefigure(section_conf, image_title, plot_png[:name], "PNG", 100, plot_svg[:name])
       rescue Exception => ex
         msg = "WARNING could not create confidence plot: "+ex.message
-        LOGGER.error(msg)
+        $logger.error(msg)
         rm_tmp_file(plot_png[:name])
         rm_tmp_file(plot_svg[:name])
         @xml_report.add_paragraph(section_conf, msg)
@@ -390,7 +390,7 @@ class Reports::ReportContent
       end
     rescue Exception => ex
       msg = "WARNING could not create box plot: "+ex.message
-      LOGGER.error(msg)
+      $logger.error(msg)
       rm_tmp_file(plot_png[:name]) if plot_png
       rm_tmp_file(plot_svg[:name]) if plot_svg
       @xml_report.add_paragraph(section_box, msg)

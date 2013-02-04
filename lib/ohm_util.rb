@@ -28,6 +28,8 @@ module Lib
     end
     
     def self.find(model, filter_params)
+      filter_params.delete('splat')
+      filter_params.delete('captures')
       params = check_params(model,filter_params)
       if (params.size==0)
         model.all

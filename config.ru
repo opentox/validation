@@ -1,5 +1,11 @@
 SERVICE = "validation"
+
+require "rubygems"
+require "ohm"
+
 require 'bundler'
 Bundler.require
+
 require './application.rb'
-run run Sinatra::Application
+run Validation::Application
+

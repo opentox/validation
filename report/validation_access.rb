@@ -27,15 +27,15 @@ class Reports::ValidationDB
         
         if same_service?u
           raise OpenTox::NotAuthorizedError.new "Not authorized: GET "+u.to_s if
-            AA_SERVER and !OpenTox::Authorization.authorized?(u,"GET",subjectid)
-          cv = Validation::Crossvalidation.get( cv_id )
+            $aa[:uri] and !OpenTox::Authorization.authorized?(u,"GET",subjectid)
+          cv = Validation::Crossvalidation[cv_id]
                   raise OpenTox::NotFoundError.new "crossvalidation with id "+cv_id.to_s+" not found" unless cv
           raise OpenTox::BadRequestError.new("crossvalidation with id '"+cv_id.to_s+"' not finished") unless cv.finished
           #res += Validation::Validation.find( :all, :conditions => { :crossvalidation_id => cv_id } ).collect{|v| v.validation_uri.to_s}
           val_uris = Validation::Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation" ).collect{|v| v.validation_uri.to_s}
         else
           val_base_uri = u.gsub(/\/crossvalidation\/[0-9]+/,"")
-          val_uris = OpenTox::RestClientWrapper.get( val_base_uri+"?crossvalidation_id="+cv_id.to_s+"&validation_type=crossvalidation", {:subjectid => subjectid, :accept => "text/uri-list" }).split("\n")
+          val_uris = OpenTox::RestClientWrapper.get( val_base_uri+"?crossvalidation_id="+cv_id.to_s+"&validation_type=crossvalidation",nil,{:subjectid => subjectid, :accept => "text/uri-list" }).split("\n")
         end
         
         val_uris.each do |v_uri|
@@ -60,10 +60,11 @@ class Reports::ValidationDB
     
     if same_service? uri
       raise OpenTox::NotAuthorizedError.new "Not authorized: GET "+uri.to_s if
-        AA_SERVER and !OpenTox::Authorization.authorized?(uri,"GET",subjectid)
-      v = Validation::Validation.get(validation_id)
+        $aa[:uri] and !OpenTox::Authorization.authorized?(uri,"GET",subjectid)
+      Ohm.connect(:thread_safe => true, :port => 6379)
+      v = Validation::Validation[validation_id]
     else
-      v = YAML::load(OpenTox::RestClientWrapper.get uri, {:subjectid=>subjectid, :accept=>"application/serialize"})
+      v = YAML::load(OpenTox::RestClientWrapper.get uri,nil,{:subjectid=>subjectid, :accept=>"application/serialize"})
     end
     v.subjectid = subjectid
     v.filter_predictions(filter_params[:min_confidence], filter_params[:min_num_predictions], filter_params[:max_num_predictions]) if 
@@ -88,19 +89,19 @@ class Reports::ValidationDB
   
   def init_validation_from_cv_statistics( validation, cv_uri, filter_params, subjectid )
     
-    raise OpenTox::BadRequestError.new "not a crossvalidation uri: "+cv_uri.to_s unless cv_uri.uri? and cv_uri =~ /crossvalidation.*\/[0-9]+$/
+    raise OpenTox::BadRequestError.new "not a crossvalidation uri: "+cv_uri.to_s unless cv_uri =~ /crossvalidation.*\/[0-9]+$/
     
     if same_service?cv_uri
       cv_id = cv_uri.split("/")[-1]
       raise OpenTox::NotAuthorizedError.new "Not authorized: GET "+cv_uri.to_s if
-        AA_SERVER and !OpenTox::Authorization.authorized?(cv_uri,"GET",subjectid)
-      cv = Validation::Crossvalidation.get(cv_id)
+        $aa[:uri] and !OpenTox::Authorization.authorized?(cv_uri,"GET",subjectid)
+      cv = Validation::Crossvalidation[cv_id]
       raise OpenTox::NotFoundError.new "crossvalidation with id "+crossvalidation_id.to_s+" not found" unless cv
       raise OpenTox::BadRequestError.new "crossvalidation with id "+crossvalidation_id.to_s+" is not finished yet" unless cv.finished
       v = Validation::Validation.from_cv_statistics(cv_id, subjectid)
     else
-      cv = YAML::load(OpenTox::RestClientWrapper.get cv_uri, {:subjectid=>subjectid, :accept=>"application/serialize"})
-      v = YAML::load(OpenTox::RestClientWrapper.get cv_uri+"/statistics", {:subjectid=>subjectid, :accept=>"application/serialize"})
+      cv = YAML::load(OpenTox::RestClientWrapper.get cv_uri,nil,{:subjectid=>subjectid, :accept=>"application/serialize"})
+      v = YAML::load(OpenTox::RestClientWrapper.get cv_uri+"/statistics",nil,{:subjectid=>subjectid, :accept=>"application/serialize"})
     end
     v.filter_predictions(filter_params[:min_confidence], filter_params[:min_num_predictions], filter_params[:max_num_predictions]) if 
       filter_params
@@ -125,10 +126,10 @@ class Reports::ValidationDB
     
     cv = nil
     if same_service?validation.crossvalidation_uri
-      cv = Validation::Crossvalidation.get(validation.crossvalidation_id)
+      cv = Validation::Crossvalidation[validation.crossvalidation_id]
       raise OpenTox::BadRequestError.new "no crossvalidation found with id "+validation.crossvalidation_id.to_s unless cv
     else
-      cv = YAML::load(OpenTox::RestClientWrapper.get validation.crossvalidation_uri, {:subjectid=>subjectid, :accept=>"application/serialize"})
+      cv = YAML::load(OpenTox::RestClientWrapper.get validation.crossvalidation_uri,nil,{:subjectid=>subjectid, :accept=>"application/serialize"})
     end
     Validation::CROSS_VAL_PROPS.each do |p|
       validation.send("#{p.to_s}=".to_sym, cv.send(p.to_s))
@@ -148,15 +149,15 @@ class Reports::ValidationDB
     training_features = Lib::DatasetCache.find( training_feature_dataset_uri(validation,subjectid), subjectid )
     test_dataset = Lib::DatasetCache.find( validation.test_dataset_uri, subjectid )
     features_found = true 
-    training_features.features.keys.each do |f|
-      unless test_dataset.features.keys.include?(f)
+    training_features.features.each do |f|
+      unless test_dataset.find_feature(f.uri)
         features_found = false
-        LOGGER.debug "training-feature are not in test-datset #{f}"
+        $logger.debug "training-feature are not in test-datset #{f}"
         break
       end
     end
     if features_found
-      LOGGER.debug "all training-features found in test-datset"
+      $logger.debug "all training-features found in test-datset"
       uri = test_dataset.uri
     else
       m = OpenTox::Model::Generic.find(validation.model_uri, subjectid)
@@ -172,7 +173,7 @@ class Reports::ValidationDB
       uri = OpenTox::RestClientWrapper.post(feat_gen,{:subjectid => subjectid,
         :feature_dataset_uri=>training_feature_dataset_uri(validation,subjectid),
         :dataset_uri=>validation.test_dataset_uri})
-      @@tmp_resources << uri
+      @@tmp_resources << OpenTox.wait_for_task(uri)
     end
     uri
   end
@@ -202,9 +203,10 @@ class Reports::ValidationDB
     test_datasets.split(";").each do |test_dataset|
       d = Lib::DatasetCache.find( test_dataset, subjectid )
       raise "cannot get test target dataset for accept values, dataset: "+test_dataset.to_s unless d
-      accept_values = d.accept_values(validation.prediction_feature)
-      raise "cannot get accept values from dataset "+test_dataset.to_s+" for feature "+
-        validation.prediction_feature+":\n"+d.features[validation.prediction_feature].to_yaml unless accept_values!=nil
+      feature = OpenTox::Feature.find(validation.prediction_feature,subjectid)
+      accept_values = feature.accept_values
+      raise "cannot get accept values for feature "+
+        validation.prediction_feature+":\n"+feature.to_yaml unless accept_values!=nil
       raise "different accept values" if res && res!=accept_values
       res = accept_values
     end
@@ -212,20 +214,24 @@ class Reports::ValidationDB
   end
   
   def feature_type( validation, subjectid=nil )
-    OpenTox::Model::Generic.new(validation.model_uri).feature_type(subjectid)
+    m = OpenTox::Model.new(validation.model_uri,subjectid)
+    m.get
+    m.feature_type(subjectid)
     #get_model(validation).classification?
   end
   
   def predicted_variable(validation, subjectid=nil)
     raise "cannot derive model depended props for merged validations" if Lib::MergeObjects.merged?(validation)
-    model = OpenTox::Model::Generic.find(validation.model_uri, subjectid)
+    model = OpenTox::Model.new(validation.model_uri,subjectid)
+    model.get
     raise OpenTox::NotFoundError.new "model not found '"+validation.model_uri+"'" unless model
     model.predicted_variable(subjectid)
   end
   
   def predicted_confidence(validation, subjectid=nil)
     raise "cannot derive model depended props for merged validations" if Lib::MergeObjects.merged?(validation)
-    model = OpenTox::Model::Generic.find(validation.model_uri, subjectid)
+    model = OpenTox::Model.new(validation.model_uri,subjectid)
+    model.get
     raise OpenTox::NotFoundError.new "model not found '"+validation.model_uri+"'" unless model
     model.predicted_confidence(subjectid)
   end

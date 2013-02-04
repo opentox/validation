@@ -1,6 +1,7 @@
 
 require "./lib/format_util.rb"
 
+
 module Validation
   
   # adding to_yaml and to_rdf functionality to validation
@@ -15,16 +16,16 @@ module Validation
          h[p] = self.send(p.to_s)
       end
       if crossvalidation_id!=nil
-        cv = {:type => OT.CrossvalidationInfo}
+        cv = {:type => OT.CrossvalidationInfo.to_s}
         #skip crossvalidation_id
         cv[:crossvalidation_fold] = self.crossvalidation_fold
-        cv[:crossvalidation_uri] = self.crossvalidation_uri
+        cv[:crossvalidation_uri] = self.crossvalidation_uri.force_encoding("UTF-8")
         h[:crossvalidation_info] = cv
       end
       if classification_statistics 
         raise "classification_statistics is no hash: "+classification_statistics.class.to_s+" -> '"+
           classification_statistics.to_s+"'" unless classification_statistics.is_a?(Hash)
-        clazz = { :type => OT.ClassificationStatistics }
+        clazz = { :type => OT.ClassificationStatistics.to_s }
         VAL_CLASS_PROPS_SINGLE.each{ |p| clazz[p] = classification_statistics[p] }
         
         # transpose results per class
@@ -32,7 +33,7 @@ module Validation
         VAL_CLASS_PROPS_PER_CLASS.each do |p|
           raise "missing classification statitstics: "+p.to_s+" "+classification_statistics.inspect if classification_statistics[p]==nil
           classification_statistics[p].each do |class_value, property_value|
-            class_values[class_value] = {:class_value => class_value, :type => OT.ClassValueStatistics} unless class_values.has_key?(class_value)
+            class_values[class_value] = {:class_value => class_value, :type => OT.ClassValueStatistics.to_s} unless class_values.has_key?(class_value)
             map = class_values[class_value]
             map[p] = property_value
           end
@@ -43,18 +44,18 @@ module Validation
         cells = []
         raise "confusion matrix missing" unless classification_statistics[:confusion_matrix]!=nil
         classification_statistics[:confusion_matrix].each do |k,v|
-          cell = { :type => OT.ConfusionMatrixCell }
+          cell = { :type => OT.ConfusionMatrixCell.to_s }
           # key in confusion matrix is map with predicted and actual attribute 
           k.each{ |kk,vv| cell[kk] = vv }
           cell[:confusion_matrix_value] = v
           cells.push cell
         end
-        cm = { :confusion_matrix_cell => cells, :type => OT.ConfusionMatrix }
+        cm = { :confusion_matrix_cell => cells, :type => OT.ConfusionMatrix.to_s }
         clazz[:confusion_matrix] = cm
         
         h[:classification_statistics] = clazz
       elsif regression_statistics
-        regr = {:type => OT.RegressionStatistics }
+        regr = {:type => OT.RegressionStatistics.to_s }
         VAL_REGR_PROPS.each{ |p| regr[p] = regression_statistics[p]}
         h[:regression_statistics] = regr
       end
@@ -63,7 +64,7 @@ module Validation
     
     def to_rdf
       s = OpenTox::Serializer::Owl.new
-      s.add_resource(validation_uri,OT.Validation,get_content_as_hash.keys_to_rdf_format.keys_to_owl_uris)
+      s.add_resource(validation_uri,OT.Validation.to_s,get_content_as_hash.keys_to_rdf_format.keys_to_owl_uris)
       s.to_rdfxml
     end
     
@@ -77,22 +78,17 @@ module Validation
   
     def get_content_as_hash
       h = {}
-      
       (CROSS_VAL_PROPS_REDUNDANT - [:crossvalidation_uri]).each do |p|
         h[p] = self.send(p)
       end
-      v = []
-      #Validation.find( :all, :conditions => { :crossvalidation_id => self.id } ).each do |val|
-      Validation.find( :crossvalidation_id => self.id, :validation_type => "crossvalidation" ).each do |val|
-        v.push( val.validation_uri.to_s )
-      end
+      v = Validation.find( :crossvalidation_id => self.id, :validation_type => "crossvalidation" ).collect{|val| val.validation_uri.force_encoding("UTF-8")}
       h[:validation_uris] = v
       h
     end
 
     def to_rdf
       s = OpenTox::Serializer::Owl.new
-      s.add_resource(crossvalidation_uri,OT.Crossvalidation,get_content_as_hash.keys_to_rdf_format.keys_to_owl_uris)
+      s.add_resource(crossvalidation_uri,OT.Crossvalidation.to_s,get_content_as_hash.keys_to_rdf_format.keys_to_owl_uris)
       s.to_rdfxml
     end
     

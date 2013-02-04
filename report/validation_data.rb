@@ -130,7 +130,7 @@ module Reports
         @predictions
       else
         unless @prediction_dataset_uri
-          LOGGER.info("no predictions available, prediction_dataset_uri not set")
+          $logger.info("no predictions available, prediction_dataset_uri not set")
           task.progress(100) if task
           nil
         else
