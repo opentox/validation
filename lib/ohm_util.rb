@@ -16,7 +16,7 @@ module Lib
               unless prop_names.include?(key)
                 key = key+"s"
                 unless prop_names.include?(key)
-                  raise OpenTox::BadRequestError.new "no attribute found: '"+k.to_s+"'"
+                  bad_request_error "no attribute found: '"+k.to_s+"'"
                 end
               end
             end

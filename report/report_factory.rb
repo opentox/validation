@@ -49,7 +49,7 @@ module Reports::ReportFactory
     when RT_METHOD_COMP
       create_report_compare_methods(validation_set, params, task)      
     else
-      raise "unknown report type "+type.to_s
+      internal_server_error "unknown report type "+type.to_s
     end
   end
   
@@ -79,7 +79,7 @@ module Reports::ReportFactory
   
   def self.create_report_validation(validation_set, params, task=nil)
     
-    raise OpenTox::BadRequestError.new("num validations is not equal to 1") unless validation_set.size==1
+    bad_request_error("num validations is not equal to 1") unless validation_set.size==1
     val = validation_set.validations[0]
     pre_load_predictions( validation_set, OpenTox::SubTask.create(task,0,50) )
 
@@ -131,22 +131,22 @@ module Reports::ReportFactory
   
   def self.create_report_crossvalidation(validation_set, params, task=nil)
     
-    raise OpenTox::BadRequestError.new "cv report not implemented for filter params" if validation_set.filter_params!=nil
-    raise OpenTox::BadRequestError.new("num validations is not >1") unless validation_set.size>1
-    raise OpenTox::BadRequestError.new("crossvalidation-id not unique and != nil: "+
+    bad_request_error "cv report not implemented for filter params" if validation_set.filter_params!=nil
+    bad_request_error("num validations is not >1") unless validation_set.size>1
+    bad_request_error("crossvalidation-id not unique and != nil: "+
       validation_set.get_values(:crossvalidation_id,false).inspect) if validation_set.unique_value(:crossvalidation_id)==nil
     validation_set.load_cv_attributes
-    raise OpenTox::BadRequestError.new("num validations ("+validation_set.size.to_s+") is not equal to num folds ("+
+    bad_request_error("num validations ("+validation_set.size.to_s+") is not equal to num folds ("+
       validation_set.unique_value(:num_folds).to_s+")") unless validation_set.unique_value(:num_folds).to_i==validation_set.size
-    raise OpenTox::BadRequestError.new("num different folds is not equal to num validations") unless validation_set.num_different_values(:crossvalidation_fold)==validation_set.size
-    raise OpenTox::BadRequestError.new("validations must have unique feature type, i.e. must be either all regression, "+
+    bad_request_error("num different folds is not equal to num validations") unless validation_set.num_different_values(:crossvalidation_fold)==validation_set.size
+    bad_request_error("validations must have unique feature type, i.e. must be either all regression, "+
       "or all classification validations") unless validation_set.unique_feature_type
     pre_load_predictions( validation_set, OpenTox::SubTask.create(task,0,80) )
     validation_set.validations.sort! do |x,y|
       x.crossvalidation_fold.to_f <=> y.crossvalidation_fold.to_f
     end
     cv_set = validation_set.replace_with_cv_stats
-    raise unless cv_set.size==1
+    internal_server_error unless cv_set.size==1
     
     #puts cv_set.get_values(:percent_correct_variance, false).inspect
     report = Reports::ReportContent.new("Crossvalidation report")
@@ -208,16 +208,16 @@ module Reports::ReportFactory
   def self.create_report_compare_algorithms(validation_set, params={}, task=nil)
     
     #validation_set.to_array([:test_dataset_uri, :model_uri, :algorithm_uri], false).each{|a| puts a.inspect}
-    raise OpenTox::BadRequestError.new("num validations is not >1") unless validation_set.size>1
-    raise OpenTox::BadRequestError.new("validations must have unique feature type, i.e. must be either all regression, "+
+    bad_request_error("num validations is not >1") unless validation_set.size>1
+    bad_request_error("validations must have unique feature type, i.e. must be either all regression, "+
       "or all classification validations") unless validation_set.unique_feature_type
-    raise OpenTox::BadRequestError.new("number of different identifiers <2: "+
+    bad_request_error("number of different identifiers <2: "+
       validation_set.get_values(:identifier).inspect) if validation_set.num_different_values(:identifier)<2
       
     if validation_set.has_nil_values?(:crossvalidation_id)
-      raise OpenTox::BadRequestError.new("algorithm comparison for non crossvalidation not yet implemented")
+      bad_request_error("algorithm comparison for non crossvalidation not yet implemented")
     else
-      raise OpenTox::BadRequestError.new("num different cross-validation-ids <2") if validation_set.num_different_values(:crossvalidation_id)<2
+      bad_request_error("num different cross-validation-ids <2") if validation_set.num_different_values(:crossvalidation_id)<2
       validation_set.load_cv_attributes
       compare_algorithms_crossvalidation(validation_set, params, task)
     end
@@ -307,10 +307,10 @@ module Reports::ReportFactory
   end
   
   def self.create_report_compare_methods(validation_set, params={}, task=nil)
-    raise OpenTox::BadRequestError.new("num validations is not >1") unless validation_set.size>1
-    raise OpenTox::BadRequestError.new("validations must have unique feature type, i.e. must be either all regression, "+
+    bad_request_error("num validations is not >1") unless validation_set.size>1
+    bad_request_error("validations must have unique feature type, i.e. must be either all regression, "+
       "or all classification validations") unless validation_set.unique_feature_type
-    raise OpenTox::BadRequestError.new("number of different identifiers <2: "+
+    bad_request_error("number of different identifiers <2: "+
       validation_set.get_values(:identifier).inspect) if validation_set.num_different_values(:identifier)<2
     #validation_set.load_cv_attributes
     

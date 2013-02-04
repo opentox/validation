@@ -75,10 +75,10 @@ module Reports::Util
   #
   def self.check_group_matching( grouped_objects, match_attributes )
     
-    raise OpenTox::BadRequestError.new("less then 2 groups, no matching possible") if grouped_objects.size<2
+    bad_request_error("less then 2 groups, no matching possible") if grouped_objects.size<2
     first_group = grouped_objects[0]
     other_groups = grouped_objects[1..-1].collect{ |g| g.collect{|o| o }} 
-    other_groups.each{ |g| raise OpenTox::BadRequestError.new("groups are not equally sized, matching impossible") if g.size != first_group.size } 
+    other_groups.each{ |g| bad_request_error("groups are not equally sized, matching impossible") if g.size != first_group.size } 
     
     first_group.each do |o|
       
@@ -94,7 +94,7 @@ module Reports::Util
             break
           end
         end
-        raise OpenTox::BadRequestError.new("no match found for "+inspect_attributes(o, match_attributes)) unless match
+        bad_request_error("no match found for "+inspect_attributes(o, match_attributes)) unless match
       end
     end
   end
@@ -108,7 +108,7 @@ module Reports::Util
 
     tmp_file_path = nil
     FileUtils.mkdir ENV['TMP_DIR'] unless File.directory?(ENV['TMP_DIR'])
-    raise "TMP_DIR does not exist and cannot be created" unless File.directory?(ENV['TMP_DIR'])
+    internal_server_error "TMP_DIR does not exist and cannot be created" unless File.directory?(ENV['TMP_DIR'])
     while (!tmp_file_path || File.exist?(tmp_file_path) )
       tmp_file_path = ENV['TMP_DIR']+"/#{tmp_file_name}.#{Time.now.strftime("%Y-%-m-%d_%H-%M-%S")}.#{rand(11111).to_s}"
     end

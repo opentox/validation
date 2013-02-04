@@ -35,7 +35,7 @@ class Reports::ReportContent
                        section_title = "Paired t-test",
                        section_text = nil)
 
-    raise "no test_attributes given: "+test_attributes.inspect unless test_attributes.is_a?(Array) and test_attributes.size>0
+    internal_server_error "no test_attributes given: "+test_attributes.inspect unless test_attributes.is_a?(Array) and test_attributes.size>0
     section_test = @xml_report.add_section(@current_section, section_title)
     @xml_report.add_paragraph(section_test, section_text) if section_text
         
@@ -402,7 +402,7 @@ class Reports::ReportContent
     tmp_file_name = name.to_s+@tmp_file_count.to_s+"."+extension.to_s
     @tmp_file_count += 1
     @tmp_files = {} unless @tmp_files
-    raise "file name already exits" if @tmp_files[tmp_file_name] || (@text_files && @text_files[tmp_file_name])  
+    internal_server_error "file name already exits" if @tmp_files[tmp_file_name] || (@text_files && @text_files[tmp_file_name])  
     tmp_file_path = Reports::Util.create_tmp_file(tmp_file_name)
     @tmp_files[tmp_file_name] = tmp_file_path
     return {:name => tmp_file_name, :path => tmp_file_path}

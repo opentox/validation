@@ -43,8 +43,8 @@ module Validation
       v =  Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation_statistics" ).first
       unless v
         crossvalidation = Crossvalidation[cv_id]
-        raise OpenTox::NotFoundError.new "Crossvalidation '#{cv_id}' not found." unless crossvalidation
-        raise OpenTox::BadRequestError.new "Crossvalidation '"+cv_id.to_s+"' not finished" unless crossvalidation.finished
+        resource_not_found_error "Crossvalidation '#{cv_id}' not found." unless crossvalidation
+        bad_request_error "Crossvalidation '"+cv_id.to_s+"' not finished" unless crossvalidation.finished
         vals = Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation" ).collect{|x| x}
         
         v = Validation.new
@@ -88,7 +88,7 @@ module Validation
         when "crossvalidation_statistics"
           to_delete = []
         else
-          raise "unknown validation type '"+self.validation_type.to_s+"'"
+          internal_server_error "unknown validation type '"+self.validation_type.to_s+"'"
         end
         Thread.new do # do deleting in background to not cause a timeout
           to_delete.each do |attr|
@@ -119,14 +119,14 @@ module Validation
     
     # validates an algorithm by building a model and validating this model
     def validate_algorithm( task=nil )
-      raise "validation_type missing" unless self.validation_type
-      raise OpenTox::BadRequestError.new "no algorithm uri: '"+self.algorithm_uri.to_s+"'" if self.algorithm_uri==nil or self.algorithm_uri.to_s.size<1
+      internal_server_error "validation_type missing" unless self.validation_type
+      bad_request_error "no algorithm uri: '"+self.algorithm_uri.to_s+"'" if self.algorithm_uri==nil or self.algorithm_uri.to_s.size<1
       
       params = { :dataset_uri => self.training_dataset_uri, :prediction_feature => self.prediction_feature }
       if (self.algorithm_params!=nil)
         self.algorithm_params.split(";").each do |alg_params|
           alg_param = alg_params.split("=",2)
-          raise OpenTox::BadRequestError.new "invalid algorithm param: '"+alg_params.to_s+"'" unless alg_param.size==2 or alg_param[0].to_s.size<1 or alg_param[1].to_s.size<1
+          bad_request_error "invalid algorithm param: '"+alg_params.to_s+"'" unless alg_param.size==2 or alg_param[0].to_s.size<1 or alg_param[1].to_s.size<1
           $logger.warn "algorihtm param contains empty space, encode? "+alg_param[1].to_s if alg_param[1] =~ /\s/
           params[alg_param[0].to_sym] = alg_param[1]
         end
@@ -146,14 +146,14 @@ module Validation
       #model = OpenTox::Model::PredictionModel.build(algorithm_uri, params, 
       #  OpenTox::SubTask.create(task, 0, 33) )
       
-      raise "model building failed" unless model_uri
+      internal_server_error "model building failed" unless model_uri
       #self.attributes = { :model_uri => model_uri }
       #self.save!
       
 #      self.save if self.new?
 #      self.update :model_uri => model_uri
       
-      #raise "error after building model: model.dependent_variable != validation.prediciton_feature ("+
+      #internal_server_error "error after building model: model.dependent_variable != validation.prediciton_feature ("+
       #  model.dependentVariables.to_s+" != "+self.prediction_feature+")" if self.prediction_feature!=model.dependentVariables
           
       validate_model OpenTox::SubTask.create(task, 33, 100)
@@ -163,11 +163,11 @@ module Validation
     # PENDING: a new dataset is created to store the predictions, this should be optional: delete predictions afterwards yes/no
     def validate_model( task=nil )
       
-      raise "validation_type missing" unless self.validation_type
+      internal_server_error "validation_type missing" unless self.validation_type
       $logger.debug "validating model '"+self.model_uri+"'"
       
       #model = OpenTox::Model::PredictionModel.find(self.model_uri)
-      #raise OpenTox::NotFoundError.new "model not found: "+self.model_uri.to_s unless model
+      #resource_not_found_error "model not found: "+self.model_uri.to_s unless model
       model = OpenTox::Model.new(self.model_uri, self.subjectid)
       model.get
       
@@ -176,7 +176,7 @@ module Validation
       end
       if self.prediction_feature.to_s.size==0
         dependentVariables = model.metadata[OT.dependentVariables.to_s]
-        raise "model has no dependentVariables specified, please give prediction_feature for model validation" unless dependentVariables
+        internal_server_error "model has no dependentVariables specified, please give prediction_feature for model validation" unless dependentVariables
         self.prediction_feature = model.metadata[OT.dependentVariables.to_s]
       end
       
@@ -214,7 +214,7 @@ module Validation
     
     def compute_prediction_data_with_model(model=nil, task=nil)
       #model = OpenTox::Model::Generic.find(self.model_uri, self.subjectid) if model==nil and self.model_uri
-      #raise OpenTox::NotFoundError.new "model not found: "+self.model_uri.to_s unless model
+      #resource_not_found_error "model not found: "+self.model_uri.to_s unless model
       model = OpenTox::Model.new(self.model_uri, self.subjectid) if model==nil
       model.get
             
@@ -224,7 +224,7 @@ module Validation
       algorithm_uri = self.algorithm_uri ? nil : model.metadata[OT.algorithm.to_s]
       predicted_variable = model.predicted_variable(self.subjectid)
       predicted_confidence = model.predicted_confidence(self.subjectid)
-      raise "cannot determine whether model '"+model.uri.to_s+"' performs classification or regression: '#{feature_type}', "+
+      internal_server_error "cannot determine whether model '"+model.uri.to_s+"' performs classification or regression: '#{feature_type}', "+
           "please set rdf-type of predictedVariables feature '"+predicted_variable.to_s+
           "' to NominalFeature or NumericFeature" if
           (feature_type.to_s!="classification" and feature_type.to_s!="regression")        
@@ -249,7 +249,7 @@ module Validation
     
     def compute_validation_stats( save_stats=true )
       p_data = self.prediction_data
-      raise "compute prediction data before" if p_data==nil
+      internal_server_error "compute prediction data before" if p_data==nil
       predictions = Lib::OTPredictions.new(p_data)
       case p_data[:feature_type]
       when "classification"
@@ -265,7 +265,7 @@ module Validation
       if (save_stats)
         self.finished = true
         self.save
-        raise unless self.valid?
+        internal_server_error unless self.valid?
       end
     end
     
@@ -273,8 +273,8 @@ module Validation
       self.prediction_data = nil
       self.save
       
-      raise OpenTox::BadRequestError.new "only supported for classification" if prediction!=nil and classification_statistics==nil
-      raise OpenTox::BadRequestError.new "illegal confidence value #{min_confidence}" unless 
+      bad_request_error "only supported for classification" if prediction!=nil and classification_statistics==nil
+      bad_request_error "illegal confidence value #{min_confidence}" unless 
         min_confidence==nil or (min_confidence.is_a?(Numeric) and min_confidence>=0 and min_confidence<=1)
       p_data = self.prediction_data
       if p_data==nil
@@ -289,7 +289,7 @@ module Validation
         self.save
         p_data = self.prediction_data
       end
-      raise OpenTox::BadRequestError.new("illegal prediction value: '"+prediction+"', available: "+
+      bad_request_error("illegal prediction value: '"+prediction+"', available: "+
         p_data[:accept_values].inspect) if prediction!=nil and p_data[:accept_values].index(prediction)==nil
       p = Lib::PredictionData.filter_data(p_data, nil, min_confidence, min_num_predictions, max_num_predictions,
         prediction==nil ? nil : p_data[:accept_values].index(prediction))
@@ -392,7 +392,7 @@ module Validation
         validation = Validation.create val
         validation.subjectid = self.subjectid
         validation.validate_algorithm( OpenTox::SubTask.create(task, i * task_step, ( i + 1 ) * task_step) )
-        raise "validation '"+validation.validation_uri+"' for crossvaldation could not be finished" unless 
+        internal_server_error "validation '"+validation.validation_uri+"' for crossvaldation could not be finished" unless 
           validation.finished
         i += 1
         $logger.debug "fold "+i.to_s+" done: "+validation.validation_uri.to_s
@@ -452,7 +452,7 @@ module Validation
     def create_new_cv_datasets( task = nil )
       $logger.debug "creating datasets for crossvalidation"
       orig_dataset = Lib::DatasetCache.find(self.dataset_uri,self.subjectid)
-      raise OpenTox::NotFoundError.new "Dataset not found: "+self.dataset_uri.to_s unless orig_dataset
+      resource_not_found_error "Dataset not found: "+self.dataset_uri.to_s unless orig_dataset
       
       train_dataset_uris = []
       test_dataset_uris = []
@@ -479,10 +479,10 @@ module Validation
               compound_indices.each{ |compound| train_compound_indices << compound}
             end 
           end
-          raise "internal error, num test compounds not correct,"+
+          internal_server_error "internal error, num test compounds not correct,"+
             " is '#{test_compound_indices.size}', should be '#{(shuffled_compound_indices.size/self.num_folds.to_i)}'" unless 
             (shuffled_compound_indices.size/self.num_folds.to_i - test_compound_indices.size).abs <= 1 
-          raise "internal error, num train compounds not correct, should be '"+(shuffled_compound_indices.size-test_compound_indices.size).to_s+
+          internal_server_error "internal error, num train compounds not correct, should be '"+(shuffled_compound_indices.size-test_compound_indices.size).to_s+
             "', is '"+train_compound_indices.size.to_s+"'" unless shuffled_compound_indices.size - test_compound_indices.size == train_compound_indices.size
           datasetname = 'dataset fold '+(n+1).to_s+' of '+self.num_folds.to_s        
           meta[DC.title] = "training "+datasetname 
@@ -507,7 +507,7 @@ module Validation
         train_dataset_uris = train_datasets.collect{|d| d.uri}
         test_dataset_uris = test_datasets.collect{|d| d.uri}
       else
-        raise OpenTox::BadRequestError.new
+        bad_request_error
       end
       
       @tmp_validations = []
@@ -537,9 +537,9 @@ module Validation
       
       orig_dataset = Lib::DatasetCache.find orig_dataset_uri,subjectid
       orig_dataset.load_all
-      raise OpenTox::NotFoundError.new "Dataset not found: "+orig_dataset_uri.to_s unless orig_dataset
+      resource_not_found_error "Dataset not found: "+orig_dataset_uri.to_s unless orig_dataset
       if prediction_feature
-        raise OpenTox::NotFoundError.new "Prediction feature '"+prediction_feature.to_s+
+        resource_not_found_error "Prediction feature '"+prediction_feature.to_s+
           "' not found in dataset, features are: \n"+
           orig_dataset.features.inspect unless orig_dataset.features.include?(prediction_feature)
       else
@@ -547,7 +547,7 @@ module Validation
       end
       
       compound_indices = (0..(orig_dataset.compounds.size-1)).to_a
-      raise OpenTox::NotFoundError.new "Cannot split datset, num compounds in dataset < 2 ("+compound_indices.size.to_s+")" if compound_indices.size<2
+      resource_not_found_error "Cannot split datset, num compounds in dataset < 2 ("+compound_indices.size.to_s+")" if compound_indices.size<2
       
       srand random_seed.to_i
       while true
@@ -599,21 +599,21 @@ module Validation
       random_seed=1 unless random_seed
       random_seed = random_seed.to_i
       
-      raise OpenTox::NotFoundError.new "Split ratio invalid: "+split_ratio.to_s unless split_ratio and split_ratio=split_ratio.to_f
-      raise OpenTox::NotFoundError.new "Split ratio not >0 and <1 :"+split_ratio.to_s unless split_ratio>0 && split_ratio<1
+      resource_not_found_error "Split ratio invalid: "+split_ratio.to_s unless split_ratio and split_ratio=split_ratio.to_f
+      resource_not_found_error "Split ratio not >0 and <1 :"+split_ratio.to_s unless split_ratio>0 && split_ratio<1
       orig_dataset = Lib::DatasetCache.find orig_dataset_uri, subjectid
-      raise OpenTox::NotFoundError.new "Dataset not found: "+orig_dataset_uri.to_s unless orig_dataset
+      resource_not_found_error "Dataset not found: "+orig_dataset_uri.to_s unless orig_dataset
       
       if prediction_feature
         if stratified==/true/
-          raise OpenTox::NotFoundError.new "Prediction feature '"+prediction_feature.to_s+
+          resource_not_found_error "Prediction feature '"+prediction_feature.to_s+
             "' not found in dataset, features are: \n"+orig_dataset.features.collect{|f| f.uri}.inspect unless orig_dataset.features.include?(prediction_feature)
         else
           $logger.warn "prediction_feature argument is ignored for non-stratified splits" if prediction_feature
           prediction_feature=nil
         end
       elsif stratified==/true/
-        raise OpenTox::BadRequestError.new "prediction feature required for stratified splits" unless prediction_feature
+        bad_request_error "prediction feature required for stratified splits" unless prediction_feature
       end
       
       meta = { DC.creator => creator_uri }
@@ -631,7 +631,7 @@ module Validation
         result = {:training_dataset_uri => train.uri, :test_dataset_uri => test.uri}
       when "false"
         compound_indices = (0..(orig_dataset.compounds.size-1)).to_a
-        raise OpenTox::BadRequestError.new "Cannot split datset, num compounds in dataset < 2 ("+compound_indices.size.to_s+")" if compound_indices.size<2
+        bad_request_error "Cannot split datset, num compounds in dataset < 2 ("+compound_indices.size.to_s+")" if compound_indices.size<2
         split = (compound_indices.size*split_ratio).round
         split = [split,1].max
         split = [split,compound_indices.size-2].min
@@ -647,7 +647,7 @@ module Validation
         result = {}
         train_data = orig_dataset.split( training_compound_indices, orig_dataset.features, meta, subjectid )
         est_num_train_compounds = (orig_dataset.compounds.size*split_ratio).round
-        raise "Train dataset num coumpounds != #{est_num_train_compounds}, instead: "+train_data.compounds.size.to_s unless 
+        internal_server_error "Train dataset num coumpounds != #{est_num_train_compounds}, instead: "+train_data.compounds.size.to_s unless 
           train_data.compounds.size==est_num_train_compounds
         result[:training_dataset_uri] = train_data.uri
         task.progress(66) if task
@@ -655,14 +655,14 @@ module Validation
         meta[DC.title] = "Test dataset split of "+orig_dataset.uri
         test_data = orig_dataset.split( test_compound_indices, orig_dataset.features, meta, subjectid )
         est_num_test_compounds = orig_dataset.compounds.size-est_num_train_compounds
-        raise "Test dataset num coumpounds != #{est_num_test_compounds}, instead: "+test_data.compounds.size.to_s unless 
+        internal_server_error "Test dataset num coumpounds != #{est_num_test_compounds}, instead: "+test_data.compounds.size.to_s unless 
           test_data.compounds.size==est_num_test_compounds
         result[:test_dataset_uri] = test_data.uri
         task.progress(100) if task  
         
         $logger.debug "split done, training dataset: '"+result[:training_dataset_uri].to_s+"', test dataset: '"+result[:test_dataset_uri].to_s+"'"
       else
-        raise OpenTox::BadRequestError.new "stratified != false|true|super, is #{stratified}"
+        bad_request_error "stratified != false|true|super, is #{stratified}"
       end
       result
     end

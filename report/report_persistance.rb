@@ -14,7 +14,7 @@ class Reports::ReportPersistance
   #   list_reports(type) => Array
   #
   def list_reports(type, filter_params)
-    raise "not implemented"
+    internal_server_error "not implemented"
   end
   
   # stores content of a report (Reports::ReportContent) and returns id
@@ -23,7 +23,7 @@ class Reports::ReportPersistance
   #   new_report(report_content) => string
   #
   def new_report(report_content)
-    raise "not implemented"
+    internal_server_error "not implemented"
   end
   
   # returns a already created report (file path on server) in a certain format (converts to this format if it does not exist yet)
@@ -32,7 +32,7 @@ class Reports::ReportPersistance
   #   get_report(type, id, format) => string
   #
   def get_report(type, id, format, force_formating, params)
-    raise "not implemented"
+    internal_server_error "not implemented"
   end
   
   # returns file path on server of a resource (i.e. image) of a report 
@@ -41,7 +41,7 @@ class Reports::ReportPersistance
   #   get_report_resource(type, id, resource) => string
   #
   def get_report_resource(type, id, resource)
-    raise "not implemented"
+    internal_server_error "not implemented"
   end
   
   # deletes a report
@@ -53,12 +53,12 @@ class Reports::ReportPersistance
   #   delete_report(type, id) => boolean
   #
   def delete_report(type, id, subjectid=nil)
-    raise "not implemented"
+    internal_server_error "not implemented"
   end
   
   # raises exception if not valid id format
   def check_report_id_format(id)
-    raise "not implemented"
+    internal_server_error "not implemented"
   end
   
 end
@@ -71,12 +71,12 @@ class Reports::FileReportPersistance < Reports::ReportPersistance
   
   def initialize()
     FileUtils.mkdir REPORT_DIR unless File.directory?(REPORT_DIR)
-    raise "report cannot be found nor created" unless File.directory?(REPORT_DIR)
+    internal_server_error "report cannot be found nor created" unless File.directory?(REPORT_DIR)
     $logger.debug "reports are stored in "+REPORT_DIR 
   end
   
   def list_reports(type, filter_params=nil)
-    raise "filter params not supported" if filter_params
+    internal_server_error "filter params not supported" if filter_params
     (Dir.new(type_directory(type)).entries - [".", ".."]).sort{|x,y| x.to_i <=> y.to_i}
   end
   
@@ -91,7 +91,7 @@ class Reports::FileReportPersistance < Reports::ReportPersistance
     return file_path if File.exist?(file_path) && !force_formating
       
     Reports::ReportFormat.format_report(report_dir, "report.xml", filename, format, force_formating, params)
-    raise "formated file not found '"+file_path+"'" unless File.exist?(file_path)
+    internal_server_error "formated file not found '"+file_path+"'" unless File.exist?(file_path)
     return file_path
   end
   
@@ -100,7 +100,7 @@ class Reports::FileReportPersistance < Reports::ReportPersistance
     report_dir = report_directory(type, id)
     raise_report_not_found(type, id) unless File.directory?(report_dir)
     file_path = report_dir+"/"+resource.to_s
-    raise OpenTox::NotFoundError.new("resource not found, resource: '"+resource.to_s+"', type:'"+type.to_s+"', id:'"+id.to_s+"'") unless File.exist?(file_path)
+    resource_not_found_error("resource not found, resource: '"+resource.to_s+"', type:'"+type.to_s+"', id:'"+id.to_s+"'") unless File.exist?(file_path)
     return file_path
   end
   
@@ -112,12 +112,12 @@ class Reports::FileReportPersistance < Reports::ReportPersistance
     entries = (Dir.new(report_dir).entries-[".", ".."]).collect{|f| report_dir+"/"+f.to_s}
     FileUtils.rm(entries)
     FileUtils.rmdir report_dir
-    raise "could not delete report directory '"+report_dir+"'" if File.directory?(report_dir)
+    internal_server_error "could not delete report directory '"+report_dir+"'" if File.directory?(report_dir)
     return true
   end
   
   def check_report_id_format(id)
-    raise "not valid report id format" unless id.to_s =~ /[0-9]+/
+    internal_server_error "not valid report id format" unless id.to_s =~ /[0-9]+/
   end
   
   def new_report(report_content, type, meta_data=nil, uri_provider=nil)
@@ -129,7 +129,7 @@ class Reports::FileReportPersistance < Reports::ReportPersistance
     $logger.debug "storing new report of type "+type.to_s 
     
     type_dir = type_directory(type)
-    raise "type dir '"+type_dir+"' cannot be found nor created" unless File.directory?(type_dir)
+    internal_server_error "type dir '"+type_dir+"' cannot be found nor created" unless File.directory?(type_dir)
     
     if (force_id==nil)
       id = 1
@@ -137,12 +137,12 @@ class Reports::FileReportPersistance < Reports::ReportPersistance
         id += 1
       end
     else
-      raise "report with id '"+force_id.to_s+"' already exists, file system not consistent with db" if File.exist?( type_dir+"/"+force_id.to_s )
+      internal_server_error "report with id '"+force_id.to_s+"' already exists, file system not consistent with db" if File.exist?( type_dir+"/"+force_id.to_s )
       id = force_id      
     end
     report_dir = type_dir+"/"+id.to_s
     FileUtils.mkdir(report_dir)
-    raise "report dir '"+report_dir+"' cannot be created" unless File.directory?(report_dir)
+    internal_server_error "report dir '"+report_dir+"' cannot be created" unless File.directory?(report_dir)
     
     xml_filename = report_dir+"/report.xml"
     xml_file = File.new(xml_filename, "w")
@@ -151,10 +151,10 @@ class Reports::FileReportPersistance < Reports::ReportPersistance
     if (report_content.tmp_files)
       report_content.tmp_files.each do |k,v|
         tmp_filename = report_dir+"/"+k
-        raise "tmp-file '"+tmp_filename.to_s+"' already exists" if File.exist?(tmp_filename)
-        raise "tmp-file '"+v.to_s+"' not found" unless File.exist?(v)
+        internal_server_error "tmp-file '"+tmp_filename.to_s+"' already exists" if File.exist?(tmp_filename)
+        internal_server_error "tmp-file '"+v.to_s+"' not found" unless File.exist?(v)
         FileUtils.mv(v.to_s,tmp_filename)
-        raise "could not move tmp-file to '"+tmp_filename.to_s+"'" unless File.exist?(tmp_filename)
+        internal_server_error "could not move tmp-file to '"+tmp_filename.to_s+"'" unless File.exist?(tmp_filename)
       end
     end
     return id
@@ -162,7 +162,7 @@ class Reports::FileReportPersistance < Reports::ReportPersistance
   
   private
   def raise_report_not_found(type, id)
-    raise OpenTox::NotFoundError.new("report not found, type:'"+type.to_s+"', id:'"+id.to_s+"'")
+    resource_not_found_error("report not found, type:'"+type.to_s+"', id:'"+id.to_s+"'")
   end
   
   def type_directory(type)
@@ -173,7 +173,7 @@ class Reports::FileReportPersistance < Reports::ReportPersistance
   
   def report_directory(type, id)
     type_dir = type_directory(type)
-    raise "type dir '"+type_dir+"' cannot be found nor created" unless File.directory?(type_dir)
+    internal_server_error "type dir '"+type_dir+"' cannot be found nor created" unless File.directory?(type_dir)
     return type_dir+"/"+id.to_s
   end
   
@@ -215,7 +215,7 @@ module Reports
     end
     
     def report_uri
-      raise "no id" if self.id==nil
+      internal_server_error "no id" if self.id==nil
       Reports::ReportService.instance.get_uri(self.report_type, self.id)
     end
     
@@ -242,7 +242,7 @@ module Reports
   class ExtendedFileReportPersistance < FileReportPersistance
     
     def new_report(report_content, type, meta_data, uri_provider, subjectid=nil)
-      raise "report meta data missing" unless meta_data
+      internal_server_error "report meta data missing" unless meta_data
       meta_data[:report_type] = type
       report = ReportData.create(meta_data)
       report.subjectid = subjectid
@@ -260,12 +260,12 @@ module Reports
     def get_report(type, id, format, force_formating, params)
       
       report = ReportData[id]
-      raise OpenTox::NotFoundError.new("Report with id='"+id.to_s+"' and type='"+type.to_s+"' not found.") if 
+      resource_not_found_error("Report with id='"+id.to_s+"' and type='"+type.to_s+"' not found.") if 
         report==nil or report.report_type!=type
 #      begin
 #        report = ReportData.find(:first, :conditions => {:id => id, :report_type => type})
 #      rescue ActiveRecord::RecordNotFound
-#        raise OpenTox::NotFoundError.new("Report with id='"+id.to_s+"' and type='"+type.to_s+"' not found.")
+#        resource_not_found_error("Report with id='"+id.to_s+"' and type='"+type.to_s+"' not found.")
 #      end
   
       case format
@@ -282,11 +282,11 @@ module Reports
 #      begin
 #        report = ReportData.find(:first, :conditions => {:id => id, :report_type => type})
 #      rescue ActiveRecord::RecordNotFound
-#        raise OpenTox::NotFoundError.new("Report with id='"+id.to_s+"' and type='"+type.to_s+"' not found.")
+#        resource_not_found_error("Report with id='"+id.to_s+"' and type='"+type.to_s+"' not found.")
 #      end
 #      ReportData.delete(id)
       report = ReportData[id]
-      raise OpenTox::NotFoundError.new("Report with id='"+id.to_s+"' and type='"+type.to_s+"' not found.") if
+      resource_not_found_error("Report with id='"+id.to_s+"' and type='"+type.to_s+"' not found.") if
         report==nil || report.report_type!=type
       report.delete
       if (subjectid)

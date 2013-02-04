@@ -15,11 +15,11 @@ module Reports
     #
     def self.create_confusion_matrix( confusion_matrix )
       
-      raise "confusion matrix is null" unless confusion_matrix
+      internal_server_error "confusion matrix is null" unless confusion_matrix
       num_classes = Math.sqrt(confusion_matrix.size)
       class_values = []
       confusion_matrix.each{ |key_map,value| class_values.push(key_map[:confusion_matrix_actual]) if class_values.index(key_map[:confusion_matrix_actual])==nil }
-      raise "confusion matrix invalid "+confusion_matrix.inspect unless num_classes.to_i == num_classes and class_values.size == num_classes 
+      internal_server_error "confusion matrix invalid "+confusion_matrix.inspect unless num_classes.to_i == num_classes and class_values.size == num_classes 
   
       sum_predicted = {}
       sum_actual = {}

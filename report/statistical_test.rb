@@ -8,7 +8,7 @@ module Reports
     # __grouped_validations__ : array of validation arrays
     def self.test_matrix( validations, group_attribute, test_attribute, class_value, test_method="paired_ttest", significance_level=0.95 )
       
-      raise "statistical-test: '"+test_method+"' does not exist" unless ReportStatisticalTest.respond_to?(test_method)
+      internal_server_error "statistical-test: '"+test_method+"' does not exist" unless ReportStatisticalTest.respond_to?(test_method)
       grouped_validations = Reports::Util.group(validations, [group_attribute])
       $logger.debug "perfom test '"+test_method.to_s+"' for '"+test_attribute.to_s+"' for #"+grouped_validations.size.to_s+" "+group_attribute.to_s
       

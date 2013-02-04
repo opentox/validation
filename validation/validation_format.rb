@@ -23,7 +23,7 @@ module Validation
         h[:crossvalidation_info] = cv
       end
       if classification_statistics 
-        raise "classification_statistics is no hash: "+classification_statistics.class.to_s+" -> '"+
+        internal_server_error "classification_statistics is no hash: "+classification_statistics.class.to_s+" -> '"+
           classification_statistics.to_s+"'" unless classification_statistics.is_a?(Hash)
         clazz = { :type => OT.ClassificationStatistics.to_s }
         VAL_CLASS_PROPS_SINGLE.each{ |p| clazz[p] = classification_statistics[p] }
@@ -31,7 +31,7 @@ module Validation
         # transpose results per class
         class_values = {}
         VAL_CLASS_PROPS_PER_CLASS.each do |p|
-          raise "missing classification statitstics: "+p.to_s+" "+classification_statistics.inspect if classification_statistics[p]==nil
+          internal_server_error "missing classification statitstics: "+p.to_s+" "+classification_statistics.inspect if classification_statistics[p]==nil
           classification_statistics[p].each do |class_value, property_value|
             class_values[class_value] = {:class_value => class_value, :type => OT.ClassValueStatistics.to_s} unless class_values.has_key?(class_value)
             map = class_values[class_value]
@@ -42,7 +42,7 @@ module Validation
         
         #converting confusion matrix
         cells = []
-        raise "confusion matrix missing" unless classification_statistics[:confusion_matrix]!=nil
+        internal_server_error "confusion matrix missing" unless classification_statistics[:confusion_matrix]!=nil
         classification_statistics[:confusion_matrix].each do |k,v|
           cell = { :type => OT.ConfusionMatrixCell.to_s }
           # key in confusion matrix is map with predicted and actual attribute 

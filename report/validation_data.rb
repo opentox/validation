@@ -92,10 +92,10 @@ module Reports
     def initialize(uri = nil, filter_params=nil, subjectid = nil)
       Reports.validation_access.init_validation(self, uri, filter_params, subjectid) if uri
       @subjectid = subjectid
-      raise unless filter_params==nil || filter_params.is_a?(Hash)
+      internal_server_error unless filter_params==nil || filter_params.is_a?(Hash)
       @filter_params = filter_params
       @created_resources = []
-      #raise "subjectid is nil" unless subjectid
+      #internal_server_error "subjectid is nil" unless subjectid
     end
     
     def self.from_cv_statistics( cv_uri, filter_params, subjectid )
@@ -165,7 +165,7 @@ module Reports
     
     # loads all crossvalidation attributes, of the corresponding cv into this object 
     def load_cv_attributes
-      raise "crossvalidation-id not set" unless @crossvalidation_id
+      internal_server_error "crossvalidation-id not set" unless @crossvalidation_id
       Reports.validation_access.init_cv(self, @subjectid)
       # load cv report
       ids = Reports.persistance.list_reports("crossvalidation",{:crossvalidation=>self.crossvalidation_uri.to_s })
@@ -360,7 +360,7 @@ module Reports
           val = nil
           @validations.each do |v|
             if v.send(attribute_row)==row and v.send(attribute_col)==col
-              #raise "two validation have equal row and column values: "+val.to_s if val!=nil
+              #internal_server_error "two validation have equal row and column values: "+val.to_s if val!=nil
               val = v.send(attribute_val)
               val = val[accept_values[0]] if first_value_elem
               val = val.to_nice_s
@@ -413,20 +413,20 @@ module Reports
             if accept_values.size==1 && accept_values[0]!=nil
               # or the attribute has a complementary value, i.e. true_positive_rate
               # -> domain is reduced to one class value
-              raise "illegal state, value for "+a.to_s+" is no hash: '"+val.to_s+"'" unless (val.is_a?(Hash))
+              internal_server_error "illegal state, value for "+a.to_s+" is no hash: '"+val.to_s+"'" unless (val.is_a?(Hash))
               val = val[accept_values[0]]
             end
             
             if variance
               #puts "variance given #{a}, #{val.inspect}, #{val.class}, #{variance.inspect}, #{variance.class}"
               if (val.is_a?(Array))
-                raise "not implemented"
+                internal_server_error "not implemented"
               elsif (val.is_a?(Hash))
                 val.collect{ |i,j| i.to_nice_s+": "+j.to_nice_s + " +- " +
                   variance[i].to_nice_s  }.join(", ")
               else
                 if (variance.is_a?(Hash))
-                  raise "invalid variance" unless accept_values.size==1 && accept_values[0]!=nil
+                  internal_server_error "invalid variance" unless accept_values.size==1 && accept_values[0]!=nil
                   variance = variance[accept_values[0]]
                 end
                 val.to_nice_s + " +- " + variance.to_nice_s
@@ -528,10 +528,10 @@ module Reports
           val = group[i].send(ranking_attribute)
           if val.is_a?(Hash)
             if class_value != nil
-              raise "no value for class value "+class_value.class.to_s+" "+class_value.to_s+" in hash "+val.inspect.to_s unless val.has_key?(class_value)
+              internal_server_error "no value for class value "+class_value.class.to_s+" "+class_value.to_s+" in hash "+val.inspect.to_s unless val.has_key?(class_value)
               val = val[class_value]
             else
-              raise "value for '"+ranking_attribute.to_s+"' is a hash, specify class value plz"
+              internal_server_error "value for '"+ranking_attribute.to_s+"' is a hash, specify class value plz"
             end
           end
           rank_hash[i] = val

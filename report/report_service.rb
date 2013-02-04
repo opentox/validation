@@ -16,15 +16,15 @@ module Reports
       if !defined?@@instance
         @@instance = ReportService.new(home_uri)
       elsif home_uri && @@instance.home_uri != home_uri
-        raise "already initialized with different home_uri!!!" 
+        internal_server_error "already initialized with different home_uri!!!" 
       end
       @@instance
     end
     
     private
     def initialize(home_uri)
-      raise "supposed to be a singleton" if defined?@@instance
-      raise "plz specify home_uri" unless home_uri
+      internal_server_error "supposed to be a singleton" if defined?@@instance
+      internal_server_error "plz specify home_uri" unless home_uri
       $logger.info "init report service"
       @home_uri = home_uri
       @@instance = self
@@ -62,15 +62,15 @@ module Reports
     # 
     def create_report(type, validation_uris, identifier=nil, params={}, subjectid=nil, task=nil)
       
-      raise "params is no hash" unless params.is_a?(Hash)
+      internal_server_error "params is no hash" unless params.is_a?(Hash)
       $logger.info "create report of type '"+type.to_s+"'"
       check_report_type(type)
       
       # step1: load validations
-      raise OpenTox::BadRequestError.new("validation_uris missing") unless validation_uris
+      bad_request_error("validation_uris missing") unless validation_uris
       $logger.debug "validation_uri(s): '"+validation_uris.inspect+"'"
       $logger.debug "identifier: '"+identifier.inspect+"'"
-      raise "illegal num identifiers: "+identifier.size.to_s+" should be equal to num validation-uris ("+validation_uris.size.to_s+")" if
+      internal_server_error "illegal num identifiers: "+identifier.size.to_s+" should be equal to num validation-uris ("+validation_uris.size.to_s+")" if
         identifier and identifier.size!=validation_uris.size
         
       filter_params = nil
@@ -81,7 +81,7 @@ module Reports
         end
       end
       validation_set = Reports::ValidationSet.new(validation_uris, identifier, filter_params, subjectid)
-      raise OpenTox::BadRequestError.new("cannot get validations from validation_uris '"+validation_uris.inspect+"'") unless validation_set and validation_set.size > 0
+      bad_request_error("cannot get validations from validation_uris '"+validation_uris.inspect+"'") unless validation_set and validation_set.size > 0
       $logger.debug "loaded "+validation_set.size.to_s+" validation/s"
       task.progress(10) if task
       
@@ -152,7 +152,7 @@ module Reports
     
     def parse_type( report_uri )
       
-      raise "invalid uri" unless report_uri.to_s =~/^#{@home_uri}.*/
+      internal_server_error "invalid uri" unless report_uri.to_s =~/^#{@home_uri}.*/
       type = report_uri.squeeze("/").split("/")[-2]
       check_report_type(type)
       return type
@@ -160,7 +160,7 @@ module Reports
     
     def parse_id( report_uri )
       
-      raise "invalid uri" unless report_uri.to_s =~/^#{@home_uri}.*/
+      internal_server_error "invalid uri" unless report_uri.to_s =~/^#{@home_uri}.*/
       id = report_uri.squeeze("/").split("/")[-1]
       @@persistance.check_report_id_format(id)
       return id
@@ -199,7 +199,7 @@ module Reports
     end
     
     def check_report_type(type)
-     raise OpenTox::NotFoundError.new("report type not found '"+type.to_s+"'") unless Reports::ReportFactory::REPORT_TYPES.index(type)
+     resource_not_found_error("report type not found '"+type.to_s+"'") unless Reports::ReportFactory::REPORT_TYPES.index(type)
     end
     
   end

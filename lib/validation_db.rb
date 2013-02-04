@@ -126,7 +126,7 @@ module Validation
     
     public
     def validation_uri
-      raise "no id" if self.id==nil
+      internal_server_error "no id" if self.id==nil
       $url_provider.url_for("/validation/"+self.id.to_s, :full)
     end
     
@@ -174,6 +174,7 @@ module Validation
     index :loo
 
     def self.create(params={})
+      Ohm.connect(:thread_safe => true, :port => 6379)
       params[:date] = Time.new
       super params
     end
@@ -185,7 +186,7 @@ module Validation
     
     public
     def crossvalidation_uri
-      raise "no id" if self.id==nil
+      internal_server_error "no id" if self.id==nil
       $url_provider.url_for("/validation/crossvalidation/"+self.id.to_s, :full) if self.id
     end
     

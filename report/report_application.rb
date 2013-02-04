@@ -9,7 +9,7 @@ class Validation::Application < OpenTox::Service
   
   def get_docbook_resource(filepath)
     perform do |rs|
-      raise OpenTox::NotFoundError.new"not found: "+filepath unless File.exist?(filepath)
+      resource_not_found_error <"not found: "+filepath unless File.exist?(filepath)
       types = MIME::Types.type_for(filepath)
       content_type(types[0].content_type) if types and types.size>0 and types[0]
       result = body(File.new(filepath))
@@ -142,7 +142,7 @@ class Validation::Application < OpenTox::Service
   end
   
   post '/validation/report/:type' do
-    raise OpenTox::BadRequestError.new "validation_uris missing" unless params[:validation_uris].to_s.size>0
+    bad_request_error "validation_uris missing" unless params[:validation_uris].to_s.size>0
     task = OpenTox::Task.run("Create report",url_for("/validation/report/"+params[:type], :full)) do |task| #,params
       perform do |rs|
         rs.create_report(params[:type],params[:validation_uris]?params[:validation_uris].split(/\n|,/):nil,

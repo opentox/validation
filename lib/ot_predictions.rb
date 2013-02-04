@@ -7,7 +7,7 @@ module Lib
   class OTPredictions < Predictions
   
     def initialize(data, compounds=nil)
-      raise unless data.is_a?(Hash)
+      internal_server_error unless data.is_a?(Hash)
       super(data)
       @compounds = compounds
     end
@@ -49,18 +49,7 @@ module Lib
         count += 1
         (0..p.num_instances-1).each do |i|
           a = []
-          
-          #PENDING!
-          begin
-            #a.push( "http://ambit.uni-plovdiv.bg:8080/ambit2/depict/cdk?search="+
-            #  URI.encode(OpenTox::Compound.new(:uri=>p.identifier(i)).smiles) ) if add_pic
-            a << p.identifier(i)+"?media=image/png"
-          rescue => ex
-            raise ex
-            #a.push("Could not add pic: "+ex.message)
-            #a.push(p.identifier(i))
-          end
-          
+          a << p.identifier(i)+"?media=image/png"
           a << (format ? p.actual_value(i).to_nice_s : p.actual_value(i))
           a << (format ? p.predicted_value(i).to_nice_s : p.predicted_value(i))
           if p.feature_type=="classification"

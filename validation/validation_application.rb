@@ -13,7 +13,7 @@ class Validation::Application < OpenTox::Service
     helpers do
       def check_stratified(params)
         params[:stratified] = "false" unless params[:stratified]
-        raise OpenTox::BadRequestError.new "stratified != true|false|super, is #{params[:stratified]}" unless
+        bad_request_error "stratified != true|false|super, is #{params[:stratified]}" unless
           params[:stratified]=~/true|false|super/
       end
     end
@@ -57,10 +57,10 @@ class Validation::Application < OpenTox::Service
     
     post '/validation/crossvalidation/?' do
       $logger.info "creating crossvalidation "+params.inspect
-      raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri].to_s.size>0
-      raise OpenTox::BadRequestError.new "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
-      raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
-      raise OpenTox::BadRequestError.new "illegal param-value num_folds: '"+params[:num_folds].to_s+"', must be integer >1" unless params[:num_folds]==nil or 
+      bad_request_error "dataset_uri missing" unless params[:dataset_uri].to_s.size>0
+      bad_request_error "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
+      bad_request_error "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
+      bad_request_error "illegal param-value num_folds: '"+params[:num_folds].to_s+"', must be integer >1" unless params[:num_folds]==nil or 
         params[:num_folds].to_i>1
       check_stratified(params)
       
@@ -102,10 +102,10 @@ class Validation::Application < OpenTox::Service
     
     post '/validation/crossvalidation/loo/?' do
       $logger.info "creating loo-crossvalidation "+params.inspect
-      raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri].to_s.size>0
-      raise OpenTox::BadRequestError.new "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
-      raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
-      raise OpenTox::BadRequestError.new "illegal param: num_folds, stratified, random_seed not allowed for loo-crossvalidation" if params[:num_folds] or 
+      bad_request_error "dataset_uri missing" unless params[:dataset_uri].to_s.size>0
+      bad_request_error "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
+      bad_request_error "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
+      bad_request_error "illegal param: num_folds, stratified, random_seed not allowed for loo-crossvalidation" if params[:num_folds] or 
         params[:stratified] or params[:random_seed]
       task = OpenTox::Task.run( "Perform loo-crossvalidation", url_for("/validation/crossvalidation/loo", :full) ) do |task| #, params
         cv_params = { :dataset_uri => params[:dataset_uri],
@@ -155,10 +155,10 @@ class Validation::Application < OpenTox::Service
     #  begin
     #    #crossvalidation = Validation::Crossvalidation.find(params[:id])
     #  rescue ActiveRecord::RecordNotFound => ex
-    #    raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found."
+    #    resource_not_found_error "Crossvalidation '#{params[:id]}' not found."
     #  end
       crossvalidation = Validation::Crossvalidation[params[:id]]
-      raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found." unless crossvalidation
+      resource_not_found_error "Crossvalidation '#{params[:id]}' not found." unless crossvalidation
       
       case request.env['HTTP_ACCEPT'].to_s
       when "application/rdf+xml"
@@ -183,7 +183,7 @@ class Validation::Application < OpenTox::Service
         content_type "application/x-yaml"
         crossvalidation.to_rdf_yaml
       else
-        raise OpenTox::BadRequestError.new "MIME type '"+request.env['HTTP_ACCEPT'].to_s+"' not supported, valid Accept-Headers: \"application/rdf+xml\", \"application/x-yaml\", \"text/html\"."
+        bad_request_error "MIME type '"+request.env['HTTP_ACCEPT'].to_s+"' not supported, valid Accept-Headers: \"application/rdf+xml\", \"application/x-yaml\", \"text/html\"."
       end
     end
     
@@ -215,7 +215,7 @@ class Validation::Application < OpenTox::Service
     get '/validation/crossvalidation/:id/statistics/probabilities' do
       
       $logger.info "get crossvalidation statistics for crossvalidation with id "+params[:id].to_s
-      raise OpenTox::BadRequestError.new("Missing params, plz give confidence and prediction") unless params[:confidence] and params[:prediction]
+      bad_request_error("Missing params, plz give confidence and prediction") unless params[:confidence] and params[:prediction]
       v = Validation::Validation.from_cv_statistics( params[:id], @subjectid )
       props = v.probabilities(params[:confidence].to_s.to_f,params[:prediction].to_s)
       content_type "text/x-yaml"
@@ -228,12 +228,12 @@ class Validation::Application < OpenTox::Service
     #  begin
         #crossvalidation = Validation::Crossvalidation.find(params[:id])
     #  rescue ActiveRecord::RecordNotFound => ex
-    #    raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found."
+    #    resource_not_found_error "Crossvalidation '#{params[:id]}' not found."
     #  end
     #  Validation::Crossvalidation.delete(params[:id])
       
       cv = Validation::Crossvalidation[params[:id]]
-      raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found." unless cv
+      resource_not_found_error "Crossvalidation '#{params[:id]}' not found." unless cv
       cv.subjectid = @subjectid
       cv.delete_crossvalidation
     end
@@ -243,7 +243,7 @@ class Validation::Application < OpenTox::Service
     #  begin
     #    crossvalidation = Validation::Crossvalidation.find(params[:id])
     #  rescue ActiveRecord::RecordNotFound => ex
-    #    raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found."
+    #    resource_not_found_error "Crossvalidation '#{params[:id]}' not found."
     #  end
     #  content_type "text/uri-list"
     #  Validation::Validation.find( :all, :conditions => { :crossvalidation_id => params[:id] } ).collect{ |v| v.validation_uri.to_s }.join("\n")+"\n"
@@ -255,9 +255,9 @@ class Validation::Application < OpenTox::Service
     #    #crossvalidation = Validation::Crossvalidation.find(params[:id])
     #    crossvalidation = Validation::Crossvalidation[params[:id]]
     #  rescue ActiveRecord::RecordNotFound => ex
-    #    raise OpenTox::NotFoundError.new "Crossvalidation '#{params[:id]}' not found."
+    #    resource_not_found_error "Crossvalidation '#{params[:id]}' not found."
     #  end
-    #  raise OpenTox::BadRequestError.new "Crossvalidation '"+params[:id].to_s+"' not finished" unless crossvalidation.finished
+    #  bad_request_error "Crossvalidation '"+params[:id].to_s+"' not finished" unless crossvalidation.finished
     #  
     #  content_type "application/x-yaml"
     #  validations = Validation::Validation.find( :crossvalidation_id => params[:id], :validation_type => "crossvalidation" )
@@ -305,7 +305,7 @@ class Validation::Application < OpenTox::Service
     end
     
     post '/validation/?' do
-      raise OpenTox::BadRequestError.new "Post not supported, to perfom a validation use '/test_set_validation', '/training_test_validation', 'bootstrapping', 'training_test_split'"
+      bad_request_error "Post not supported, to perfom a validation use '/test_set_validation', '/training_test_validation', 'bootstrapping', 'training_test_split'"
     end
     
     post '/validation/test_set_validation' do
@@ -323,7 +323,7 @@ class Validation::Application < OpenTox::Service
         end
         return_task(task)
       else
-        raise OpenTox::BadRequestError.new "illegal parameters, pls specify model_uri and test_dataset_uri\n"+
+        bad_request_error "illegal parameters, pls specify model_uri and test_dataset_uri\n"+
           "params given: "+params.inspect
       end
     end
@@ -373,7 +373,7 @@ class Validation::Application < OpenTox::Service
         end
         return_task(task)
       else
-        raise OpenTox::BadRequestError.new "illegal parameters, pls specify algorithm_uri, training_dataset_uri, test_dataset_uri, prediction_feature\n"+
+        bad_request_error "illegal parameters, pls specify algorithm_uri, training_dataset_uri, test_dataset_uri, prediction_feature\n"+
             "params given: "+params.inspect
       end
     end
@@ -409,9 +409,9 @@ class Validation::Application < OpenTox::Service
     
     post '/validation/bootstrapping' do
       $logger.info "performing bootstrapping validation "+params.inspect
-      raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri].to_s.size>0
-      raise OpenTox::BadRequestError.new "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
-      raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
+      bad_request_error "dataset_uri missing" unless params[:dataset_uri].to_s.size>0
+      bad_request_error "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
+      bad_request_error "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
       task = OpenTox::Task.run( "Perform bootstrapping validation", url_for("/validation/bootstrapping", :full) ) do |task| #, params
         params.merge!( Validation::Util.bootstrapping( params[:dataset_uri], 
           params[:prediction_feature], @subjectid, 
@@ -468,9 +468,9 @@ class Validation::Application < OpenTox::Service
     
     post '/validation/training_test_split' do
       $logger.info "creating training test split "+params.inspect
-      raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri].to_s.size>0
-      raise OpenTox::BadRequestError.new "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
-      raise OpenTox::BadRequestError.new "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
+      bad_request_error "dataset_uri missing" unless params[:dataset_uri].to_s.size>0
+      bad_request_error "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
+      bad_request_error "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
       check_stratified(params)
       task = OpenTox::Task.run( "Perform training test split validation", url_for("/validation/training_test_split", :full) )  do |task| #, params
       #task = OpenTox::Task.create( $task[:uri], nil, RDF::DC.description => "Perform training test split validation")  do |task| #, params
@@ -567,7 +567,7 @@ class Validation::Application < OpenTox::Service
     
     post '/validation/plain_training_test_split' do
       $logger.info "creating pure training test split "+params.inspect
-      raise OpenTox::BadRequestError.new "dataset_uri missing" unless params[:dataset_uri]
+      bad_request_error "dataset_uri missing" unless params[:dataset_uri]
       check_stratified(params)
       task = OpenTox::Task.run( "Create data-split", url_for("/validation/plain_training_test_split", :full) ) do |task|
         result = Validation::Util.train_test_dataset_split(url_for("/validation/plain_training_test_split", :full), params[:dataset_uri], params[:prediction_feature], 
@@ -581,19 +581,19 @@ class Validation::Application < OpenTox::Service
     post '/validation/validate_datasets' do
       task = OpenTox::Task.run( "Perform dataset validation", url_for("/validation/validate_datasets", :full) ) do |task| #, params
         $logger.info "validating values "+params.inspect
-        raise OpenTox::BadRequestError.new "test_dataset_uri missing" unless params[:test_dataset_uri]
-        raise OpenTox::BadRequestError.new "prediction_datset_uri missing" unless params[:prediction_dataset_uri]
+        bad_request_error "test_dataset_uri missing" unless params[:test_dataset_uri]
+        bad_request_error "prediction_datset_uri missing" unless params[:prediction_dataset_uri]
         params[:validation_type] = "validate_datasets" 
         
         if params[:model_uri]
-          raise OpenTox::BadRequestError.new "please specify 'model_uri' or set either 'classification' or 'regression' flag" if params[:classification] or params[:regression]
+          bad_request_error "please specify 'model_uri' or set either 'classification' or 'regression' flag" if params[:classification] or params[:regression]
           v = Validation::Validation.create params
           v.subjectid = @subjectid
           v.compute_validation_stats_with_model(nil,false,task)
         else
-          raise OpenTox::BadRequestError.new "please specify 'model_uri' or 'prediction_feature'" unless params[:prediction_feature]
-          raise OpenTox::BadRequestError.new "please specify 'model_uri' or 'predicted_variable'" unless params[:predicted_variable]
-          raise OpenTox::BadRequestError.new "please specify 'model_uri' or set either 'classification' or 'regression' flag" unless 
+          bad_request_error "please specify 'model_uri' or 'prediction_feature'" unless params[:prediction_feature]
+          bad_request_error "please specify 'model_uri' or 'predicted_variable'" unless params[:predicted_variable]
+          bad_request_error "please specify 'model_uri' or set either 'classification' or 'regression' flag" unless 
                 params[:classification] or params[:regression]
           predicted_variable = params.delete("predicted_variable")
           predicted_confidence = params.delete("predicted_confidence")
@@ -615,11 +615,11 @@ class Validation::Application < OpenTox::Service
       begin
         validation = Validation::Validation[params[:id]]
       rescue ActiveRecord::RecordNotFound => ex
-        raise OpenTox::NotFoundError.new("Validation '#{params[:id]}' not found.")
+        resource_not_found_error("Validation '#{params[:id]}' not found.")
       end
       validation.subjectid = @subjectid
-      raise OpenTox::BadRequestError.new("Validation '"+params[:id].to_s+"' not finished") unless validation.finished
-      raise OpenTox::BadRequestError.new("Missing params, plz give confidence and prediction") unless params[:confidence] and params[:prediction]
+      bad_request_error("Validation '"+params[:id].to_s+"' not finished") unless validation.finished
+      bad_request_error("Missing params, plz give confidence and prediction") unless params[:confidence] and params[:prediction]
       props = validation.probabilities(params[:confidence].to_s.to_f,params[:prediction].to_s)
       content_type "text/x-yaml"
       props.to_yaml
@@ -632,9 +632,9 @@ class Validation::Application < OpenTox::Service
     #    #validation = Validation::Validation.find(params[:id])
     #    validation = Validation::Validation[params[:id]]
     #  rescue ActiveRecord::RecordNotFound => ex
-    #    raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found."
+    #    resource_not_found_error "Validation '#{params[:id]}' not found."
     #  end
-    #  raise OpenTox::BadRequestError.new "Validation '"+params[:id].to_s+"' not finished" unless validation.finished
+    #  bad_request_error "Validation '"+params[:id].to_s+"' not finished" unless validation.finished
     #  p = validation.compute_validation_stats_with_model(nil, true)
     #  case request.env['HTTP_ACCEPT'].to_s
     #  when /text\/html/
@@ -656,12 +656,12 @@ class Validation::Application < OpenTox::Service
     #  begin
     #    validation = Validation::Validation.find(params[:id])
     #  rescue ActiveRecord::RecordNotFound => ex
-    #    raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found."
+    #    resource_not_found_error "Validation '#{params[:id]}' not found."
     #  end
     #  begin
-    #    raise unless validation.attribute_loaded?(params[:attribute])
+    #    internal_server_error unless validation.attribute_loaded?(params[:attribute])
     #  rescue
-    #    raise OpenTox::BadRequestError.new "Not a validation attribute: "+params[:attribute].to_s
+    #    bad_request_error "Not a validation attribute: "+params[:attribute].to_s
     #  end
     #  content_type "text/plain"
     #  return validation.send(params[:attribute])
@@ -672,10 +672,10 @@ class Validation::Application < OpenTox::Service
     #  begin
         #validation = Validation::Validation.find(params[:id])
     #  rescue ActiveRecord::RecordNotFound => ex
-    #    raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found."
+    #    resource_not_found_error "Validation '#{params[:id]}' not found."
     #  end
       validation = Validation::Validation[params[:id]]
-      raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found." unless validation
+      resource_not_found_error "Validation '#{params[:id]}' not found." unless validation
        
       case request.env['HTTP_ACCEPT'].to_s
       when "application/rdf+xml"
@@ -706,11 +706,11 @@ class Validation::Application < OpenTox::Service
     #  begin
         #validation = Validation::Validation.find(params[:id])
     #  rescue ActiveRecord::RecordNotFound => ex
-    #    raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found."
+    #    resource_not_found_error "Validation '#{params[:id]}' not found."
     #  end
       validation = Validation::Validation[params[:id]]
       validation.subjectid = @subjectid
-      raise OpenTox::NotFoundError.new "Validation '#{params[:id]}' not found." unless validation
+      resource_not_found_error "Validation '#{params[:id]}' not found." unless validation
       content_type "text/plain"
       validation.delete_validation
     end 

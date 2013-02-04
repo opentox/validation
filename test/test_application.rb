@@ -10,9 +10,9 @@ post '/test_validation/?' do
     task.progress(10)
     ex.check_requirements
     ex.validate(OpenTox::SubTask.create(task,10,80))
-    #raise ex.validation_error if ex.validation_error
+    #internal_server_error ex.validation_error if ex.validation_error
     ex.report(OpenTox::SubTask.create(task,80,99)) unless params[:report]=="false"
-    #raise ex.report_error if ex.report_error
+    #internal_server_error ex.report_error if ex.report_error
     if ex.report_uri
       ex.report_uri
     else

@@ -22,7 +22,7 @@ module Lib
     end
     
     def initialize( data )
-      raise unless data.is_a?(Hash)
+      internal_server_error unless data.is_a?(Hash)
                     
       @feature_type = data[:feature_type]
       @accept_values = data[:accept_values]
@@ -32,21 +32,21 @@ module Lib
       #puts "actual:     "+actual_values.inspect
       #puts "confidence: "+confidence_values.inspect
       
-      raise "unknown feature_type: '"+@feature_type.to_s+"'" unless 
+      internal_server_error "unknown feature_type: '"+@feature_type.to_s+"'" unless 
         @feature_type=="classification" || @feature_type=="regression"
-      raise "no predictions" if data[:predicted_values].size == 0
+      internal_server_error "no predictions" if data[:predicted_values].size == 0
       num_info = "predicted:"+data[:predicted_values].size.to_s+
         " confidence:"+data[:confidence_values].size.to_s+" actual:"+data[:actual_values].size.to_s
-      raise "illegal num actual values "+num_info if  data[:actual_values].size != data[:predicted_values].size
-      raise "illegal num confidence values "+num_info if  data[:confidence_values].size != data[:predicted_values].size
+      internal_server_error "illegal num actual values "+num_info if  data[:actual_values].size != data[:predicted_values].size
+      internal_server_error "illegal num confidence values "+num_info if  data[:confidence_values].size != data[:predicted_values].size
       
       case @feature_type
       when "classification"
-        raise "accept_values missing while performing classification" unless @accept_values
+        internal_server_error "accept_values missing while performing classification" unless @accept_values
         @num_classes = @accept_values.size
-        raise "num classes < 2" if @num_classes<2
+        internal_server_error "num classes < 2" if @num_classes<2
       when "regression"
-        raise "accept_values != nil while performing regression" if @accept_values
+        internal_server_error "accept_values != nil while performing regression" if @accept_values
       end
       
       @predicted_values = []
@@ -117,17 +117,17 @@ module Lib
     
     def update_stats( predicted_value, actual_value, confidence_value )
       
-      raise "illegal confidence value: '"+confidence_value.to_s+"'" unless 
+      internal_server_error "illegal confidence value: '"+confidence_value.to_s+"'" unless 
         confidence_value==nil or (confidence_value.is_a?(Numeric) and confidence_value>=0 and confidence_value<=1)
       case @feature_type
       when "classification"
         { "predicted"=>predicted_value, "actual"=>actual_value }.each do |s,v|
-          raise "illegal "+s+" classification-value ("+v.to_s+"),"+
+          internal_server_error "illegal "+s+" classification-value ("+v.to_s+"),"+
             "has to be either nil or index of predicted-values" if v!=nil and (!v.is_a?(Numeric) or v<0 or v>@num_classes)
         end
       when "regression"
         { "predicted"=>predicted_value, "actual"=>actual_value }.each do |s,v|
-          raise "illegal "+s+" regression-value ("+v.to_s+"),"+
+          internal_server_error "illegal "+s+" regression-value ("+v.to_s+"),"+
             " has to be either nil or number (not NaN, not Infinite)" unless v==nil or (v.is_a?(Numeric) and !v.nan? and v.finite?)
         end
       end
@@ -196,13 +196,13 @@ module Lib
     end
     
     def percent_correct
-      raise "no classification" unless @feature_type=="classification"
+      internal_server_error "no classification" unless @feature_type=="classification"
       pct = 100 * @num_correct / (@num_with_actual_value - @num_unpredicted).to_f
       pct.nan? ? 0 : pct 
     end
     
     def percent_incorrect
-      raise "no classification" unless @feature_type=="classification"
+      internal_server_error "no classification" unless @feature_type=="classification"
       return 0 if @num_with_actual_value==0
       return 100 * @num_incorrect / (@num_with_actual_value - @num_unpredicted).to_f
     end
@@ -214,7 +214,7 @@ module Lib
     
     def weighted_accuracy
       return 0 unless confidence_values_available?      
-      raise "no classification" unless @feature_type=="classification"
+      internal_server_error "no classification" unless @feature_type=="classification"
       total = 0
       correct = 0
       (0..@predicted_values.size-1).each do |i|
@@ -249,17 +249,17 @@ module Lib
     end
 
     def num_correct
-      raise "no classification" unless @feature_type=="classification"
+      internal_server_error "no classification" unless @feature_type=="classification"
       return @num_correct
     end
 
     def num_incorrect
-      raise "no classification" unless @feature_type=="classification"
+      internal_server_error "no classification" unless @feature_type=="classification"
       return @num_incorrect
     end
     
     def num_unclassified
-      raise "no classification" unless @feature_type=="classification"
+      internal_server_error "no classification" unless @feature_type=="classification"
       return @num_unpredicted
     end
     
@@ -268,7 +268,7 @@ module Lib
     #     and values: <int-value>
     def confusion_matrix
       
-      raise "no classification" unless @feature_type=="classification"
+      internal_server_error "no classification" unless @feature_type=="classification"
       res = {}
       (0..@num_classes-1).each do |actual|
           (0..@num_classes-1).each do |predicted|
@@ -508,7 +508,7 @@ module Lib
         end
         sum_instances += num_instances_per_class[i]
       end
-      raise "sum instances ("+sum_instances.to_s+") != num predicted ("+@num_predicted.to_s+")" unless @num_predicted == sum_instances
+      internal_server_error "sum instances ("+sum_instances.to_s+") != num predicted ("+@num_predicted.to_s+")" unless @num_predicted == sum_instances
       
       weighted = 0;
       (0..@num_classes-1).each do |i|
@@ -661,11 +661,11 @@ module Lib
      def get_roc_prediction_values(class_value)
       
       #puts "get_roc_values for class_value: "+class_value.to_s
-      raise "no confidence values" unless confidence_values_available?
-      raise "no class-value specified" if class_value==nil
+      internal_server_error "no confidence values" unless confidence_values_available?
+      internal_server_error "no class-value specified" if class_value==nil
       
       class_index = @accept_values.index(class_value) if class_value!=nil
-      raise "class not found "+class_value.to_s if (class_value!=nil && class_index==nil)
+      internal_server_error "class not found "+class_value.to_s if (class_value!=nil && class_index==nil)
       
       c = []; tp = []
       (0..@predicted_values.size-1).each do |i|
@@ -680,7 +680,7 @@ module Lib
       end
       
       # DO NOT raise exception here, maybe different validations are concated
-      #raise "no instance predicted as '"+class_value+"'" if p.size == 0
+      #internal_server_error "no instance predicted as '"+class_value+"'" if p.size == 0
       
       h = {:true_positives => tp, :confidence_values => c}
       #puts h.inspect
@@ -690,8 +690,8 @@ module Lib
     def get_prediction_values(performance_attr, performance_accept_value)
       
       #puts "get_roc_values for class_value: "+class_value.to_s
-      raise "no confidence values" unless confidence_values_available?
-      #raise "no class-value specified" if class_value==nil
+      internal_server_error "no confidence values" unless confidence_values_available?
+      #internal_server_error "no class-value specified" if class_value==nil
       
       actual_accept_value = nil
       predicted_accept_value = nil
@@ -701,9 +701,9 @@ module Lib
         predicted_accept_value = performance_accept_value
       end
       actual_class_index = @accept_values.index(actual_accept_value) if actual_accept_value!=nil
-      raise "class not found '"+actual_accept_value.to_s+"' in "+@accept_values.inspect if (actual_accept_value!=nil && actual_class_index==nil)
+      internal_server_error "class not found '"+actual_accept_value.to_s+"' in "+@accept_values.inspect if (actual_accept_value!=nil && actual_class_index==nil)
       predicted_class_index = @accept_values.index(predicted_accept_value) if predicted_accept_value!=nil
-      raise "class not found '"+predicted_accept_value.to_s+"' in "+@accept_values.inspect if (predicted_accept_value!=nil && predicted_class_index==nil)
+      internal_server_error "class not found '"+predicted_accept_value.to_s+"' in "+@accept_values.inspect if (predicted_accept_value!=nil && predicted_class_index==nil)
       
       c = []; p = []; a = []
       (0..@predicted_values.size-1).each do |i|
@@ -762,7 +762,7 @@ module Lib
     end      
     
     def classification_miss?(instance_index)
-      raise "no classification" unless @feature_type=="classification"
+      internal_server_error "no classification" unless @feature_type=="classification"
       return false if predicted_value(instance_index)==nil or actual_value(instance_index)==nil
       return predicted_value(instance_index) != actual_value(instance_index)
     end

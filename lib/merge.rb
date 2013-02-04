@@ -37,10 +37,10 @@ module Lib
     end
     
     def self.merge_objects( object1, object2 )
-      raise "classes not equal : "+object1.class.to_s+" != "+object2.class.to_s if object1.class != object2.class
+      internal_server_error "classes not equal : "+object1.class.to_s+" != "+object2.class.to_s if object1.class != object2.class
       object_class = object1.class
-      raise "register which attributes to merge first, nothing found for class "+object_class.to_s unless merge_attributes_registered?(object_class)
-      raise "not supported, successivly add unmerged object to a merge object" if merge_count(object2)>1
+      internal_server_error "register which attributes to merge first, nothing found for class "+object_class.to_s unless merge_attributes_registered?(object_class)
+      internal_server_error "not supported, successivly add unmerged object to a merge object" if merge_count(object2)>1
       
       new_object = object_class.new
       # actually instance_variables would be appropriate, but the datamanager creates objects dynamically
@@ -89,7 +89,7 @@ module Lib
             value = value1 + value2
           end
         elsif value1.is_a?(Array) and value2.is_a?(Array)
-          raise "cannot merge arrays with unequal sizes" if !value2.is_a?(Array) || value1.size!=value2.size
+          internal_server_error "cannot merge arrays with unequal sizes" if !value2.is_a?(Array) || value1.size!=value2.size
           value = []
           variance = [] if avg
           (0..value1.size-1).each do |i|
@@ -112,7 +112,7 @@ module Lib
             end
           end        
         else
-          raise "invalid, cannot avg/sum non-numeric content for attribute: "+attribute.to_s+" contents: '"+value1.to_s+"' ("+
+          internal_server_error "invalid, cannot avg/sum non-numeric content for attribute: "+attribute.to_s+" contents: '"+value1.to_s+"' ("+
             value1.class.to_s+"), '"+value2.to_s+"' ("+value2.class.to_s+")"
         end
       elsif non_numeric_attribute?(object_class, attribute)
@@ -126,7 +126,7 @@ module Lib
             end
           end
         elsif value1.is_a?(Array)
-          raise "non-numerical arrays not yet supported"
+          internal_server_error "non-numerical arrays not yet supported"
         else
           if value1==nil && value2==nil
             value = nil
@@ -137,7 +137,7 @@ module Lib
           end
         end
       else
-        raise "invalid type '"+attribute.to_s+"'"
+        internal_server_error "invalid type '"+attribute.to_s+"'"
       end
       {:value => value, :variance => variance }
     end 

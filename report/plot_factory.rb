@@ -38,8 +38,8 @@ class Array
   
   private
   def compress(groups)
-    raise "length not equal" unless self.size==groups.size
-    raise "to small" unless self.size>=2
+    internal_server_error "length not equal" unless self.size==groups.size
+    internal_server_error "to small" unless self.size>=2
     a = [ self[0] ]
     (1..groups.size-1).each do |i|
       if groups[i]!=groups[i-1]
@@ -94,7 +94,7 @@ module Reports
       names = [""] if names.size==1 
 
       omit_str = omit_count>0 ? " ("+omit_count.to_s+" predictions omitted)" : ""
-      raise "no predictions performed"+omit_str if x.size==0 || x[0].size==0
+      internal_server_error "no predictions performed"+omit_str if x.size==0 || x[0].size==0
       out_files.each do |out_file|
         RubyPlot::regression_point_plot(out_file, "Regression plot", "Predicted values", "Actual values", names, x, y, logscale)
       end
@@ -235,7 +235,7 @@ module Reports
             value.values.each{ |val| avg_value+=val }
             value = avg_value/value.values.size.to_f
           else
-            raise "box plot value is hash, but no entry for class-value ("+class_value.to_s+
+            internal_server_error "box plot value is hash, but no entry for class-value ("+class_value.to_s+
               "); value for "+value_attribute.to_s+" -> "+value.inspect unless value.key?(class_value)
             value = value[class_value]
           end
@@ -271,11 +271,11 @@ module Reports
                   value.values.each{ |val| avg_value+=val }
                   value = avg_value/value.values.size.to_f
                 else
-                  raise "bar plot value is hash, but no entry for class-value ("+class_value.to_s+"); value for "+a.to_s+" -> "+value.inspect unless value.key?(class_value)
+                  internal_server_error "bar plot value is hash, but no entry for class-value ("+class_value.to_s+"); value for "+a.to_s+" -> "+value.inspect unless value.key?(class_value)
                   value = value[class_value]
                 end
               end
-              raise "value is nil\nattribute: "+a.to_s+"\nvalidation: "+v.inspect if value==nil
+              internal_server_error "value is nil\nattribute: "+a.to_s+"\nvalidation: "+v.inspect if value==nil
               values.push(value)
               labels.push(a.to_s.gsub("_","-") + ( class_value==nil ? "" : "("+class_value.to_s+")" ))
             end
@@ -288,7 +288,7 @@ module Reports
         end
         
         titles << v.send(title_attribute).to_s
-        raise "no title for '"+title_attribute.to_s+"' in validation: "+v.to_yaml if titles[-1].to_s.size==0
+        internal_server_error "no title for '"+title_attribute.to_s+"' in validation: "+v.to_yaml if titles[-1].to_s.size==0
         data << values
       end
       
@@ -351,7 +351,7 @@ module Reports
             res += line 
           end
       end
-      raise "rank plot failed" unless $?==0
+      internal_server_error "rank plot failed" unless $?==0
       
       if out_file
         f = File.new(out_file, "w")
@@ -544,7 +544,7 @@ module Reports
       c = pred_values[:confidence_values]
       p = pred_values[:predicted_values]
       a = pred_values[:actual_values]
-      raise "no prediction values for confidence plot" if p.size==0
+      internal_server_error "no prediction values for confidence plot" if p.size==0
      
       (0..p.size-2).each do |i|
         ((i+1)..p.size-1).each do |j|
@@ -586,7 +586,7 @@ module Reports
       
       c = roc_values[:confidence_values]
       tp = roc_values[:true_positives]
-      raise "no prediction values for roc-plot" if tp.size==0
+      internal_server_error "no prediction values for roc-plot" if tp.size==0
       
       # hack for painting perfect/worst roc curve, otherwhise fp/tp-rate will always be 100%
       # determine if perfect/worst roc curve

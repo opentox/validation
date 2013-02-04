@@ -35,7 +35,7 @@ module Reports::ReportFormat
     when "application/pdf"
       "pdf"
     else
-      raise "invalid format type for file extensions: "+format.to_s
+      internal_server_error "invalid format type for file extensions: "+format.to_s
     end
   end
   
@@ -44,20 +44,20 @@ module Reports::ReportFormat
   # * the new format can be found in __dest_filame__
   def self.format_report(directory, xml_filename, dest_filename, format, overwrite=false, params={})
     
-    raise "cannot format to XML" if format=="text/xml"
-    raise "directory does not exist: "+directory.to_s unless File.directory?directory.to_s
+    internal_server_error "cannot format to XML" if format=="text/xml"
+    internal_server_error "directory does not exist: "+directory.to_s unless File.directory?directory.to_s
     xml_file = directory.to_s+"/"+xml_filename.to_s
-    raise "xml file not found: "+xml_file unless File.exist?xml_file
+    internal_server_error "xml file not found: "+xml_file unless File.exist?xml_file
     dest_file = directory.to_s+"/"+dest_filename.to_s
-    raise "destination file already exists: "+dest_file if (File.exist?(dest_file) && !overwrite)
+    internal_server_error "destination file already exists: "+dest_file if (File.exist?(dest_file) && !overwrite)
     
     case format
     when "text/html"
       format_report_to_html(directory, xml_filename, dest_filename, params[:css_style_sheet])
     when "application/pdf"
-      raise "pdf conversion not supported yet"
+      internal_server_error "pdf conversion not supported yet"
     else
-      raise "unknown format type"
+      internal_server_error "unknown format type"
     end
   end
   
@@ -77,7 +77,7 @@ module Reports::ReportFormat
         #$logger.info "saxon-xslt> "+line
       end
     end
-    raise "error during conversion" unless $?==0
+    internal_server_error "error during conversion" unless $?==0
   end
   
 end

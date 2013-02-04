@@ -26,7 +26,7 @@ module Reports
         $url_provider.url_for("/validation/"+ENV['DOCBOOK_DIRECTORY']+'/'+ENV['REPORT_DTD'], :full)
       else
         f = File.expand_path(File.join(ENV['DOCBOOK_DIRECTORY'],ENV['REPORT_DTD']))
-        raise "cannot find dtd" unless File.exist?(f)
+        internal_server_error "cannot find dtd" unless File.exist?(f)
         f
       end
     end
@@ -183,7 +183,7 @@ module Reports
     #
     def add_table( element, title, table_values, first_row_header=true, first_col_header=false, transpose=false, auto_link_urls=true )
       
-      raise "table_values is not multi-dimensional-array" unless table_values && table_values.is_a?(Array) && table_values[0].is_a?(Array) 
+      internal_server_error "table_values is not multi-dimensional-array" unless table_values && table_values.is_a?(Array) && table_values[0].is_a?(Array) 
       
       values = transpose ? table_values.transpose : table_values
       
@@ -193,7 +193,7 @@ module Reports
       
       table << Reports::XMLReportUtil.text_element("title", title)
       
-      raise "column count 0" if values.at(0).size < 1 
+      internal_server_error "column count 0" if values.at(0).size < 1 
       
       tgroup = Reports::XMLReportUtil.attribute_element("tgroup",{"cols" => values.at(0).size})
       
@@ -287,7 +287,7 @@ module Reports
       #alternativly use base href in html-header
       if (resource_path)
         @resource_path_elements.each do |k,v|
-          raise "attribute '"+v+"' not found in element '"+k+"'" unless k.attributes.has_key?(v)
+          internal_server_error "attribute '"+v+"' not found in element '"+k+"'" unless k.attributes.has_key?(v)
           k.add_attribute( v, resource_path.to_s+"/"+k.attributes[v].to_s )
         end
       end

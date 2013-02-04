@@ -34,7 +34,7 @@ module Lib
       if uri.task_uri?
         task = OpenTox::Task.find(uri)
         task.wait_for_completion
-        #raise "task failed: "+uri.to_s+", error is:\n"+task.description if task.error?
+        #internal_server_error "task failed: "+uri.to_s+", error is:\n"+task.description if task.error?
         $logger.error "task failed :\n"+task.to_yaml if task.error?
         uri = task.result_uri
       end
@@ -50,7 +50,7 @@ module Lib
       when /owl$/
         type = "application/rdf+xml"
       else
-        raise "unknown type for file: "+file.path.to_s
+        internal_server_error "unknown type for file: "+file.path.to_s
       end
          
       data = File.read(file.path)
