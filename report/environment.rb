@@ -1,4 +1,4 @@
-['rubygems', 'logger', 'fileutils', 'sinatra', 'sinatra/url_for', 'rest_client', 
+['rubygems', 'logger', 'fileutils', 'sinatra', #'rest_client', 
   'yaml', 'fileutils', 'mime/types', 'abbrev', 
   'rexml/document',  'ruby-plot' ].each do |g|
     require g

@@ -1,6 +1,6 @@
 require 'rubygems'
 #gem "opentox-ruby"
-[ 'sinatra', 'sinatra/url_for', 'ohm', 'benchmark' ].each do |lib|
+[ 'sinatra', 'ohm', 'benchmark' ].each do |lib|
   require lib
 end
 

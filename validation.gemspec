@@ -22,9 +22,9 @@ Gem::Specification.new do |s|
 
   # specify any dependencies here; for example:
   s.add_runtime_dependency "opentox-server"
-  s.add_runtime_dependency "ohm"
-  s.add_runtime_dependency "ohm-contrib"
-  #s.add_runtime_dependency "asdfasdfasdfasdfasfasdfsadf"
+  s.add_runtime_dependency "ohm", "=0.1.3"
+  s.add_runtime_dependency "ohm-contrib", "=0.1.1"
+  s.add_runtime_dependency "ruby-plot"
   s.post_install_message = "Please configure your service in ~/.opentox/config/validation.rb"
 end
 

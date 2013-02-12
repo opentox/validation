@@ -127,11 +127,11 @@ module Validation
     public
     def validation_uri
       internal_server_error "no id" if self.id==nil
-      $url_provider.url_for("/validation/"+self.id.to_s, :full)
+      $url_provider.to("/validation/"+self.id.to_s, :full)
     end
     
     def crossvalidation_uri
-      $url_provider.url_for("/validation/crossvalidation/"+self.crossvalidation_id.to_s, :full) if self.crossvalidation_id
+      $url_provider.to("/validation/crossvalidation/"+self.crossvalidation_id.to_s, :full) if self.crossvalidation_id
     end
     
     def self.classification_property?( property )
@@ -187,7 +187,7 @@ module Validation
     public
     def crossvalidation_uri
       internal_server_error "no id" if self.id==nil
-      $url_provider.url_for("/validation/crossvalidation/"+self.id.to_s, :full) if self.id
+      $url_provider.to("/validation/crossvalidation/"+self.id.to_s, :full) if self.id
     end
     
     # convenience method to list all crossvalidations that are unique 

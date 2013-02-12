@@ -574,13 +574,13 @@ module Validation
       result = {}
       result[:training_dataset_uri] = orig_dataset.split( training_compound_indices, orig_dataset.features, 
         { DC.title => "Bootstrapping training dataset of "+orig_dataset.title.to_s,
-          DC.creator => $url_provider.url_for('/validation/bootstrapping',:full) },
+          DC.creator => $url_provider.to('/validation/bootstrapping',:full) },
         subjectid ).uri
       task.progress(66) if task
 
       result[:test_dataset_uri] = orig_dataset.split( test_compound_indices, orig_dataset.features,
         { DC.title => "Bootstrapping test dataset of "+orig_dataset.title.to_s,
-          DC.creator => $url_provider.url_for('/validation/bootstrapping',:full)} ,
+          DC.creator => $url_provider.to('/validation/bootstrapping',:full)} ,
         subjectid ).uri
       task.progress(100) if task
       

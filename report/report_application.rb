@@ -3,7 +3,7 @@ require "./report/environment.rb"
 class Validation::Application < OpenTox::Service
 
   def perform
-    @@report_service = Reports::ReportService.instance( url_for("/validation/report", :full) ) unless defined?@@report_service  
+    @@report_service = Reports::ReportService.instance( to("/validation/report", :full) ) unless defined?@@report_service  
     yield( @@report_service )
   end
   
@@ -40,7 +40,7 @@ class Validation::Application < OpenTox::Service
       case request.env['HTTP_ACCEPT'].to_s
       when  /text\/html/
         related_links =
-          "All validations: "+url_for("/validation/",:full)
+          "All validations: "+to("/validation/",:full)
         description = 
           "A list of all report types."
         content_type "text/html"
@@ -61,9 +61,9 @@ class Validation::Application < OpenTox::Service
       case request.env['HTTP_ACCEPT'].to_s
       when  /text\/html/
         related_links =
-          "Available report types: "+url_for("/validation/report",:full)+"\n"+
-          "Single validations:     "+url_for("/validation/",:full)+"\n"+
-          "Crossvalidations:       "+url_for("/validation/crossvalidation",:full)
+          "Available report types: "+to("/validation/report",:full)+"\n"+
+          "Single validations:     "+to("/validation/",:full)+"\n"+
+          "Crossvalidations:       "+to("/validation/crossvalidation",:full)
         description = 
           "A list of all "+params[:report_type]+" reports. To create a report, use the POST method."
         if params[:report_type]=="algorithm_comparison"
@@ -143,7 +143,7 @@ class Validation::Application < OpenTox::Service
   
   post '/validation/report/:type' do
     bad_request_error "validation_uris missing" unless params[:validation_uris].to_s.size>0
-    task = OpenTox::Task.run("Create report",url_for("/validation/report/"+params[:type], :full)) do |task| #,params
+    task = OpenTox::Task.run("Create report",to("/validation/report/"+params[:type], :full)) do |task| #,params
       perform do |rs|
         rs.create_report(params[:type],params[:validation_uris]?params[:validation_uris].split(/\n|,/):nil,
           params[:identifier]?params[:identifier].split(/\n|,/):nil,params,@subjectid,task)

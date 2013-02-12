@@ -1,5 +1,5 @@
 
-[ 'rubygems', 'sinatra', 'sinatra/url_for' ].each do |lib|
+[ 'rubygems', 'sinatra' ].each do |lib|
   require lib
 end
 
@@ -8,8 +8,6 @@ require './validation/validation_service.rb'
 
 class Validation::Application < OpenTox::Service
   
-    helpers Sinatra::UrlForHelper
-
     helpers do
       def check_stratified(params)
         params[:stratified] = "false" unless params[:stratified]
@@ -33,9 +31,9 @@ class Validation::Application < OpenTox::Service
       uri_list = Lib::OhmUtil.find( Validation::Crossvalidation, params ).sort.collect{|v| v.crossvalidation_uri}.join("\n") + "\n"
       if request.env['HTTP_ACCEPT'] =~ /text\/html/
         related_links = 
-          "Single validations:             "+url_for("/validation/",:full)+"\n"+
-          "Leave-one-out crossvalidations: "+url_for("/validation/crossvalidation/loo",:full)+"\n"+
-          "Crossvalidation reports:        "+url_for("/validation/report/crossvalidation",:full)
+          "Single validations:             "+to("/validation/",:full)+"\n"+
+          "Leave-one-out crossvalidations: "+to("/validation/crossvalidation/loo",:full)+"\n"+
+          "Crossvalidation reports:        "+to("/validation/report/crossvalidation",:full)
         description = 
           "A list of all crossvalidations.\n"+
           "Use the POST method to perform a crossvalidation."
@@ -64,7 +62,7 @@ class Validation::Application < OpenTox::Service
         params[:num_folds].to_i>1
       check_stratified(params)
       
-      task = OpenTox::Task.run( "Perform crossvalidation", url_for("/validation/crossvalidation", :full) ) do |task| #, params
+      task = OpenTox::Task.run( "Perform crossvalidation", to("/validation/crossvalidation", :full) ) do |task| #, params
         cv_params = { :dataset_uri => params[:dataset_uri],  
                       :algorithm_uri => params[:algorithm_uri],
                       :algorithm_params => params[:algorithm_params],
@@ -107,7 +105,7 @@ class Validation::Application < OpenTox::Service
       bad_request_error "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
       bad_request_error "illegal param: num_folds, stratified, random_seed not allowed for loo-crossvalidation" if params[:num_folds] or 
         params[:stratified] or params[:random_seed]
-      task = OpenTox::Task.run( "Perform loo-crossvalidation", url_for("/validation/crossvalidation/loo", :full) ) do |task| #, params
+      task = OpenTox::Task.run( "Perform loo-crossvalidation", to("/validation/crossvalidation/loo", :full) ) do |task| #, params
         cv_params = { :dataset_uri => params[:dataset_uri],
                       :algorithm_params => params[:algorithm_params],
                       :prediction_feature => params[:prediction_feature],  
@@ -130,9 +128,9 @@ class Validation::Application < OpenTox::Service
       uri_list = Lib::OhmUtil.find( Validation::Crossvalidation, params ).sort.collect{|v| v.crossvalidation_uri}.join("\n") + "\n"
       if request.env['HTTP_ACCEPT'] =~ /text\/html/
         related_links = 
-          "Single validations:      "+url_for("/validation/",:full)+"\n"+
-          "All crossvalidations:    "+url_for("/validation/crossvalidation",:full)+"\n"+
-          "Crossvalidation reports: "+url_for("/validation/report/crossvalidation",:full)
+          "Single validations:      "+to("/validation/",:full)+"\n"+
+          "All crossvalidations:    "+to("/validation/crossvalidation",:full)+"\n"+
+          "Crossvalidation reports: "+to("/validation/report/crossvalidation",:full)
         description = 
           "A list of all leave one out crossvalidations.\n"+
           "Use the POST method to perform a crossvalidation."
@@ -166,11 +164,11 @@ class Validation::Application < OpenTox::Service
         crossvalidation.to_rdf
       when /text\/html/
         related_links = 
-          "Search for corresponding cv report:  "+url_for("/validation/report/crossvalidation?crossvalidation="+crossvalidation.crossvalidation_uri,:full)+"\n"+
-          "Statistics for this crossvalidation: "+url_for("/validation/crossvalidation/"+params[:id]+"/statistics",:full)+"\n"+
-          "Predictions of this crossvalidation: "+url_for("/validation/crossvalidation/"+params[:id]+"/predictions",:full)+"\n"+
-          "All crossvalidations:                "+url_for("/validation/crossvalidation",:full)+"\n"+
-          "All crossvalidation reports:         "+url_for("/validation/report/crossvalidation",:full)
+          "Search for corresponding cv report:  "+to("/validation/report/crossvalidation?crossvalidation="+crossvalidation.crossvalidation_uri,:full)+"\n"+
+          "Statistics for this crossvalidation: "+to("/validation/crossvalidation/"+params[:id]+"/statistics",:full)+"\n"+
+          "Predictions of this crossvalidation: "+to("/validation/crossvalidation/"+params[:id]+"/predictions",:full)+"\n"+
+          "All crossvalidations:                "+to("/validation/crossvalidation",:full)+"\n"+
+          "All crossvalidation reports:         "+to("/validation/report/crossvalidation",:full)
         description = 
             "A crossvalidation resource."
         content_type "text/html"
@@ -194,7 +192,7 @@ class Validation::Application < OpenTox::Service
       case request.env['HTTP_ACCEPT'].to_s
       when /text\/html/
         related_links = 
-           "The corresponding crossvalidation resource: "+url_for("/validation/crossvalidation/"+params[:id],:full)
+           "The corresponding crossvalidation resource: "+to("/validation/crossvalidation/"+params[:id],:full)
         description = 
            "The averaged statistics for the crossvalidation."
         content_type "text/html"
@@ -269,8 +267,8 @@ class Validation::Application < OpenTox::Service
     #    description = 
     #      "The crossvalidation predictions as (yaml-)array."
     #    related_links = 
-    #      "All crossvalidations:         "+url_for("/validation/crossvalidation",:full)+"\n"+
-    #      "Correspoding crossvalidation: "+url_for("/validation/crossvalidation/"+params[:id],:full)
+    #      "All crossvalidations:         "+to("/validation/crossvalidation",:full)+"\n"+
+    #      "Correspoding crossvalidation: "+to("/validation/crossvalidation/"+params[:id],:full)
     #    OpenTox.text_to_html p,@subjectid, related_links, description
     #  else
     #    content_type "text/x-yaml"
@@ -285,14 +283,14 @@ class Validation::Application < OpenTox::Service
       if request.env['HTTP_ACCEPT'] =~ /text\/html/
         related_links = 
           "To perform a validation:\n"+
-          "* "+url_for("/validation/test_set_validation",:full)+"\n"+
-          "* "+url_for("/validation/training_test_validation",:full)+"\n"+
-          "* "+url_for("/validation/bootstrapping",:full)+"\n"+
-          "* "+url_for("/validation/training_test_split",:full)+"\n"+
-          "* "+url_for("/validation/crossvalidation",:full)+"\n"+
-          "Validation reporting:            "+url_for("/validation/report",:full)+"\n"+
-          "REACH relevant reporting:        "+url_for("/validation/reach_report",:full)+"\n"+
-          "Examples for using this service: "+url_for("/validation/examples",:full)+"\n"
+          "* "+to("/validation/test_set_validation",:full)+"\n"+
+          "* "+to("/validation/training_test_validation",:full)+"\n"+
+          "* "+to("/validation/bootstrapping",:full)+"\n"+
+          "* "+to("/validation/training_test_split",:full)+"\n"+
+          "* "+to("/validation/crossvalidation",:full)+"\n"+
+          "Validation reporting:            "+to("/validation/report",:full)+"\n"+
+          "REACH relevant reporting:        "+to("/validation/reach_report",:full)+"\n"+
+          "Examples for using this service: "+to("/validation/examples",:full)+"\n"
         description = 
             "A validation web service for the OpenTox project ( http://opentox.org ).\n"+
             "In the root directory (this is where you are now), a list of all validation resources is returned."
@@ -312,7 +310,7 @@ class Validation::Application < OpenTox::Service
       $logger.info "creating test-set-validation "+params.inspect
       if params[:model_uri].to_s.size>0 and params[:test_dataset_uri].to_s.size>0 and 
         params[:training_dataset_uri].to_s.size==0 and params[:algorithm_uri].to_s.size==0
-        task = OpenTox::Task.run( "Perform test-set-validation", url_for("/validation/", :full) ) do |task| #, params
+        task = OpenTox::Task.run( "Perform test-set-validation", to("/validation/", :full) ) do |task| #, params
           v = Validation::Validation.create :validation_type => "test_set_validation", 
                            :model_uri => params[:model_uri], 
                            :test_dataset_uri => params[:test_dataset_uri],
@@ -339,8 +337,8 @@ class Validation::Application < OpenTox::Service
       
       if request.env['HTTP_ACCEPT'] =~ /text\/html/
         related_links = 
-          "All validations:    "+url_for("/validation/",:full)+"\n"+
-          "Validation reports: "+url_for("/validation/report/validation",:full)
+          "All validations:    "+to("/validation/",:full)+"\n"+
+          "Validation reports: "+to("/validation/report/validation",:full)
         description = 
             "A list of all test-set-validations.\n"+
             "To perform a test-set-validation use the POST method."
@@ -360,7 +358,7 @@ class Validation::Application < OpenTox::Service
       $logger.info "creating training-test-validation "+params.inspect
       if params[:algorithm_uri].to_s.size>0 and params[:training_dataset_uri].to_s.size>0 and 
         params[:test_dataset_uri].to_s.size>0 and params[:prediction_feature].to_s.size>0 and params[:model_uri].to_s.size==0
-        task = OpenTox::Task.run( "Perform training-test-validation", url_for("/validation/", :full) ) do |task| #, params
+        task = OpenTox::Task.run( "Perform training-test-validation", to("/validation/", :full) ) do |task| #, params
           v = Validation::Validation.create :validation_type => "training_test_validation", 
                             :algorithm_uri => params[:algorithm_uri],
                             :algorithm_params => params[:algorithm_params],
@@ -388,8 +386,8 @@ class Validation::Application < OpenTox::Service
       
       if request.env['HTTP_ACCEPT'] =~ /text\/html/
         related_links = 
-          "All validations:    "+url_for("/validation/",:full)+"\n"+
-          "Validation reports: "+url_for("/validation/report/validation",:full)
+          "All validations:    "+to("/validation/",:full)+"\n"+
+          "Validation reports: "+to("/validation/report/validation",:full)
         description = 
             "A list of all training-test-validations.\n"+
             "To perform a training-test-validation use the POST method."
@@ -412,7 +410,7 @@ class Validation::Application < OpenTox::Service
       bad_request_error "dataset_uri missing" unless params[:dataset_uri].to_s.size>0
       bad_request_error "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
       bad_request_error "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
-      task = OpenTox::Task.run( "Perform bootstrapping validation", url_for("/validation/bootstrapping", :full) ) do |task| #, params
+      task = OpenTox::Task.run( "Perform bootstrapping validation", to("/validation/bootstrapping", :full) ) do |task| #, params
         params.merge!( Validation::Util.bootstrapping( params[:dataset_uri], 
           params[:prediction_feature], @subjectid, 
           params[:random_seed], OpenTox::SubTask.create(task,0,33)) )
@@ -440,8 +438,8 @@ class Validation::Application < OpenTox::Service
       
       if request.env['HTTP_ACCEPT'] =~ /text\/html/
         related_links = 
-          "All validations:    "+url_for("/validation/",:full)+"\n"+
-          "Validation reports: "+url_for("/validation/report/validation",:full)
+          "All validations:    "+to("/validation/",:full)+"\n"+
+          "Validation reports: "+to("/validation/report/validation",:full)
         description = 
             "A list of all bootstrapping-validations.\n\n"+
             "Bootstrapping performs sampling with replacement to create a training dataset and test dataset from the orignial dataset.\n"+
@@ -472,10 +470,10 @@ class Validation::Application < OpenTox::Service
       bad_request_error "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
       bad_request_error "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
       check_stratified(params)
-      task = OpenTox::Task.run( "Perform training test split validation", url_for("/validation/training_test_split", :full) )  do |task| #, params
+      task = OpenTox::Task.run( "Perform training test split validation", to("/validation/training_test_split", :full) )  do |task| #, params
       #task = OpenTox::Task.create( $task[:uri], nil, RDF::DC.description => "Perform training test split validation")  do |task| #, params
         $logger.debug "performing train test split"
-        params.merge!( Validation::Util.train_test_dataset_split(url_for("/validation/training_test_split", :full), params[:dataset_uri], 
+        params.merge!( Validation::Util.train_test_dataset_split(to("/validation/training_test_split", :full), params[:dataset_uri], 
           (params[:stratified].to_s=~/true/ ? params[:prediction_feature] : nil), @subjectid,  params[:stratified], params[:split_ratio], 
           params[:random_seed], OpenTox::SubTask.create(task,0,33)))
         $logger.debug "creating validation"  
@@ -504,8 +502,8 @@ class Validation::Application < OpenTox::Service
       
       if request.env['HTTP_ACCEPT'] =~ /text\/html/
         related_links = 
-          "All validations:    "+url_for("/validation/",:full)+"\n"+
-          "Validation reports: "+url_for("/validation/report/validation",:full)
+          "All validations:    "+to("/validation/",:full)+"\n"+
+          "Validation reports: "+to("/validation/report/validation",:full)
         description = 
             "A list of all training-test-split-validations.\n"+
             "To perform a training-test-split-validation use the POST method."
@@ -569,8 +567,8 @@ class Validation::Application < OpenTox::Service
       $logger.info "creating pure training test split "+params.inspect
       bad_request_error "dataset_uri missing" unless params[:dataset_uri]
       check_stratified(params)
-      task = OpenTox::Task.run( "Create data-split", url_for("/validation/plain_training_test_split", :full) ) do |task|
-        result = Validation::Util.train_test_dataset_split(url_for("/validation/plain_training_test_split", :full), params[:dataset_uri], params[:prediction_feature], 
+      task = OpenTox::Task.run( "Create data-split", to("/validation/plain_training_test_split", :full) ) do |task|
+        result = Validation::Util.train_test_dataset_split(to("/validation/plain_training_test_split", :full), params[:dataset_uri], params[:prediction_feature], 
           @subjectid, params[:stratified], params[:split_ratio], params[:random_seed], task)
         content_type "text/uri-list"
         result[:training_dataset_uri]+"\n"+result[:test_dataset_uri]+"\n"
@@ -579,7 +577,7 @@ class Validation::Application < OpenTox::Service
     end
     
     post '/validation/validate_datasets' do
-      task = OpenTox::Task.run( "Perform dataset validation", url_for("/validation/validate_datasets", :full) ) do |task| #, params
+      task = OpenTox::Task.run( "Perform dataset validation", to("/validation/validate_datasets", :full) ) do |task| #, params
         $logger.info "validating values "+params.inspect
         bad_request_error "test_dataset_uri missing" unless params[:test_dataset_uri]
         bad_request_error "prediction_datset_uri missing" unless params[:prediction_dataset_uri]
@@ -642,8 +640,8 @@ class Validation::Application < OpenTox::Service
     #    description = 
     #      "The validation predictions as (yaml-)array."
     #    related_links = 
-    #      "All validations:         "+url_for("/validation/",:full)+"\n"+
-    #      "Correspoding validation: "+url_for("/validation/"+params[:id],:full)
+    #      "All validations:         "+to("/validation/",:full)+"\n"+
+    #      "Correspoding validation: "+to("/validation/"+params[:id],:full)
     #    OpenTox.text_to_html p.to_array.to_yaml,@subjectid, related_links, description
     #  else
     #    content_type "text/x-yaml"
@@ -686,10 +684,10 @@ class Validation::Application < OpenTox::Service
         description = 
           "A validation resource."
         related_links = 
-          "Search for corresponding report: "+url_for("/validation/report/validation?validation="+validation.validation_uri,:full)+"\n"+
-          "Get validation predictions:      "+url_for("/validation/"+params[:id]+"/predictions",:full)+"\n"+
-          "All validations:                 "+url_for("/validation/",:full)+"\n"+
-          "All validation reports:          "+url_for("/validation/report/validation",:full)
+          "Search for corresponding report: "+to("/validation/report/validation?validation="+validation.validation_uri,:full)+"\n"+
+          "Get validation predictions:      "+to("/validation/"+params[:id]+"/predictions",:full)+"\n"+
+          "All validations:                 "+to("/validation/",:full)+"\n"+
+          "All validation reports:          "+to("/validation/report/validation",:full)
         OpenTox.text_to_html validation.to_rdf_yaml,@subjectid,related_links,description
       when "application/serialize"
         content_type "application/serialize"

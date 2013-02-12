@@ -55,8 +55,9 @@ module Sinatra
   set :raise_errors, false
   set :show_exceptions, false
 
+=begin
   module UrlForHelper
-    def url_for url_fragment, mode=:path_only
+    def to url_fragment, mode=:path_only
       case mode
       when :path_only
         raise "not impl"
@@ -65,12 +66,13 @@ module Sinatra
       "#{BASE}#{url_fragment}"
     end
   end
+=end
   
 end
 
 
 $url_provider = Object.new
-def $url_provider.url_for(url_fragment, mode=:path_only) 
+def $url_provider.to(url_fragment, mode=:path_only) 
   "#{BASE}#{url_fragment}"
 end 
 

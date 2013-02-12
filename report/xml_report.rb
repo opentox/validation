@@ -23,7 +23,7 @@ module Reports
     
     def self.dtd_directory
       if $url_provider
-        $url_provider.url_for("/validation/"+ENV['DOCBOOK_DIRECTORY']+'/'+ENV['REPORT_DTD'], :full)
+        $url_provider.to("/validation/"+ENV['DOCBOOK_DIRECTORY']+'/'+ENV['REPORT_DTD'], :full)
       else
         f = File.expand_path(File.join(ENV['DOCBOOK_DIRECTORY'],ENV['REPORT_DTD']))
         internal_server_error "cannot find dtd" unless File.exist?(f)
