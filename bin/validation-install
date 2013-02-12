@@ -67,16 +67,14 @@ if ! cat "$OT_CONFIG_DIR/config/$SELF.rb" | grep "four_store">/dev/null 2>&1; th
 if ! cat "$OT_CONFIG_DIR/config/$SELF.rb" | grep "aa">/dev/null 2>&1; then echo '$aa = { :uri => nil }' >> $OT_CONFIG_DIR/config/$SELF.rb; fi
 if ! cat "$OT_DEFAULT_CONF" | grep "$SELF">/dev/null 2>&1; then echo '$validation = { :uri => "http://localhost:8087/validation" }' >> $OT_DEFAULT_CONF; fi
 
+########################################
 #install redis
-WGET="`which wget`"
-if [ ! -e "$WGET" ]; then
-  echo "'wget' missing. Install 'wget' first. Aborting..."
-  exit 1
-fi
+SELF="redis"
+check_log $SELF
+check_utils "grep make tar wget"
 REDIS_VER="2.4.4"
 REDIS_DEST="$SELF_DIR/redis-$REDIS_VER"
 REDIS_SERVER_CONF="$REDIS_DEST/redis.conf"
-LOG="redis-log.txt"
 echo
 echo "Redis (log: '$LOG', dir: '$REDIS_DEST'):"
 REDIS_DONE=false
@@ -94,28 +92,32 @@ if ! $REDIS_DONE; then
   URI="http://redis.googlecode.com/files/redis-$REDIS_VER.tar.gz"
   if ! [ -d "redis-$REDIS_VER" ]; then
     cmd="$WGET $URI" && run_cmd "$cmd" "Download"
-    cmd="tar zxf redis-$REDIS_VER.tar.gz" && run_cmd "$cmd" "Unpack"
+    cmd="$TAR zxf redis-$REDIS_VER.tar.gz" && run_cmd "$cmd" "Unpack"
   fi
   cd redis-$REDIS_VER >>$LOG 2>&1
-  cmd="make" && run_cmd "$cmd" "Make"
-  if ! grep "daemonize yes" $REDIS_SERVER_CONF >>$LOG 2>&1 ; then 
+  cmd="$MAKE" && run_cmd "$cmd" "Make"
+  if ! $GREP "daemonize yes" $REDIS_SERVER_CONF >>$LOG 2>&1 ; then
     echo "daemonize yes" > $REDIS_SERVER_CONF 2>$LOG
   fi
-  if ! grep "dir `pwd`" $REDIS_SERVER_CONF >>$LOG 2>&1 ; then 
+  if ! $GREP "dir `pwd`" $REDIS_SERVER_CONF >>$LOG 2>&1 ; then
     echo "dir `pwd`" >> $REDIS_SERVER_CONF 2>$LOG
   fi
-  if ! grep "save 900 1" $REDIS_SERVER_CONF >>$LOG 2>&1 ; then 
+  if ! $GREP "save 900 1" $REDIS_SERVER_CONF >>$LOG 2>&1 ; then
     echo "save 900 1" >> $REDIS_SERVER_CONF 2>$LOG
+  fi
+  if ! $GREP "port $OHM_PORT" $REDIS_SERVER_CONF >>$LOG 2>&1 ; then
+    echo "port $OHM_PORT" >> $REDIS_SERVER_CONF 2>$LOG
   fi
 else
   echo "redis already installed"  
 fi
 if [ ! -f $REDIS_CONF ]; then
   echo "if ! echo \"\$PATH\" | grep \"$REDIS_DEST\">/dev/null 2>&1; then export PATH=$REDIS_DEST/src:\$PATH; fi" >> "$REDIS_CONF"
+  echo "if ! echo \"\$OHM_PORT\" | grep $OHM_PORT>/dev/null 2>&1; then export OHM_PORT=$OHM_PORT; fi" >> "$REDIS_CONF"
   echo "Redis configuration has been stored in '$REDIS_CONF'."
-  #if ! grep ". \"$REDIS_CONF\"" $OT_UI_CONF; then
-  #  echo ". \"$REDIS_CONF\"" >> $OT_UI_CONF
-  #fi
+  if ! grep ". \"$REDIS_CONF\"" $OT_UI_CONF; then
+    echo ". \"$REDIS_CONF\"" >> $OT_UI_CONF
+  fi
 fi
 
 
