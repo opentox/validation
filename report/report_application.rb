@@ -44,7 +44,7 @@ class Validation::Application < OpenTox::Service
         description = 
           "A list of all report types."
         content_type "text/html"
-        OpenTox.text_to_html rs.get_report_types,@subjectid,related_links,description
+        rs.get_report_types.to_html(related_links,description)
       else
         content_type "text/uri-list"
         rs.get_report_types
@@ -88,7 +88,7 @@ class Validation::Application < OpenTox::Service
             # VAL_ATTR_TTEST_CLASS.join(",")+"', default for regression: '"+VAL_ATTR_TTEST_REGR.join(",")+"'")
         # end
         content_type "text/html"
-        OpenTox.text_to_html rs.get_all_reports(params[:report_type], params),@subjectid,related_links,description#,post_command
+        rs.get_all_reports(params[:report_type], params).to_html related_links,description#,post_command
       else
         content_type "text/uri-list"
         rs.get_all_reports(params[:report_type], params)

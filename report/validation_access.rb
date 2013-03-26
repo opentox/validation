@@ -142,7 +142,7 @@ class Reports::ValidationDB
   def training_feature_dataset_uri(validation, subjectid)
     m = OpenTox::Model::Generic.find(validation.model_uri, subjectid)
     if m
-      f = m.metadata[OT.featureDataset]
+      f = m.metadata[RDF::OT.featureDataset]
       return f.chomp if f
     end
     internal_server_error "no feature dataset found"
@@ -153,7 +153,8 @@ class Reports::ValidationDB
     test_dataset = Lib::DatasetCache.find( validation.test_dataset_uri, subjectid )
     features_found = true 
     training_features.features.each do |f|
-      unless test_dataset.find_feature(f.uri)
+      unless test_dataset.features.include?(f)
+      #unless test_dataset.find_feature_uri(f.uri)
         features_found = false
         $logger.debug "training-feature are not in test-datset #{f}"
         break
@@ -165,12 +166,12 @@ class Reports::ValidationDB
     else
       m = OpenTox::Model::Generic.find(validation.model_uri, subjectid)
       feat_gen = nil
-      m.metadata[OT.parameters].each do |h|
-        if h[DC.title] and h[DC.title]=~/feature_generation/ and h[OT.paramValue]
-          feat_gen = h[OT.paramValue]
+      m.metadata[RDF::OT.parameters].each do |h|
+        if h[RDF::DC.title] and h[RDF::DC.title]=~/feature_generation/ and h[RDF::OT.paramValue]
+          feat_gen = h[RDF::OT.paramValue]
           break
         end
-      end if m  and m.metadata[OT.parameters]
+      end if m  and m.metadata[RDF::OT.parameters]
       internal_server_error "no feature creation alg found" unless feat_gen
       feat_gen = File.join(feat_gen,"match") if feat_gen=~/fminer/
       uri = OpenTox::RestClientWrapper.post(feat_gen,{:subjectid => subjectid,

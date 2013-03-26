@@ -1,4 +1,3 @@
-
 [ 'rubygems', 'sinatra' ].each do |lib|
   require lib
 end
@@ -46,7 +45,7 @@ class Validation::Application < OpenTox::Service
         # post_command.attributes << OpenTox::PostAttribute.new("random_seed",false,"1","An equal random seed value ensures the excact same random dataset split.")
         # post_command.attributes << OpenTox::PostAttribute.new("stratified",false,"false","Stratification ensures an equal class-value spread in folds.")
         content_type "text/html"
-        OpenTox.text_to_html uri_list,@subjectid,related_links,description#,post_command
+        uri_list.to_html(related_links,description)#,post_command
       else
         content_type "text/uri-list"
         uri_list
@@ -140,7 +139,7 @@ class Validation::Application < OpenTox::Service
         # post_command.attributes << OpenTox::PostAttribute.new("prediction_feature")
         # post_command.attributes << OpenTox::PostAttribute.new("algorithm_params",false,nil,"Params used for model building, separate with ';', example: param1=v1;param2=v2")
         content_type "text/html"
-        OpenTox.text_to_html uri_list,@subjectid,related_links,description#,post_command
+        uri_list.to_html related_links,description#,post_command
       else
         content_type "text/uri-list"
         uri_list
@@ -172,7 +171,7 @@ class Validation::Application < OpenTox::Service
         description = 
             "A crossvalidation resource."
         content_type "text/html"
-        OpenTox.text_to_html crossvalidation.to_rdf_yaml,@subjectid,related_links,description
+        crossvalidation.to_rdf_yaml.to_html related_links,description
       when "application/serialize"
         content_type "application/serialize"
         crossvalidation.inspect # to load all the stuff
@@ -196,7 +195,7 @@ class Validation::Application < OpenTox::Service
         description = 
            "The averaged statistics for the crossvalidation."
         content_type "text/html"
-        OpenTox.text_to_html v.to_rdf_yaml,@subjectid,related_links,description
+        v.to_rdf_yaml.to_html related_links,description
       when "application/rdf+xml"
         content_type "application/rdf+xml"
         v.to_rdf
@@ -295,7 +294,7 @@ class Validation::Application < OpenTox::Service
             "A validation web service for the OpenTox project ( http://opentox.org ).\n"+
             "In the root directory (this is where you are now), a list of all validation resources is returned."
         content_type "text/html"
-        OpenTox.text_to_html uri_list,@subjectid,related_links,description
+        uri_list.to_html related_links,description
       else
         content_type "text/uri-list"
         uri_list
@@ -347,7 +346,7 @@ class Validation::Application < OpenTox::Service
         # post_command.attributes << OpenTox::PostAttribute.new("test_dataset_uri")
         # post_command.attributes << OpenTox::PostAttribute.new("prediction_feature",false,nil,"Default is 'dependentVariables' of the model.")
         content_type "text/html"
-        OpenTox.text_to_html uri_list,@subjectid,related_links,description#,post_command
+        uri_list.to_html related_links,description#,post_command
       else
         content_type "text/uri-list"
         uri_list
@@ -398,7 +397,7 @@ class Validation::Application < OpenTox::Service
         # post_command.attributes << OpenTox::PostAttribute.new("prediction_feature")
         # post_command.attributes << OpenTox::PostAttribute.new("algorithm_params",false,nil,"Params used for model building, separate with ';', example: param1=v1;param2=v2")
         content_type "text/html"
-        OpenTox.text_to_html uri_list,@subjectid,related_links,description#,post_command
+        uri_list.to_html related_links,description#,post_command
       else
         content_type "text/uri-list"
         uri_list
@@ -457,7 +456,7 @@ class Validation::Application < OpenTox::Service
         # post_command.attributes << OpenTox::PostAttribute.new("algorithm_params",false,nil,"Params used for model building, separate with ';', example: param1=v1;param2=v2")
         # post_command.attributes << OpenTox::PostAttribute.new("random_seed",false,"1","An equal random seed value ensures the excact same random dataset split.")
         content_type "text/html"
-        OpenTox.text_to_html uri_list,@subjectid,related_links,description#,post_command
+        uri_list.to_html related_links,description#,post_command
       else
         content_type "text/uri-list"
         uri_list
@@ -470,8 +469,7 @@ class Validation::Application < OpenTox::Service
       bad_request_error "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
       bad_request_error "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
       check_stratified(params)
-      task = OpenTox::Task.run( "Perform training test split validation", to("/validation/training_test_split", :full) )  do |task| #, params
-      #task = OpenTox::Task.create( $task[:uri], nil, RDF::DC.description => "Perform training test split validation")  do |task| #, params
+      task = OpenTox::Task.run( "Perform training test split validation", uri("/validation/training_test_split"), @subjectid )  do |task| #, params
         $logger.debug "performing train test split"
         params.merge!( Validation::Util.train_test_dataset_split(to("/validation/training_test_split", :full), params[:dataset_uri], 
           (params[:stratified].to_s=~/true/ ? params[:prediction_feature] : nil), @subjectid,  params[:stratified], params[:split_ratio], 
@@ -515,7 +513,7 @@ class Validation::Application < OpenTox::Service
         # post_command.attributes << OpenTox::PostAttribute.new("random_seed",false,"1","An equal random seed value ensures the excact same random dataset split.")
         # post_command.attributes << OpenTox::PostAttribute.new("split_ratio",false,"0.66","A split ratio of 0.66 implies that two thirds of the compounds are used for training.")
         content_type "text/html"
-        OpenTox.text_to_html uri_list,@subjectid,related_links,description#,post_command
+        uri_list.to_html related_links,description#,post_command
       else
         content_type "text/uri-list"
         uri_list
@@ -688,7 +686,7 @@ class Validation::Application < OpenTox::Service
           "Get validation predictions:      "+to("/validation/"+params[:id]+"/predictions",:full)+"\n"+
           "All validations:                 "+to("/validation/",:full)+"\n"+
           "All validation reports:          "+to("/validation/report/validation",:full)
-        OpenTox.text_to_html validation.to_rdf_yaml,@subjectid,related_links,description
+        validation.to_rdf_yaml.to_html related_links,description
       when "application/serialize"
         content_type "application/serialize"
         validation.inspect # to load all the stuff

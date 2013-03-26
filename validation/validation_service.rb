@@ -172,12 +172,12 @@ module Validation
       model.get
       
       unless self.algorithm_uri
-        self.algorithm_uri = model.metadata[OT.algorithm.to_s]
+        self.algorithm_uri = model.metadata[RDF::OT.algorithm.to_s]
       end
       if self.prediction_feature.to_s.size==0
-        dependentVariables = model.metadata[OT.dependentVariables.to_s]
+        dependentVariables = model.metadata[RDF::OT.dependentVariables.to_s]
         internal_server_error "model has no dependentVariables specified, please give prediction_feature for model validation" unless dependentVariables
-        self.prediction_feature = model.metadata[OT.dependentVariables.to_s]
+        self.prediction_feature = model.metadata[RDF::OT.dependentVariables.to_s]
       end
       
       prediction_dataset_uri = ""
@@ -219,9 +219,9 @@ module Validation
       model.get
             
       feature_type = model.feature_type(self.subjectid)
-      dependentVariables = model.metadata[OT.dependentVariables.to_s]
+      dependentVariables = model.metadata[RDF::OT.dependentVariables.to_s]
       prediction_feature = self.prediction_feature ? nil : dependentVariables
-      algorithm_uri = self.algorithm_uri ? nil : model.metadata[OT.algorithm.to_s]
+      algorithm_uri = self.algorithm_uri ? nil : model.metadata[RDF::OT.algorithm.to_s]
       predicted_variable = model.predicted_variable(self.subjectid)
       predicted_confidence = model.predicted_confidence(self.subjectid)
       internal_server_error "cannot determine whether model '"+model.uri.to_s+"' performs classification or regression: '#{feature_type}', "+
@@ -327,9 +327,9 @@ module Validation
         if (delete_feature_datasets)
           begin
             model = OpenTox::Model::Generic.find(v.model_uri)
-            if model.metadata[OT.featureDataset.to_s]
-              $logger.debug "loo-cleanup> delete feature dataset "+model.metadata[OT.featureDataset.to_s]
-              OpenTox::RestClientWrapper.delete model.metadata[OT.featureDataset.to_s],subjectid
+            if model.metadata[RDF::OT.featureDataset.to_s]
+              $logger.debug "loo-cleanup> delete feature dataset "+model.metadata[RDF::OT.featureDataset.to_s]
+              OpenTox::RestClientWrapper.delete model.metadata[RDF::OT.featureDataset.to_s],subjectid
             end
           rescue
           end
@@ -425,8 +425,11 @@ module Validation
         Validation.find( :crossvalidation_id => cv.id, :validation_type => "crossvalidation" ).each do |v|
           break unless 
             v.prediction_feature == prediction_feature and
-            OpenTox::Dataset.exist?(v.training_dataset_uri,self.subjectid) and 
-            OpenTox::Dataset.exist?(v.test_dataset_uri,self.subjectid)
+            URI.accessible?(v.training_dataset_uri,self.subjectid) and 
+            URI.accessible?(v.test_dataset_uri,self.subjectid)
+            # CH: Dataset.exist? has been removed, URI.accessible? is cheaper because it needs only HEAD requests 
+            #OpenTox::Dataset.exist?(v.training_dataset_uri,self.subjectid) and 
+            #OpenTox::Dataset.exist?(v.test_dataset_uri,self.subjectid)
           #make sure self.id is set
           #self.save if self.new?
           tmp_val << { :validation_type => "crossvalidation",
@@ -457,7 +460,7 @@ module Validation
       train_dataset_uris = []
       test_dataset_uris = []
       
-      meta = { DC.creator => self.crossvalidation_uri }
+      meta = { RDF::DC.creator => self.crossvalidation_uri }
       case stratified
       when "false"
         if self.loo=="true"
@@ -485,11 +488,11 @@ module Validation
           internal_server_error "internal error, num train compounds not correct, should be '"+(shuffled_compound_indices.size-test_compound_indices.size).to_s+
             "', is '"+train_compound_indices.size.to_s+"'" unless shuffled_compound_indices.size - test_compound_indices.size == train_compound_indices.size
           datasetname = 'dataset fold '+(n+1).to_s+' of '+self.num_folds.to_s        
-          meta[DC.title] = "training "+datasetname 
+          meta[RDF::DC.title] = "training "+datasetname 
           $logger.debug "training set: "+datasetname+"_train, compounds: "+train_compound_indices.size.to_s
           train_dataset_uri = orig_dataset.split( train_compound_indices, orig_dataset.features, meta, self.subjectid ).uri
           train_dataset_uris << train_dataset_uri
-          meta[DC.title] = "test "+datasetname
+          meta[RDF::DC.title] = "test "+datasetname
           $logger.debug "test set:     "+datasetname+"_test, compounds: "+test_compound_indices.size.to_s
           test_dataset_uri = orig_dataset.split( test_compound_indices, orig_dataset.features, meta, self.subjectid ).uri
           test_dataset_uris << test_dataset_uri
@@ -573,14 +576,14 @@ module Validation
       
       result = {}
       result[:training_dataset_uri] = orig_dataset.split( training_compound_indices, orig_dataset.features, 
-        { DC.title => "Bootstrapping training dataset of "+orig_dataset.title.to_s,
-          DC.creator => $url_provider.to('/validation/bootstrapping',:full) },
+        { RDF::DC.title => "Bootstrapping training dataset of "+orig_dataset.title.to_s,
+          RDF::DC.creator => $url_provider.to('/validation/bootstrapping',:full) },
         subjectid ).uri
       task.progress(66) if task
 
       result[:test_dataset_uri] = orig_dataset.split( test_compound_indices, orig_dataset.features,
-        { DC.title => "Bootstrapping test dataset of "+orig_dataset.title.to_s,
-          DC.creator => $url_provider.to('/validation/bootstrapping',:full)} ,
+        { RDF::DC.title => "Bootstrapping test dataset of "+orig_dataset.title.to_s,
+          RDF::DC.creator => $url_provider.to('/validation/bootstrapping',:full)} ,
         subjectid ).uri
       task.progress(100) if task
       
@@ -616,7 +619,7 @@ module Validation
         bad_request_error "prediction feature required for stratified splits" unless prediction_feature
       end
       
-      meta = { DC.creator => creator_uri }
+      meta = { RDF::DC.creator => creator_uri }
       
       case stratified
       when /true|super/
@@ -643,7 +646,7 @@ module Validation
         test_compound_indices = compound_indices[split..-1]
         task.progress(33) if task
   
-        meta[DC.title] = "Training dataset split of "+orig_dataset.uri
+        meta[RDF::DC.title] = "Training dataset split of "+orig_dataset.uri
         result = {}
         train_data = orig_dataset.split( training_compound_indices, orig_dataset.features, meta, subjectid )
         est_num_train_compounds = (orig_dataset.compounds.size*split_ratio).round
@@ -652,7 +655,7 @@ module Validation
         result[:training_dataset_uri] = train_data.uri
         task.progress(66) if task
   
-        meta[DC.title] = "Test dataset split of "+orig_dataset.uri
+        meta[RDF::DC.title] = "Test dataset split of "+orig_dataset.uri
         test_data = orig_dataset.split( test_compound_indices, orig_dataset.features, meta, subjectid )
         est_num_test_compounds = orig_dataset.compounds.size-est_num_train_compounds
         internal_server_error "Test dataset num coumpounds != #{est_num_test_compounds}, instead: "+test_data.compounds.size.to_s unless 

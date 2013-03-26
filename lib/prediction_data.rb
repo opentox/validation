@@ -94,7 +94,7 @@ module Lib
         internal_server_error "prediction_feature not found in test_dataset\n"+
               "prediction_feature: '"+prediction_feature.to_s+"'\n"+
               "test_dataset: '"+test_dataset_uri.to_s+"'\n"+  
-              "available features are: "+test_dataset.features.inspect if test_dataset.find_feature(prediction_feature)==nil
+              "available features are: "+test_dataset.features.inspect if test_dataset.find_feature_uri(prediction_feature)==nil
         
         $logger.debug "test dataset size: "+test_dataset.compounds.size.to_s
         internal_server_error "test dataset is empty "+test_dataset_uri.to_s unless test_dataset.compounds.size>0
