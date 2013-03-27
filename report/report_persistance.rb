@@ -234,7 +234,7 @@ module Reports
     
     def to_rdf
       s = OpenTox::Serializer::Owl.new
-      s.add_resource(report_uri,OT.Report,get_content_as_hash.keys_to_rdf_format.keys_to_owl_uris)
+      s.add_resource(report_uri,RDF::OT.Report,get_content_as_hash.keys_to_rdf_format.keys_to_owl_uris)
       s.to_rdfxml
     end
   end

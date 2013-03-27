@@ -84,7 +84,7 @@ module ValidationExamples
       else
         params[:accept] = accept_header
         uri = OpenTox::RestClientWrapper.post(File.join($validation[:uri],uri),params,{},waiting_task).to_s
-        uri = OpenTox.wait_for_task(uri)
+        uri = wait_for_task(uri)
       end
       raise "validation post result not a validation uri: #{uri}" unless uri.validation_uri?
       uri
@@ -359,19 +359,19 @@ module ValidationExamples
         size = 0
         target = nil
         
-        cv.metadata[OT.validation].each do |v|
+        cv.metadata[RDF::OT.validation].each do |v|
           val = OpenTox::Validation.find(v)
           dataset = {}
-          dataset[:test] = val.metadata[OT.testDataset]
-          dataset[:training] = val.metadata[OT.trainingDataset]
-          #dataset[:target] = val.metadata[OT.testTargetDataset]
-          raise if (target!=nil and target!=val.metadata[OT.testTargetDataset])
-          target = val.metadata[OT.testTargetDataset]
+          dataset[:test] = val.metadata[RDF::OT.testDataset]
+          dataset[:training] = val.metadata[RDF::OT.trainingDataset]
+          #dataset[:target] = val.metadata[RDF::OT.testTargetDataset]
+          raise if (target!=nil and target!=val.metadata[RDF::OT.testTargetDataset])
+          target = val.metadata[RDF::OT.testTargetDataset]
             
-          dataset[:prediction] = val.metadata[OT.predictionDataset]
-          m =  val.metadata[OT.model]
+          dataset[:prediction] = val.metadata[RDF::OT.predictionDataset]
+          m =  val.metadata[RDF::OT.model]
           model = OpenTox::Model::Generic.find(m)
-          dataset[:feature] = model.metadata[OT.featureDataset]
+          dataset[:feature] = model.metadata[RDF::OT.featureDataset]
           
           puts v
           val_size = 0

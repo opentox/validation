@@ -177,7 +177,7 @@ class Reports::ValidationDB
       uri = OpenTox::RestClientWrapper.post(feat_gen,{:subjectid => subjectid,
         :feature_dataset_uri=>training_feature_dataset_uri(validation,subjectid),
         :dataset_uri=>validation.test_dataset_uri})
-      @@tmp_resources << OpenTox.wait_for_task(uri)
+      @@tmp_resources << wait_for_task(uri)
     end
     uri
   end
@@ -219,8 +219,8 @@ class Reports::ValidationDB
   
   def feature_type( validation, subjectid=nil )
     m = OpenTox::Model.new(validation.model_uri,subjectid)
-    m.get
-    m.feature_type(subjectid)
+    #m.get
+    m.feature_type
     #get_model(validation).classification?
   end
   
@@ -229,7 +229,7 @@ class Reports::ValidationDB
     model = OpenTox::Model.new(validation.model_uri,subjectid)
     model.get
     resource_not_found_error "model not found '"+validation.model_uri+"'" unless model
-    model.predicted_variable(subjectid)
+    model.predicted_variable
   end
   
   def predicted_confidence(validation, subjectid=nil)
@@ -237,7 +237,7 @@ class Reports::ValidationDB
     model = OpenTox::Model.new(validation.model_uri,subjectid)
     model.get
     resource_not_found_error "model not found '"+validation.model_uri+"'" unless model
-    model.predicted_confidence(subjectid)
+    model.predicted_confidence
   end
   
 #  private

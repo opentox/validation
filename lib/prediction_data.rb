@@ -101,7 +101,7 @@ module Lib
         
         if feature_type=="classification"
           av = OpenTox::Feature.find(prediction_feature).accept_values
-          internal_server_error "'"+OT.acceptValue.to_s+"' missing/invalid for feature '"+prediction_feature.to_s+"' in dataset '"+
+          internal_server_error "'"+RDF::OT.acceptValue.to_s+"' missing/invalid for feature '"+prediction_feature.to_s+"' in dataset '"+
             test_dataset_uri.to_s+"', acceptValues are: '"+av.inspect+"'" if av==nil or av.length<2
           if accept_values==nil
             accept_values=av
@@ -129,11 +129,11 @@ module Lib
         internal_server_error "predicted_variable not found in prediction_dataset\n"+
             "predicted_variable '"+predicted_variable.to_s+"'\n"+
             "prediction_dataset: '"+prediction_dataset_uri.to_s+"'\n"+
-            "available features are: "+prediction_dataset.features.inspect if prediction_dataset.find_feature(predicted_variable)==nil and prediction_dataset.compounds.size>0
+            "available features are: "+prediction_dataset.features.inspect if prediction_dataset.find_feature_uri(predicted_variable)==nil and prediction_dataset.compounds.size>0
         internal_server_error "predicted_confidence not found in prediction_dataset\n"+
                 "predicted_confidence '"+predicted_confidence.to_s+"'\n"+
                 "prediction_dataset: '"+prediction_dataset_uri.to_s+"'\n"+
-                "available features are: "+prediction_dataset.features.inspect if predicted_confidence and prediction_dataset.find_feature(predicted_confidence)==nil and prediction_dataset.compounds.size>0
+                "available features are: "+prediction_dataset.features.inspect if predicted_confidence and prediction_dataset.find_feature_uri(predicted_confidence)==nil and prediction_dataset.compounds.size>0
 
         #internal_server_error "more predicted than test compounds, #test: "+test_dataset.compounds.size.to_s+" < #prediction: "+
         #  prediction_dataset.compounds.size.to_s+", test-dataset: "+test_dataset_uri.to_s+", prediction-dataset: "+
@@ -178,6 +178,10 @@ module Lib
         
         task.progress( task_status += task_step ) if task # loaded predicted values and confidence
       end
+        puts all_compounds.inspect
+        puts all_predicted_values.inspect
+        puts all_actual_values.inspect
+        puts all_confidence_values.inspect
       
       #sort according to confidence if available
       if all_confidence_values.compact.size>0
@@ -204,6 +208,7 @@ module Lib
       data = { :predicted_values => all_predicted_values, :actual_values => all_actual_values, :confidence_values => all_confidence_values,
         :feature_type => feature_type, :accept_values => accept_values }
         
+      puts data.inspect
       PredictionData.new(data, all_compounds)
     end
     
@@ -226,7 +231,10 @@ module Lib
     end
     
     def self.classification_val(dataset, compound_index, feature, accept_values)
+      puts compound_index
+      puts feature.inspect
       v = dataset.data_entry_value(compound_index, feature)
+      puts v.to_s
       i = accept_values.index(v)
       internal_server_error "illegal class_value of prediction (value is '"+v.to_s+"'), accept values are "+
         accept_values.inspect unless v==nil or i!=nil

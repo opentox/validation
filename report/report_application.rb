@@ -145,6 +145,7 @@ class Validation::Application < OpenTox::Service
     bad_request_error "validation_uris missing" unless params[:validation_uris].to_s.size>0
     task = OpenTox::Task.run("Create report",to("/validation/report/"+params[:type], :full)) do |task| #,params
       perform do |rs|
+        puts rs.inspect
         rs.create_report(params[:type],params[:validation_uris]?params[:validation_uris].split(/\n|,/):nil,
           params[:identifier]?params[:identifier].split(/\n|,/):nil,params,@subjectid,task)
       end

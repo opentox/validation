@@ -169,20 +169,21 @@ module Validation
       #model = OpenTox::Model::PredictionModel.find(self.model_uri)
       #resource_not_found_error "model not found: "+self.model_uri.to_s unless model
       model = OpenTox::Model.new(self.model_uri, self.subjectid)
-      model.get
+      #model.get
       
       unless self.algorithm_uri
-        self.algorithm_uri = model.metadata[RDF::OT.algorithm.to_s]
+        self.algorithm_uri = model.metadata[RDF::OT.algorithm]
       end
       if self.prediction_feature.to_s.size==0
-        dependentVariables = model.metadata[RDF::OT.dependentVariables.to_s]
+        dependentVariables = model.metadata[RDF::OT.dependentVariables]
         internal_server_error "model has no dependentVariables specified, please give prediction_feature for model validation" unless dependentVariables
-        self.prediction_feature = model.metadata[RDF::OT.dependentVariables.to_s]
+        self.prediction_feature = model.metadata[RDF::OT.dependentVariables]
       end
       
       prediction_dataset_uri = ""
       benchmark = Benchmark.measure do 
         #prediction_dataset_uri = model.predict_dataset(self.test_dataset_uri, OpenTox::SubTask.create(task, 0, 50))
+        puts self.test_dataset_uri
         prediction_dataset_uri = model.run({:dataset_uri => self.test_dataset_uri, :subjectid => self.subjectid})
           #"text/uri-list",OpenTox::SubTask.create(task, 0, 50))
       end
@@ -200,12 +201,12 @@ module Validation
     
     def compute_prediction_data_with_cv(cv_vals, waiting_task=nil)
       models = cv_vals.collect{|v| m = OpenTox::Model.new(v.model_uri, subjectid); m.get; m}
-      feature_type = models.first.feature_type(subjectid)
+      feature_type = models.first.feature_type # CH: subjectid is a object variable, no need to pass it as a parameter
       test_dataset_uris = cv_vals.collect{|v| v.test_dataset_uri}
       prediction_feature = cv_vals.first.prediction_feature
       prediction_dataset_uris = cv_vals.collect{|v| v.prediction_dataset_uri}
-      predicted_variables = models.collect{|m| m.predicted_variable(subjectid)}
-      predicted_confidences = models.collect{|m| m.predicted_confidence(subjectid)}
+      predicted_variables = models.collect{|m| m.predicted_variable}
+      predicted_confidences = models.collect{|m| m.predicted_confidence}
       p_data = Lib::PredictionData.create( feature_type, test_dataset_uris, prediction_feature, 
         prediction_dataset_uris, predicted_variables, predicted_confidences, subjectid, waiting_task )
       self.prediction_data = p_data.data
@@ -214,16 +215,15 @@ module Validation
     
     def compute_prediction_data_with_model(model=nil, task=nil)
       #model = OpenTox::Model::Generic.find(self.model_uri, self.subjectid) if model==nil and self.model_uri
-      #resource_not_found_error "model not found: "+self.model_uri.to_s unless model
-      model = OpenTox::Model.new(self.model_uri, self.subjectid) if model==nil
-      model.get
+      model = OpenTox::Model.find(self.model_uri, self.subjectid) if model==nil and self.model_uri
+      resource_not_found_error "model not found: "+self.model_uri.to_s unless model
             
-      feature_type = model.feature_type(self.subjectid)
-      dependentVariables = model.metadata[RDF::OT.dependentVariables.to_s]
+      feature_type = model.feature_type # CH: subjectid is a object variable, no need to pass it as a parameter
+      dependentVariables = model.metadata[RDF::OT.dependentVariables]
       prediction_feature = self.prediction_feature ? nil : dependentVariables
-      algorithm_uri = self.algorithm_uri ? nil : model.metadata[RDF::OT.algorithm.to_s]
-      predicted_variable = model.predicted_variable(self.subjectid)
-      predicted_confidence = model.predicted_confidence(self.subjectid)
+      algorithm_uri = self.algorithm_uri ? nil : model.metadata[RDF::OT.algorithm]
+      predicted_variable = model.predicted_variable
+      predicted_confidence = model.predicted_confidence
       internal_server_error "cannot determine whether model '"+model.uri.to_s+"' performs classification or regression: '#{feature_type}', "+
           "please set rdf-type of predictedVariables feature '"+predicted_variable.to_s+
           "' to NominalFeature or NumericFeature" if
@@ -280,6 +280,7 @@ module Validation
       if p_data==nil
         # this is to ensure backwards compatibilty
         # may cause a timeout on the first run, as this is not meant to run in a task
+        puts validation_type
         if validation_type=="crossvalidation_statistics"
           vals = Validation.find( :crossvalidation_id => self.crossvalidation_id, :validation_type => "crossvalidation" ).collect{|x| x}
           compute_prediction_data_with_cv(vals)
@@ -327,9 +328,9 @@ module Validation
         if (delete_feature_datasets)
           begin
             model = OpenTox::Model::Generic.find(v.model_uri)
-            if model.metadata[RDF::OT.featureDataset.to_s]
-              $logger.debug "loo-cleanup> delete feature dataset "+model.metadata[RDF::OT.featureDataset.to_s]
-              OpenTox::RestClientWrapper.delete model.metadata[RDF::OT.featureDataset.to_s],subjectid
+            if model.metadata[RDF::OT.featureDataset]
+              $logger.debug "loo-cleanup> delete feature dataset "+model.metadata[RDF::OT.featureDataset]
+              OpenTox::RestClientWrapper.delete model.metadata[RDF::OT.featureDataset],subjectid
             end
           rescue
           end

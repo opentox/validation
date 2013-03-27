@@ -24,8 +24,8 @@ class Validation::Application < OpenTox::Service
       model_uri = params.delete("model") || params.delete("model_uri")
       if model_uri
         model = OpenTox::Model::Generic.find(model_uri, @subjectid)
-        params[:algorithm] = model.metadata[OT.algorithm]
-        params[:dataset] = model.metadata[OT.trainingDataset]
+        params[:algorithm] = model.metadata[RDF::OT.algorithm]
+        params[:dataset] = model.metadata[RDF::OT.trainingDataset]
       end
       uri_list = Lib::OhmUtil.find( Validation::Crossvalidation, params ).sort.collect{|v| v.crossvalidation_uri}.join("\n") + "\n"
       if request.env['HTTP_ACCEPT'] =~ /text\/html/
