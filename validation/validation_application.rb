@@ -19,6 +19,11 @@ class Validation::Application < OpenTox::Service
       $url_provider = self
     end
     
+    # for service check
+    head '/validation/?' do
+      $logger.debug "Validation service is running."
+    end
+    
     get '/validation/crossvalidation/?' do
       $logger.info "list all crossvalidations "+params.inspect
       model_uri = params.delete("model") || params.delete("model_uri")
