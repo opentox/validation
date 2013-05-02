@@ -21,7 +21,7 @@ class Validation::Application < OpenTox::Service
     
     # for service check
     head '/validation/?' do
-      $logger.debug "Validation service is running."
+      #$logger.debug "Validation service is running."
     end
     
     get '/validation/crossvalidation/?' do
