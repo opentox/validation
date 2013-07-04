@@ -135,7 +135,7 @@ module Validation
       #$logger.warn "running alg"
       #$logger.warn algorithm_uri
       #$logger.warn params.inspect
-      self.model_uri = OpenTox::Algorithm.new(algorithm_uri).run(params)
+      self.model_uri = OpenTox::Algorithm::Generic.new(algorithm_uri).run(params)
       #$logger.warn "algorithm run finished"
       #$logger.warn "#{result}"
       
@@ -168,7 +168,7 @@ module Validation
       
       #model = OpenTox::Model::PredictionModel.find(self.model_uri)
       #resource_not_found_error "model not found: "+self.model_uri.to_s unless model
-      model = OpenTox::Model.new(self.model_uri, self.subjectid)
+      model = OpenTox::Model::Generic.new(self.model_uri, self.subjectid)
       #model.get
       
       unless self.algorithm_uri
@@ -200,7 +200,7 @@ module Validation
     end
     
     def compute_prediction_data_with_cv(cv_vals, waiting_task=nil)
-      models = cv_vals.collect{|v| m = OpenTox::Model.new(v.model_uri, subjectid); m.get; m}
+      models = cv_vals.collect{|v| m = OpenTox::Model::Generic.new(v.model_uri, subjectid); m.get; m}
       feature_type = models.first.feature_type # CH: subjectid is a object variable, no need to pass it as a parameter
       test_dataset_uris = cv_vals.collect{|v| v.test_dataset_uri}
       prediction_feature = cv_vals.first.prediction_feature

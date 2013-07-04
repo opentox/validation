@@ -218,7 +218,7 @@ class Reports::ValidationDB
   end
   
   def feature_type( validation, subjectid=nil )
-    m = OpenTox::Model.new(validation.model_uri,subjectid)
+    m = OpenTox::Model::Generic.new(validation.model_uri,subjectid)
     #m.get
     m.feature_type
     #get_model(validation).classification?
@@ -226,7 +226,7 @@ class Reports::ValidationDB
   
   def predicted_variable(validation, subjectid=nil)
     internal_server_error "cannot derive model depended props for merged validations" if Lib::MergeObjects.merged?(validation)
-    model = OpenTox::Model.new(validation.model_uri,subjectid)
+    model = OpenTox::Model::Generic.new(validation.model_uri,subjectid)
     model.get
     resource_not_found_error "model not found '"+validation.model_uri+"'" unless model
     model.predicted_variable
@@ -234,7 +234,7 @@ class Reports::ValidationDB
   
   def predicted_confidence(validation, subjectid=nil)
     internal_server_error "cannot derive model depended props for merged validations" if Lib::MergeObjects.merged?(validation)
-    model = OpenTox::Model.new(validation.model_uri,subjectid)
+    model = OpenTox::Model::Generic.new(validation.model_uri,subjectid)
     model.get
     resource_not_found_error "model not found '"+validation.model_uri+"'" unless model
     model.predicted_confidence

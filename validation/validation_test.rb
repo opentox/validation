@@ -132,12 +132,12 @@ class ValidationTest < Test::Unit::TestCase
          params = {:dataset_uri=>train, 
            :prediction_feature=>prediction_feature}
          alg_params.each{ |k,v| params[k] = v }
-         model = OpenTox::Algorithm.new(alg).run(params)
+         model = OpenTox::Algorithm::Generic.new(alg).run(params)
        else
          model = "http://localhost:8085/model/ffb80776-2b11-468a-ace9-753b2ce3ec5b"
        end 
        puts "model #{model}"
-       m = OpenTox::Model.new(model)
+       m = OpenTox::Model::Generic.new(model)
        m.get
        predicted_feature = m.predicted_variable
        puts "predicted: #{predicted_feature}"
@@ -148,7 +148,7 @@ class ValidationTest < Test::Unit::TestCase
        if (apply_model)          
          params = {:dataset_uri=>test, 
                  :prediction_feature=>prediction_feature}
-         pred = OpenTox::Model.new(model).run(params)
+         pred = OpenTox::Model::Generic.new(model).run(params)
        else
          pred = "http://localhost:8083/dataset/354ccada-3b0c-4ceb-9acf-a0f7dc9c5e09"
        end  
