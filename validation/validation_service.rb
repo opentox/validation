@@ -169,7 +169,6 @@ module Validation
       #model = OpenTox::Model::PredictionModel.find(self.model_uri)
       #resource_not_found_error "model not found: "+self.model_uri.to_s unless model
       model = OpenTox::Model::Generic.new(self.model_uri, self.subjectid)
-      #model.get
       
       unless self.algorithm_uri
         self.algorithm_uri = model.metadata[RDF::OT.algorithm]
@@ -183,7 +182,9 @@ module Validation
       prediction_dataset_uri = ""
       benchmark = Benchmark.measure do 
         #prediction_dataset_uri = model.predict_dataset(self.test_dataset_uri, OpenTox::SubTask.create(task, 0, 50))
-        puts self.test_dataset_uri
+        #puts self.test_dataset_uri
+        #puts "MODEL"
+        #puts model.uri
         prediction_dataset_uri = model.run({:dataset_uri => self.test_dataset_uri, :subjectid => self.subjectid})
           #"text/uri-list",OpenTox::SubTask.create(task, 0, 50))
       end
@@ -649,7 +650,7 @@ module Validation
   
         meta[RDF::DC.title] = "Training dataset split of "+orig_dataset.uri
         result = {}
-        train_data = orig_dataset.split( training_compound_indices, orig_dataset.features, meta, subjectid )
+        train_data = orig_dataset.split( training_compound_indices, orig_dataset.features, meta )
         est_num_train_compounds = (orig_dataset.compounds.size*split_ratio).round
         internal_server_error "Train dataset num coumpounds != #{est_num_train_compounds}, instead: "+train_data.compounds.size.to_s unless 
           train_data.compounds.size==est_num_train_compounds
@@ -657,7 +658,7 @@ module Validation
         task.progress(66) if task
   
         meta[RDF::DC.title] = "Test dataset split of "+orig_dataset.uri
-        test_data = orig_dataset.split( test_compound_indices, orig_dataset.features, meta, subjectid )
+        test_data = orig_dataset.split( test_compound_indices, orig_dataset.features, meta )
         est_num_test_compounds = orig_dataset.compounds.size-est_num_train_compounds
         internal_server_error "Test dataset num coumpounds != #{est_num_test_compounds}, instead: "+test_data.compounds.size.to_s unless 
           test_data.compounds.size==est_num_test_compounds
