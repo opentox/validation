@@ -28,7 +28,7 @@ class Validation::Application < OpenTox::Service
       $logger.info "list all crossvalidations "+params.inspect
       model_uri = params.delete("model") || params.delete("model_uri")
       if model_uri
-        model = OpenTox::Model::Generic.find(model_uri, @subjectid)
+        model = OpenTox::Model::Generic.find(model_uri)
         params[:algorithm] = model.metadata[RDF::OT.algorithm]
         params[:dataset] = model.metadata[RDF::OT.trainingDataset]
       end
@@ -72,14 +72,12 @@ class Validation::Application < OpenTox::Service
                       :algorithm_params => params[:algorithm_params],
                       :prediction_feature => params[:prediction_feature],
                       :stratified => params[:stratified],
-                      :loo => "false",
-                      :subjectid => @subjectid }
+                      :loo => "false" }
         [ :num_folds, :random_seed ].each{ |sym| cv_params[sym] = params[sym] if params[sym] }
         cv = Validation::Crossvalidation.create cv_params
-        cv.subjectid = @subjectid
         cv.perform_cv( OpenTox::SubTask.create(task,0,95) )
         # computation of stats is cheap as dataset are already loaded into the memory
-        Validation::Validation.from_cv_statistics( cv.id, @subjectid, OpenTox::SubTask.create(task,95,100) )
+        Validation::Validation.from_cv_statistics( cv.id, OpenTox::SubTask.create(task,95,100) )
         cv.crossvalidation_uri
       end
       return_task(task)
@@ -90,10 +88,9 @@ class Validation::Application < OpenTox::Service
       content_type "text/uri-list"
       deleted = []
       Validation::Crossvalidation.all.collect.delete_if{|cv| cv.finished}.each do |cv|
-        if OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"DELETE",@subjectid)
+        if OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"DELETE",OpenTox::RestClientWrapper.subjectid)
           $logger.debug "delete cv with id:"+cv.id.to_s+", finished is false"
           deleted << cv.crossvalidation_uri
-          cv.subjectid = @subjectid
           cv.delete_crossvalidation
           sleep 1 if $aa[:uri]
         end
@@ -116,10 +113,9 @@ class Validation::Application < OpenTox::Service
                       :algorithm_uri => params[:algorithm_uri],
                       :loo => "true" }
         cv = Validation::Crossvalidation.create cv_params
-        cv.subjectid = @subjectid
         cv.perform_cv( OpenTox::SubTask.create(task,0,95))
         # computation of stats is cheap as dataset are already loaded into the memory
-        Validation::Validation.from_cv_statistics( cv.id, @subjectid, OpenTox::SubTask.create(task,95,100) )
+        Validation::Validation.from_cv_statistics( cv.id, OpenTox::SubTask.create(task,95,100) )
         cv.clean_loo_files( !(params[:algorithm_params] && params[:algorithm_params] =~ /feature_dataset_uri/) )
         cv.crossvalidation_uri
       end
@@ -192,7 +188,7 @@ class Validation::Application < OpenTox::Service
     get '/validation/crossvalidation/:id/statistics' do
       
       $logger.info "get crossvalidation statistics for crossvalidation with id "+params[:id].to_s
-      v = Validation::Validation.from_cv_statistics( params[:id], @subjectid )
+      v = Validation::Validation.from_cv_statistics( params[:id] )
       case request.env['HTTP_ACCEPT'].to_s
       when /text\/html/
         related_links = 
@@ -218,7 +214,7 @@ class Validation::Application < OpenTox::Service
       
       $logger.info "get crossvalidation statistics for crossvalidation with id "+params[:id].to_s
       bad_request_error("Missing params, plz give confidence and prediction") unless params[:confidence] and params[:prediction]
-      v = Validation::Validation.from_cv_statistics( params[:id], @subjectid )
+      v = Validation::Validation.from_cv_statistics( params[:id] )
       props = v.probabilities(params[:confidence].to_s.to_f,params[:prediction].to_s)
       content_type "text/x-yaml"
       props.to_yaml
@@ -236,7 +232,6 @@ class Validation::Application < OpenTox::Service
       
       cv = Validation::Crossvalidation[params[:id]]
       resource_not_found_error "Crossvalidation '#{params[:id]}' not found." unless cv
-      cv.subjectid = @subjectid
       cv.delete_crossvalidation
     end
     
@@ -319,7 +314,6 @@ class Validation::Application < OpenTox::Service
                            :model_uri => params[:model_uri], 
                            :test_dataset_uri => params[:test_dataset_uri],
                            :prediction_feature => params[:prediction_feature]
-          v.subjectid = @subjectid
           v.validate_model( task )
           v.validation_uri
         end
@@ -369,7 +363,6 @@ class Validation::Application < OpenTox::Service
                             :training_dataset_uri => params[:training_dataset_uri], 
                             :test_dataset_uri => params[:test_dataset_uri],
                             :prediction_feature => params[:prediction_feature]
-          v.subjectid = @subjectid
           v.validate_algorithm( task ) 
           v.validation_uri
         end
@@ -416,7 +409,7 @@ class Validation::Application < OpenTox::Service
       bad_request_error "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
       task = OpenTox::Task.run( "Perform bootstrapping validation", to("/validation/bootstrapping", :full) ) do |task| #, params
         params.merge!( Validation::Util.bootstrapping( params[:dataset_uri], 
-          params[:prediction_feature], @subjectid, 
+          params[:prediction_feature],
           params[:random_seed], OpenTox::SubTask.create(task,0,33)) )
         $logger.info "params after bootstrapping: "+params.inspect
         v = Validation::Validation.create :validation_type => "bootstrapping", 
@@ -425,7 +418,6 @@ class Validation::Application < OpenTox::Service
                          :algorithm_params => params[:algorithm_params],
                          :training_dataset_uri => params[:training_dataset_uri], 
                          :test_dataset_uri => params[:test_dataset_uri]
-        v.subjectid = @subjectid
         v.validate_algorithm( OpenTox::SubTask.create(task,33,100))
         v.validation_uri
       end
@@ -474,10 +466,10 @@ class Validation::Application < OpenTox::Service
       bad_request_error "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
       bad_request_error "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
       check_stratified(params)
-      task = OpenTox::Task.run( "Perform training test split validation", uri("/validation/training_test_split"), @subjectid )  do |task| #, params
+      task = OpenTox::Task.run( "Perform training test split validation", uri("/validation/training_test_split"))  do |task| #, params
         $logger.debug "performing train test split"
         params.merge!( Validation::Util.train_test_dataset_split(to("/validation/training_test_split", :full), params[:dataset_uri], 
-          (params[:stratified].to_s=~/true/ ? params[:prediction_feature] : nil), @subjectid,  params[:stratified], params[:split_ratio], 
+          (params[:stratified].to_s=~/true/ ? params[:prediction_feature] : nil), params[:stratified], params[:split_ratio], 
           params[:random_seed], OpenTox::SubTask.create(task,0,33)))
         $logger.debug "creating validation"  
         v = Validation::Validation.create :validation_type => "training_test_split", 
@@ -486,7 +478,6 @@ class Validation::Application < OpenTox::Service
                          :prediction_feature => params[:prediction_feature],
                          :algorithm_uri => params[:algorithm_uri],
                          :algorithm_params => params[:algorithm_params]
-        v.subjectid = @subjectid
         $logger.debug "created validation, validating algorithm"
         v.validate_algorithm( OpenTox::SubTask.create(task,33,100))
         v.validation_uri
@@ -530,10 +521,9 @@ class Validation::Application < OpenTox::Service
       content_type "text/uri-list"
       deleted = []
       Validation::Validation.all.collect.delete_if{|val| val.finished}.each do |val|
-        if OpenTox::Authorization.authorized?(val.validation_uri,"DELETE",@subjectid)
+        if OpenTox::Authorization.authorized?(val.validation_uri,"DELETE",OpenTox::RestClientWrapper.subjectid)
           $logger.debug "delete val with id:"+val.id.to_s+", finished is false"
           deleted << val.validation_uri
-          val.subjectid = @subjectid
           val.delete_validation
           sleep 1 if $aa[:uri]
         end
@@ -556,9 +546,9 @@ class Validation::Application < OpenTox::Service
       end
       deleted = []
       OpenTox::Dataset.all.each do |d|
-        if !used_datasets.include?(d.uri) and OpenTox::Authorization.authorized?(d.uri,"DELETE",@subjectid)
+        if !used_datasets.include?(d.uri) and OpenTox::Authorization.authorized?(d.uri,"DELETE",OpenTox::RestClientWrapper.subjectid)
           deleted << d.uri
-          d.delete(@subjectid)
+          d.delete
           sleep 1 if $aa[:uri]
         end
       end
@@ -572,7 +562,7 @@ class Validation::Application < OpenTox::Service
       check_stratified(params)
       task = OpenTox::Task.run( "Create data-split", to("/validation/plain_training_test_split", :full) ) do |task|
         result = Validation::Util.train_test_dataset_split(to("/validation/plain_training_test_split", :full), params[:dataset_uri], params[:prediction_feature], 
-          @subjectid, params[:stratified], params[:split_ratio], params[:random_seed], task)
+          params[:stratified], params[:split_ratio], params[:random_seed], task)
         content_type "text/uri-list"
         result[:training_dataset_uri]+"\n"+result[:test_dataset_uri]+"\n"
       end
@@ -589,7 +579,6 @@ class Validation::Application < OpenTox::Service
         if params[:model_uri]
           bad_request_error "please specify 'model_uri' or set either 'classification' or 'regression' flag" if params[:classification] or params[:regression]
           v = Validation::Validation.create params
-          v.subjectid = @subjectid
           v.compute_validation_stats_with_model(nil,false,task)
         else
           bad_request_error "please specify 'model_uri' or 'prediction_feature'" unless params[:prediction_feature]
@@ -601,7 +590,6 @@ class Validation::Application < OpenTox::Service
           feature_type = "classification" if params.delete("classification")!=nil
           feature_type = "regression" if params.delete("regression")!=nil
           v = Validation::Validation.create params  
-          v.subjectid = @subjectid
           v.compute_prediction_data(feature_type,predicted_variable,predicted_confidence,v.prediction_feature,nil,task)
           v.compute_validation_stats()#feature_type,predicted_variable,predicted_confidence,nil,nil,false,task)
         end
@@ -618,7 +606,6 @@ class Validation::Application < OpenTox::Service
       rescue ActiveRecord::RecordNotFound => ex
         resource_not_found_error("Validation '#{params[:id]}' not found.")
       end
-      validation.subjectid = @subjectid
       bad_request_error("Validation '"+params[:id].to_s+"' not finished") unless validation.finished
       bad_request_error("Missing params, plz give confidence and prediction") unless params[:confidence] and params[:prediction]
       props = validation.probabilities(params[:confidence].to_s.to_f,params[:prediction].to_s)
@@ -710,7 +697,6 @@ class Validation::Application < OpenTox::Service
     #    resource_not_found_error "Validation '#{params[:id]}' not found."
     #  end
       validation = Validation::Validation[params[:id]]
-      validation.subjectid = @subjectid
       resource_not_found_error "Validation '#{params[:id]}' not found." unless validation
       content_type "text/plain"
       validation.delete_validation

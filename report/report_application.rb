@@ -137,7 +137,7 @@ class Validation::Application < OpenTox::Service
   delete '/validation/report/:type/:id' do
     perform do |rs|
       content_type "text/plain"
-      rs.delete_report(params[:type],params[:id],@subjectid)
+      rs.delete_report(params[:type],params[:id])
     end
   end
   
@@ -147,7 +147,7 @@ class Validation::Application < OpenTox::Service
       perform do |rs|
         puts rs.inspect
         rs.create_report(params[:type],params[:validation_uris]?params[:validation_uris].split(/\n|,/):nil,
-          params[:identifier]?params[:identifier].split(/\n|,/):nil,params,@subjectid,task)
+          params[:identifier]?params[:identifier].split(/\n|,/):nil,params,task)
       end
     end
     return_task(task)

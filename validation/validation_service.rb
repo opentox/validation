@@ -39,7 +39,7 @@ module Validation
   
   class Validation
     
-    def self.from_cv_statistics( cv_id, subjectid=nil, waiting_task=nil )
+    def self.from_cv_statistics( cv_id, waiting_task=nil )
       v =  Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation_statistics" ).first
       unless v
         crossvalidation = Crossvalidation[cv_id]
@@ -48,7 +48,6 @@ module Validation
         vals = Validation.find( :crossvalidation_id => cv_id, :validation_type => "crossvalidation" ).collect{|x| x}
         
         v = Validation.new
-        v.subjectid = subjectid
         v.compute_prediction_data_with_cv(vals, waiting_task)
         v.compute_validation_stats()
           
@@ -62,7 +61,6 @@ module Validation
         v.real_runtime = vals.collect{ |vv| vv.real_runtime }.uniq.join(";")
         v.save
       end
-      v.subjectid = subjectid
       waiting_task.progress(100) if waiting_task
       v
     end
@@ -95,7 +93,7 @@ module Validation
             uri = self.send(attr)
             $logger.debug "also deleting "+attr.to_s+" : "+uri.to_s if uri
             begin
-              OpenTox::RestClientWrapper.delete(uri, :subjectid => subjectid) if uri
+              OpenTox::RestClientWrapper.delete(uri) if uri
               sleep 1 if $aa[:uri] # wait a second to not stress the a&a service too much
             rescue => ex
               $logger.warn "could not delete "+uri.to_s+" : "+ex.message.to_s
@@ -104,10 +102,10 @@ module Validation
         end
       end
       self.delete
-      if (subjectid)
+      if (OpenTox::RestClientWrapper.subjectid)
         Thread.new do
           begin
-            res = OpenTox::Authorization.delete_policies_from_uri(validation_uri, subjectid)
+            res = OpenTox::Authorization.delete_policies_from_uri(validation_uri, OpenTox::RestClientWrapper.subjectid)
             $logger.debug "Deleted validation policy: #{res}"
           rescue
             $logger.warn "Policy delete error for validation: #{validation_uri}"
@@ -168,7 +166,7 @@ module Validation
       
       #model = OpenTox::Model::PredictionModel.find(self.model_uri)
       #resource_not_found_error "model not found: "+self.model_uri.to_s unless model
-      model = OpenTox::Model::Generic.new(self.model_uri, self.subjectid)
+      model = OpenTox::Model::Generic.new(self.model_uri)
       
       unless self.algorithm_uri
         self.algorithm_uri = model.metadata[RDF::OT.algorithm]
@@ -185,7 +183,7 @@ module Validation
         #puts self.test_dataset_uri
         #puts "MODEL"
         #puts model.uri
-        prediction_dataset_uri = model.run({:dataset_uri => self.test_dataset_uri, :subjectid => self.subjectid})
+        prediction_dataset_uri = model.run({:dataset_uri => self.test_dataset_uri})
           #"text/uri-list",OpenTox::SubTask.create(task, 0, 50))
       end
 #      self.attributes = { :prediction_dataset_uri => prediction_dataset_uri,
@@ -201,25 +199,25 @@ module Validation
     end
     
     def compute_prediction_data_with_cv(cv_vals, waiting_task=nil)
-      models = cv_vals.collect{|v| m = OpenTox::Model::Generic.new(v.model_uri, subjectid); m.get; m}
-      feature_type = models.first.feature_type # CH: subjectid is a object variable, no need to pass it as a parameter
+      models = cv_vals.collect{|v| m = OpenTox::Model::Generic.new(v.model_uri); m.get; m}
+      feature_type = models.first.feature_type 
       test_dataset_uris = cv_vals.collect{|v| v.test_dataset_uri}
       prediction_feature = cv_vals.first.prediction_feature
       prediction_dataset_uris = cv_vals.collect{|v| v.prediction_dataset_uri}
       predicted_variables = models.collect{|m| m.predicted_variable}
       predicted_confidences = models.collect{|m| m.predicted_confidence}
       p_data = Lib::PredictionData.create( feature_type, test_dataset_uris, prediction_feature, 
-        prediction_dataset_uris, predicted_variables, predicted_confidences, subjectid, waiting_task )
+        prediction_dataset_uris, predicted_variables, predicted_confidences, waiting_task )
       self.prediction_data = p_data.data
       p_data.data
     end
     
     def compute_prediction_data_with_model(model=nil, task=nil)
       #model = OpenTox::Model::Generic.find(self.model_uri, self.subjectid) if model==nil and self.model_uri
-      model = OpenTox::Model.find(self.model_uri, self.subjectid) if model==nil and self.model_uri
+      model = OpenTox::Model.find(self.model_uri) if model==nil and self.model_uri
       resource_not_found_error "model not found: "+self.model_uri.to_s unless model
             
-      feature_type = model.feature_type # CH: subjectid is a object variable, no need to pass it as a parameter
+      feature_type = model.feature_type 
       dependentVariables = model.metadata[RDF::OT.dependentVariables]
       prediction_feature = self.prediction_feature ? nil : dependentVariables
       algorithm_uri = self.algorithm_uri ? nil : model.metadata[RDF::OT.algorithm]
@@ -241,7 +239,7 @@ module Validation
       $logger.debug "computing prediction stats"
       p_data = Lib::PredictionData.create( feature_type, 
         self.test_dataset_uri, self.prediction_feature, 
-        self.prediction_dataset_uri, predicted_variable, predicted_confidence, self.subjectid,
+        self.prediction_dataset_uri, predicted_variable, predicted_confidence, 
         OpenTox::SubTask.create(task, 0, 80) )
       self.prediction_data = p_data.data
       task.progress(100) if task
@@ -325,13 +323,13 @@ module Validation
     def clean_loo_files( delete_feature_datasets )
       Validation.find( :crossvalidation_id => self.id, :validation_type => "crossvalidation" ).each do |v|
         $logger.debug "loo-cleanup> delete training dataset "+v.training_dataset_uri
-        OpenTox::RestClientWrapper.delete v.training_dataset_uri,subjectid
+        OpenTox::RestClientWrapper.delete v.training_dataset_uri
         if (delete_feature_datasets)
           begin
             model = OpenTox::Model::Generic.find(v.model_uri)
             if model.metadata[RDF::OT.featureDataset]
               $logger.debug "loo-cleanup> delete feature dataset "+model.metadata[RDF::OT.featureDataset]
-              OpenTox::RestClientWrapper.delete model.metadata[RDF::OT.featureDataset],subjectid
+              OpenTox::RestClientWrapper.delete model.metadata[RDF::OT.featureDataset]
             end
           rescue
           end
@@ -344,17 +342,16 @@ module Validation
       validations = Validation.find(:crossvalidation_id => self.id) 
       Thread.new do # do deleting in background to not cause a timeout
         validations.each do |v|
-          v.subjectid = self.subjectid
           $logger.debug "deleting cv-validation "+v.validation_uri.to_s
           v.delete_validation
           sleep 1 if $aa[:uri] # wait a second to not stress the a&a service too much
         end
       end
       self.delete
-      if (subjectid)
+      if (OpenTox::RestClientWrapper.subjectid)
         Thread.new do
           begin
-            res = OpenTox::Authorization.delete_policies_from_uri(crossvalidation_uri, subjectid)
+            res = OpenTox::Authorization.delete_policies_from_uri(crossvalidation_uri, OpenTox::RestClientWrapper.subjectid)
             $logger.debug "Deleted crossvalidation policy: #{res}"
           rescue
             $logger.warn "Policy delete error for crossvalidation: #{crossvalidation_uri}"
@@ -367,7 +364,7 @@ module Validation
     # creates the cv folds
     def create_cv_datasets( task=nil )
       if self.loo=="true"
-        orig_dataset = Lib::DatasetCache.find(self.dataset_uri,self.subjectid)
+        orig_dataset = Lib::DatasetCache.find(self.dataset_uri)
         self.num_folds = orig_dataset.compounds.size
         self.random_seed = 0
         self.stratified = "false"
@@ -392,7 +389,6 @@ module Validation
       task_step = 100 / self.num_folds.to_f;
       @tmp_validations.each do | val |
         validation = Validation.create val
-        validation.subjectid = self.subjectid
         validation.validate_algorithm( OpenTox::SubTask.create(task, i * task_step, ( i + 1 ) * task_step) )
         internal_server_error "validation '"+validation.validation_uri+"' for crossvaldation could not be finished" unless 
           validation.finished
@@ -422,13 +418,13 @@ module Validation
                                           (cv.prediction_feature && 
                                            cv.prediction_feature != self.prediction_feature)) }
       cvs.each do |cv|
-        next if $aa[:uri] and !OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"GET",self.subjectid)
+        next if $aa[:uri] and !OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"GET",OpenTox::RestClientWrapper.subjectid)
         tmp_val = []
         Validation.find( :crossvalidation_id => cv.id, :validation_type => "crossvalidation" ).each do |v|
           break unless 
             v.prediction_feature == prediction_feature and
-            URI.accessible?(v.training_dataset_uri,self.subjectid) and 
-            URI.accessible?(v.test_dataset_uri,self.subjectid)
+            URI.accessible?(v.training_dataset_uri) and 
+            URI.accessible?(v.test_dataset_uri)
             # CH: Dataset.exist? has been removed, URI.accessible? is cheaper because it needs only HEAD requests 
             #OpenTox::Dataset.exist?(v.training_dataset_uri,self.subjectid) and 
             #OpenTox::Dataset.exist?(v.test_dataset_uri,self.subjectid)
@@ -456,7 +452,7 @@ module Validation
     # stores uris in validation objects 
     def create_new_cv_datasets( task = nil )
       $logger.debug "creating datasets for crossvalidation"
-      orig_dataset = Lib::DatasetCache.find(self.dataset_uri,self.subjectid)
+      orig_dataset = Lib::DatasetCache.find(self.dataset_uri)
       resource_not_found_error "Dataset not found: "+self.dataset_uri.to_s unless orig_dataset
       
       train_dataset_uris = []
@@ -492,11 +488,11 @@ module Validation
           datasetname = 'dataset fold '+(n+1).to_s+' of '+self.num_folds.to_s        
           meta[RDF::DC.title] = "training "+datasetname 
           $logger.debug "training set: "+datasetname+"_train, compounds: "+train_compound_indices.size.to_s
-          train_dataset_uri = orig_dataset.split( train_compound_indices, orig_dataset.features, meta, self.subjectid ).uri
+          train_dataset_uri = orig_dataset.split( train_compound_indices, orig_dataset.features, meta ).uri
           train_dataset_uris << train_dataset_uri
           meta[RDF::DC.title] = "test "+datasetname
           $logger.debug "test set:     "+datasetname+"_test, compounds: "+test_compound_indices.size.to_s
-          test_dataset_uri = orig_dataset.split( test_compound_indices, orig_dataset.features, meta, self.subjectid ).uri
+          test_dataset_uri = orig_dataset.split( test_compound_indices, orig_dataset.features, meta ).uri
           test_dataset_uris << test_dataset_uri
         end
       when /true|super/
@@ -507,7 +503,7 @@ module Validation
         end
         r_util = OpenTox::RUtil.new 
         train_datasets, test_datasets = r_util.stratified_k_fold_split(orig_dataset,meta,
-          "NA",self.num_folds.to_i,@subjectid,self.random_seed, features)
+          "NA",self.num_folds.to_i,self.random_seed, features)
         r_util.quit_r
         train_dataset_uris = train_datasets.collect{|d| d.uri}
         test_dataset_uris = test_datasets.collect{|d| d.uri}
@@ -536,11 +532,11 @@ module Validation
     # splits a dataset into test and training dataset via bootstrapping
     # (training dataset-size is n, sampling from orig dataset with replacement)
     # returns map with training_dataset_uri and test_dataset_uri
-    def self.bootstrapping( orig_dataset_uri, prediction_feature, subjectid, random_seed=nil, task=nil )
+    def self.bootstrapping( orig_dataset_uri, prediction_feature, random_seed=nil, task=nil )
       
       random_seed=1 unless random_seed
       
-      orig_dataset = Lib::DatasetCache.find orig_dataset_uri,subjectid
+      orig_dataset = Lib::DatasetCache.find orig_dataset_uri
       orig_dataset.load_all
       resource_not_found_error "Dataset not found: "+orig_dataset_uri.to_s unless orig_dataset
       if prediction_feature
@@ -579,14 +575,14 @@ module Validation
       result = {}
       result[:training_dataset_uri] = orig_dataset.split( training_compound_indices, orig_dataset.features, 
         { RDF::DC.title => "Bootstrapping training dataset of "+orig_dataset.title.to_s,
-          RDF::DC.creator => $url_provider.to('/validation/bootstrapping',:full) },
-        subjectid ).uri
+          RDF::DC.creator => $url_provider.to('/validation/bootstrapping',:full) }
+        ).uri
       task.progress(66) if task
 
       result[:test_dataset_uri] = orig_dataset.split( test_compound_indices, orig_dataset.features,
         { RDF::DC.title => "Bootstrapping test dataset of "+orig_dataset.title.to_s,
-          RDF::DC.creator => $url_provider.to('/validation/bootstrapping',:full)} ,
-        subjectid ).uri
+          RDF::DC.creator => $url_provider.to('/validation/bootstrapping',:full)}
+        ).uri
       task.progress(100) if task
       
       $logger.debug "bootstrapping done, training dataset: '"+result[:training_dataset_uri].to_s+"', test dataset: '"+result[:test_dataset_uri].to_s+"'"
@@ -595,7 +591,7 @@ module Validation
     
     # splits a dataset into test and training dataset
     # returns map with training_dataset_uri and test_dataset_uri
-    def self.train_test_dataset_split( creator_uri, orig_dataset_uri, prediction_feature, subjectid, stratified="false", split_ratio=nil, random_seed=nil, task=nil )
+    def self.train_test_dataset_split( creator_uri, orig_dataset_uri, prediction_feature, stratified="false", split_ratio=nil, random_seed=nil, task=nil )
       
       $logger.debug "train test split"
       
@@ -606,7 +602,7 @@ module Validation
       
       resource_not_found_error "Split ratio invalid: "+split_ratio.to_s unless split_ratio and split_ratio=split_ratio.to_f
       resource_not_found_error "Split ratio not >0 and <1 :"+split_ratio.to_s unless split_ratio>0 && split_ratio<1
-      orig_dataset = Lib::DatasetCache.find orig_dataset_uri, subjectid
+      orig_dataset = Lib::DatasetCache.find orig_dataset_uri
       resource_not_found_error "Dataset not found: "+orig_dataset_uri.to_s unless orig_dataset
       
       if prediction_feature
@@ -631,7 +627,7 @@ module Validation
           features = nil
         end
         r_util = OpenTox::RUtil.new 
-        train, test = r_util.stratified_split( orig_dataset, meta, "NA", split_ratio, @subjectid, random_seed, features )
+        train, test = r_util.stratified_split( orig_dataset, meta, "NA", split_ratio, random_seed, features )
         r_util.quit_r
         result = {:training_dataset_uri => train.uri, :test_dataset_uri => test.uri}
       when "false"

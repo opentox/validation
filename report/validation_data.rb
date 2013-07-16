@@ -76,8 +76,8 @@ module Reports
   #
   class ReportValidation
     
-    def self.resolve_cv_uris(validation_uris, identifier, subjectid)
-      Reports.validation_access.resolve_cv_uris(validation_uris, identifier, subjectid)
+    def self.resolve_cv_uris(validation_uris, identifier)
+      Reports.validation_access.resolve_cv_uris(validation_uris, identifier)
     end
     
     # create member variables for all validation properties
@@ -87,26 +87,24 @@ module Reports
     @@validation_attributes.each{ |a| attr_accessor a } 
   
     attr_reader :predictions, :filter_params
-    attr_accessor :identifier, :validation_report_uri, :crossvalidation_report_uri, :subjectid
+    attr_accessor :identifier, :validation_report_uri, :crossvalidation_report_uri
     
-    def initialize(uri = nil, filter_params=nil, subjectid = nil)
-      Reports.validation_access.init_validation(self, uri, filter_params, subjectid) if uri
-      @subjectid = subjectid
+    def initialize(uri = nil, filter_params=nil)
+      Reports.validation_access.init_validation(self, uri, filter_params) if uri
       internal_server_error unless filter_params==nil || filter_params.is_a?(Hash)
       @filter_params = filter_params
       @created_resources = []
-      #internal_server_error "subjectid is nil" unless subjectid
     end
     
-    def self.from_cv_statistics( cv_uri, filter_params, subjectid )
-      v = ReportValidation.new(nil, filter_params, subjectid)
-      Reports.validation_access.init_validation_from_cv_statistics(v, cv_uri, filter_params, subjectid)
+    def self.from_cv_statistics( cv_uri, filter_params)
+      v = ReportValidation.new(nil, filter_params)
+      Reports.validation_access.init_validation_from_cv_statistics(v, cv_uri, filter_params)
       v
     end
     
     def training_feature_dataset_uri
       unless @training_feature_dataset
-        @training_feature_dataset = Reports.validation_access.training_feature_dataset_uri( self, @subjectid )
+        @training_feature_dataset = Reports.validation_access.training_feature_dataset_uri( self)
       end
       @training_feature_dataset
     end
@@ -114,7 +112,7 @@ module Reports
     #hack this does create the features for the test dataset
     def test_feature_dataset_uri
       unless @test_feature_dataset
-        @test_feature_dataset = Reports.validation_access.test_feature_dataset_uri( self, @subjectid )
+        @test_feature_dataset = Reports.validation_access.test_feature_dataset_uri( self)
       end
       @test_feature_dataset
     end
@@ -134,7 +132,7 @@ module Reports
           task.progress(100) if task
           nil
         else
-          @predictions = Reports.validation_access.get_predictions( self, @filter_params, @subjectid, task )
+          @predictions = Reports.validation_access.get_predictions( self, @filter_params, task )
         end
       end
     end
@@ -142,7 +140,7 @@ module Reports
     # returns the predictions feature values (i.e. the domain of the class attribute)
     #
     def get_accept_values()
-      @accept_values = Reports.validation_access.get_accept_values(self, @subjectid) unless @accept_values
+      @accept_values = Reports.validation_access.get_accept_values(self) unless @accept_values
       @accept_values
     end
     
@@ -150,23 +148,23 @@ module Reports
     #
     def feature_type
       return @feature_type if @feature_type!=nil
-      @feature_type = Reports.validation_access.feature_type(self, @subjectid) 
+      @feature_type = Reports.validation_access.feature_type(self) 
     end
     
     def predicted_variable
       return @predicted_variable if @predicted_variable!=nil
-      @predicted_variable = Reports.validation_access.predicted_variable(self, @subjectid) 
+      @predicted_variable = Reports.validation_access.predicted_variable(self) 
     end
     
     def predicted_confidence
       return @predicted_confidence if @predicted_confidence!=nil
-      @predicted_confidence = Reports.validation_access.predicted_confidence(self, @subjectid) 
+      @predicted_confidence = Reports.validation_access.predicted_confidence(self) 
     end    
     
     # loads all crossvalidation attributes, of the corresponding cv into this object 
     def load_cv_attributes
       internal_server_error "crossvalidation-id not set" unless @crossvalidation_id
-      Reports.validation_access.init_cv(self, @subjectid)
+      Reports.validation_access.init_cv(self)
       # load cv report
       ids = Reports.persistance.list_reports("crossvalidation",{:crossvalidation=>self.crossvalidation_uri.to_s })
       @crossvalidation_report_uri = ReportService.instance.get_uri("crossvalidation",ids[-1]) if ids and ids.size>0
@@ -185,13 +183,13 @@ module Reports
   #
   class ValidationSet
     
-    def initialize(validation_uris=nil, identifier=nil, filter_params=nil, subjectid=nil)
+    def initialize(validation_uris=nil, identifier=nil, filter_params=nil)
       @unique_values = {}
       @validations = []
       if validation_uris    
-        validation_uri_and_ids = ReportValidation.resolve_cv_uris(validation_uris, identifier, subjectid)
+        validation_uri_and_ids = ReportValidation.resolve_cv_uris(validation_uris, identifier)
         validation_uri_and_ids.each do |u,id|
-          v = ReportValidation.new(u, filter_params, subjectid)
+          v = ReportValidation.new(u, filter_params)
           v.identifier = id if id
           ids = Reports.persistance.list_reports("validation",{:validation_uris=>v.validation_uri })
           v.validation_report_uri = ReportService.instance.get_uri("validation",ids[-1]) if ids and ids.size>0
@@ -451,7 +449,7 @@ module Reports
       new_set = ValidationSet.new
       grouping = Util.group(@validations, [:crossvalidation_id])
       grouping.each do |g|
-        v = ReportValidation.from_cv_statistics(g[0].crossvalidation_uri, @validations.first.filter_params, g[0].subjectid)
+        v = ReportValidation.from_cv_statistics(g[0].crossvalidation_uri, @validations.first.filter_params)
         v.identifier = g.collect{|vv| vv.identifier}.uniq.join(";")
         new_set.validations << v 
       end
@@ -478,7 +476,7 @@ module Reports
       #merge
       Lib::MergeObjects.register_merge_attributes( ReportValidation,
         Validation::VAL_MERGE_AVG+Validation::VAL_MERGE_SUM,[],
-        Validation::VAL_MERGE_GENERAL+[:identifier, :validation_report_uri, :crossvalidation_report_uri, :subjectid]) unless 
+        Validation::VAL_MERGE_GENERAL+[:identifier, :validation_report_uri, :crossvalidation_report_uri]) unless 
           Lib::MergeObjects.merge_attributes_registered?(ReportValidation)
       grouping.each do |g|
         new_set.validations << g[0].clone_validation

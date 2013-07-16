@@ -5,7 +5,6 @@ post '/test_validation/?' do
   task = OpenTox::Task.run("Test validation",to("/validation/test_validation",:full)) do |task| 
     v = validationExamples[0][0]
     ex = v.new
-    ex.subjectid = @subjectid
     ex.upload_files
     task.progress(10)
     ex.check_requirements

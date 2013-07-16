@@ -52,7 +52,7 @@ class Reports::ReportPersistance
   # call-seq:
   #   delete_report(type, id) => boolean
   #
-  def delete_report(type, id, subjectid=nil)
+  def delete_report(type, id)
     internal_server_error "not implemented"
   end
   
@@ -104,7 +104,7 @@ class Reports::FileReportPersistance < Reports::ReportPersistance
     return file_path
   end
   
-  def delete_report(type, id, subjectid=nil)
+  def delete_report(type, id)
     
     report_dir = report_directory(type, id)
     raise_report_not_found(type, id) unless File.directory?(report_dir)
@@ -202,8 +202,6 @@ module Reports
     index :crossvalidation_uris
     index :algorithm_uris
     
-    attr_accessor :subjectid
-    
     def self.create(params={})
       params[:date] = Time.new
       super params
@@ -211,7 +209,7 @@ module Reports
     
     def save
       super
-      OpenTox::Authorization.check_policy(report_uri, subjectid)
+      OpenTox::Authorization.check_policy(report_uri, OpenTox::RestClientWrapper.subjectid)
     end
     
     def report_uri
@@ -241,12 +239,11 @@ module Reports
   
   class ExtendedFileReportPersistance < FileReportPersistance
     
-    def new_report(report_content, type, meta_data, uri_provider, subjectid=nil)
+    def new_report(report_content, type, meta_data, uri_provider)
       internal_server_error "report meta data missing" unless meta_data
       meta_data[:report_type] = type
       report = ReportData.create(meta_data)
-      report.subjectid = subjectid
-      OpenTox::Authorization.check_policy(report.report_uri, subjectid)
+      OpenTox::Authorization.check_policy(report.report_uri, OpenTox::RestClientWrapper.subjectid)
       new_report_with_id(report_content, type, report.id)
     end
     
@@ -278,7 +275,7 @@ module Reports
       end
     end
     
-    def delete_report(type, id, subjectid=nil)
+    def delete_report(type, id)
 #      begin
 #        report = ReportData.find(:first, :conditions => {:id => id, :report_type => type})
 #      rescue ActiveRecord::RecordNotFound
@@ -289,9 +286,9 @@ module Reports
       resource_not_found_error("Report with id='"+id.to_s+"' and type='"+type.to_s+"' not found.") if
         report==nil || report.report_type!=type
       report.delete
-      if (subjectid)
+      if (OpenTox::RestClientWrapper.subjectid)
         begin
-          res = OpenTox::Authorization.delete_policies_from_uri(report.report_uri, subjectid)
+          res = OpenTox::Authorization.delete_policies_from_uri(report.report_uri, OpenTox::RestClientWrapper.subjectid)
           $logger.debug "Deleted validation policy: #{res}"
         rescue
           $logger.warn "Policy delete error for validation: #{report.report_uri}"

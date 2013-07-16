@@ -108,7 +108,7 @@ module Reports
         validation_set.validations.each do |v|
         [[v.test_dataset_uri, test],
          [v.training_dataset_uri, train]].each do |uri,array|
-            d = Lib::DatasetCache.find(uri, validation_set.validations[0].subjectid)
+            d = Lib::DatasetCache.find(uri)
             d.compounds.each do |c|
               d.data_entries[c][v.prediction_feature].each do |val|
                 array << val 
@@ -124,7 +124,7 @@ module Reports
       else
         Reports::r_util.feature_value_plot(out_files, validation_set.validations[0].training_feature_dataset_uri,
           validation_set.validations[0].test_feature_dataset_uri, "Training Data", "Test Data",
-          nil, validation_set.validations[0].subjectid, waiting_task )
+          nil, waiting_task )
       end
     end
     

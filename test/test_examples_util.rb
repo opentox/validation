@@ -17,7 +17,7 @@ module ValidationExamples
     @@dataset_uris = {}
     @@prediction_features = {}
 
-    def self.upload_dataset(file, subjectid=nil, dataset_service=$dataset[:uri]) #, file_type="application/x-yaml")
+    def self.upload_dataset(file, dataset_service=$dataset[:uri]) #, file_type="application/x-yaml")
       
       raise "File not found: "+file.path.to_s unless File.exist?(file.path)
       if @@dataset_uris[file.path.to_s]==nil
@@ -27,22 +27,20 @@ module ValidationExamples
           #data_uri = OpenTox::RestClientWrapper.post_wait(dataset_service,{:content_type => file_type},data).to_s.chomp
           #@@dataset_uris[file.path.to_s] = data_uri
           #$logger.debug "uploaded dataset: "+data_uri
-          d = OpenTox::Dataset.create($dataset[:uri], subjectid)
+          d = OpenTox::Dataset.create($dataset[:uri])
           d.load_yaml(data)
-          d.save( subjectid )
+          d.put
           @@dataset_uris[file.path.to_s] = d.uri
         elsif (file.path =~ /csv$/)
-          d = OpenTox::Dataset.new nil, subjectid
+          d = OpenTox::Dataset.new 
           d.upload file.path
-          d.get
-          #d = OpenTox::Dataset.create_from_csv_file(file.path, subjectid)
           raise "num features not 1 (="+d.features.size.to_s+"), what to predict??" if d.features.size != 1
           @@prediction_features[file.path.to_s] = d.features[0].uri
           @@dataset_uris[file.path.to_s] = d.uri
         elsif (file.path =~ /rdf$/)
-          d = OpenTox::Dataset.create($dataset[:uri], subjectid)
-          d.load_rdfxml_file(file, subjectid)
-          d.save(subjectid)
+          d = OpenTox::Dataset.create($dataset[:uri])
+          d.load_rdfxml_file(file)
+          d.put
           @@dataset_uris[file.path.to_s] = d.uri
         else
           raise "unknown file type: "+file.path.to_s
@@ -59,7 +57,7 @@ module ValidationExamples
       @@prediction_features[file.path.to_s]
     end
     
-    def self.build_compare_report(validation_examples, subjectid)
+    def self.build_compare_report(validation_examples)
       
       @comp = validation_examples[0].algorithm_uri==nil ? :model_uri : :algorithm_uri
       return nil if @comp == :model_uri
@@ -69,15 +67,14 @@ module ValidationExamples
       end
       return nil if to_compare.size < 2
       #begin
-        return validation_post "report/algorithm_comparison",{ :validation_uris => to_compare.join("\n") }, subjectid
+        return validation_post "report/algorithm_comparison",{ :validation_uris => to_compare.join("\n") }
       #rescue => ex
         #return "error creating comparison report "+ex.message
       #end
     end
     
-    def self.validation_post(uri, params, subjectid, waiting_task=nil, accept_header='application/rdf+xml' )
+    def self.validation_post(uri, params, waiting_task=nil, accept_header='application/rdf+xml' )
       
-      params[:subjectid] = subjectid if subjectid
       if $test_case
         $test_case.post '/validation'+uri,params,'HTTP_ACCEPT' => accept_header 
         uri =  wait($test_case.last_response.body)
@@ -90,9 +87,8 @@ module ValidationExamples
       uri
     end
     
-    def self.validation_get(uri, subjectid, accept_header='application/rdf+xml')
+    def self.validation_get(uri, accept_header='application/rdf+xml')
       params = {}
-      params[:subjectid] = subjectid if subjectid
       if $test_case
         #puts "getting "+uri+","+accept_header
         $test_case.get '/validation'+uri,params,'HTTP_ACCEPT' => accept_header 
@@ -106,10 +102,10 @@ module ValidationExamples
     def self.validation_delete(uri, accept_header='application/rdf+xml')
       
       if $test_case
-        $test_case.delete '/validation'+uri,{:subjectid => SUBJECTID},'HTTP_ACCEPT' => accept_header 
+        $test_case.delete '/validation'+uri,{},'HTTP_ACCEPT' => accept_header 
         return wait($test_case.last_response.body)
       else
-        return OpenTox::RestClientWrapper.delete(File.join($validation[:uri],uri),{:accept => accept_header,:subjectid => SUBJECTID})
+        return OpenTox::RestClientWrapper.delete(File.join($validation[:uri],uri),{:accept => accept_header})
       end
     end
     
@@ -256,7 +252,6 @@ module ValidationExamples
                   :random_seed,
                   :num_folds,
                   :stratified,
-                  :subjectid
     #results                  
     attr_accessor :validation_uri,
                   :report_uri,
@@ -270,7 +265,7 @@ module ValidationExamples
          uri = a[0]
          file = a[1]
          if send(uri)==nil and send(file)!=nil
-            dataset_uri = Util.upload_dataset(send(file), @subjectid)
+            dataset_uri = Util.upload_dataset(send(file))
             send("#{uri.to_s}=".to_sym, dataset_uri)
             @uploaded_datasets = [] unless @uploaded_datasets
             @uploaded_datasets << dataset_uri
@@ -307,7 +302,7 @@ module ValidationExamples
       @uploaded_datasets.each do |d|
        # begin
           puts "deleting dataset "+d
-          OpenTox::RestClientWrapper.delete(d,{:subjectid => SUBJECTID})
+          OpenTox::RestClientWrapper.delete(d)
 #        rescue => ex
           #puts "Could not delete dataset:' "+d+" "+ex.message
         #end
@@ -316,9 +311,8 @@ module ValidationExamples
     
     def report( waiting_task=nil )
       #begin
-        @report_uri = Util.validation_post '/report/'+report_type,{:validation_uris => @validation_uri},
-          @subjectid,waiting_task if @validation_uri
-        Util.validation_get "/report/"+report_uri.split("/")[-2]+"/"+report_uri.split("/")[-1], @subjectid if @report_uri
+        @report_uri = Util.validation_post '/report/'+report_type,{:validation_uris => @validation_uri}, waiting_task if @validation_uri
+        Util.validation_get "/report/"+report_uri.split("/")[-2]+"/"+report_uri.split("/")[-1] if @report_uri
       #rescue => ex
         #puts "could not create report: "+ex.message
         #raise ex
@@ -328,7 +322,7 @@ module ValidationExamples
     
     def validate( waiting_task=nil )
       #begin
-        @validation_uri = Util.validation_post '/'+validation_type, get_params, @subjectid, waiting_task
+        @validation_uri = Util.validation_post '/'+validation_type, get_params, waiting_task
       #rescue => ex
         #puts "could not validate: "+ex.message
         #@validation_error = ex.message
@@ -338,15 +332,15 @@ module ValidationExamples
     
     def compare_yaml_vs_rdf
       if @validation_uri
-        yaml = YAML.load(Util.validation_get(@validation_uri.split("/")[-1],@subjectid,'application/x-yaml'))
-        owl = OpenTox::Owl.from_data(Util.validation_get(@validation_uri.split("/")[-1],@subjectid),@validation_uri,"Validation")
+        yaml = YAML.load(Util.validation_get(@validation_uri.split("/")[-1],'application/x-yaml'))
+        owl = OpenTox::Owl.from_data(Util.validation_get(@validation_uri.split("/")[-1]),@validation_uri,"Validation")
         Util.compare_yaml_and_owl(yaml,owl)
       end
       if @report_uri
-        yaml = YAML.load(Util.validation_get(@report_uri.split("/")[-3..-1].join("/"),@subjectid,'application/x-yaml'))
-        owl = OpenTox::Owl.from_data(Util.validation_get(@report_uri.split("/")[-3..-1].join("/"),@subjectid),@report_uri,"ValidationReport")
+        yaml = YAML.load(Util.validation_get(@report_uri.split("/")[-3..-1].join("/"),'application/x-yaml'))
+        owl = OpenTox::Owl.from_data(Util.validation_get(@report_uri.split("/")[-3..-1].join("/")),@report_uri,"ValidationReport")
         Util.compare_yaml_and_owl(yaml,owl)
-        Util.validation_get(@report_uri.split("/")[-3..-1].join("/"),@subjectid,'text/html')
+        Util.validation_get(@report_uri.split("/")[-3..-1].join("/"),'text/html')
       else
         puts "no report"
       end
@@ -354,7 +348,7 @@ module ValidationExamples
     
     def compute_dataset_size
       if @validation_uri =~ /crossvalidation/
-        cv = OpenTox::Crossvalidation.find(@validation_uri,@subjectid)
+        cv = OpenTox::Crossvalidation.find(@validation_uri)
         count = 0
         size = 0
         target = nil
@@ -411,7 +405,7 @@ module ValidationExamples
         Util.validation_get("crossvalidation/"+@validation_uri.split("/")[-1]+"/statistics",'application/x-yaml')
         Util.verify_validation(Util.validation_get("crossvalidation/"+@validation_uri.split("/")[-1]+"/statistics",'application/x-yaml'))
       else
-        Util.verify_validation(Util.validation_get(@validation_uri.split("/")[-1],@subjectid,'application/x-yaml'))
+        Util.verify_validation(Util.validation_get(@validation_uri.split("/")[-1],'application/x-yaml'))
       end
     end
     

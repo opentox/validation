@@ -55,7 +55,7 @@ module Lib
     end
     
     def self.create( feature_type, test_dataset_uris, prediction_feature, prediction_dataset_uris, 
-      predicted_variables, predicted_confidences, subjectid=nil, task=nil )      
+      predicted_variables, predicted_confidences, task=nil )      
       
       test_dataset_uris = [test_dataset_uris] unless test_dataset_uris.is_a?(Array)
       prediction_dataset_uris = [prediction_dataset_uris] unless prediction_dataset_uris.is_a?(Array)
@@ -88,7 +88,7 @@ module Lib
         
         predicted_variable=prediction_feature if predicted_variable==nil
       
-        test_dataset = Lib::DatasetCache.find test_dataset_uri,subjectid
+        test_dataset = Lib::DatasetCache.find test_dataset_uri
         internal_server_error "test dataset not found: '"+test_dataset_uri.to_s+"'" unless test_dataset
       
         internal_server_error "prediction_feature not found in test_dataset\n"+
@@ -122,7 +122,7 @@ module Lib
         end
         task.progress( task_status += task_step ) if task # loaded actual values
       
-        prediction_dataset = Lib::DatasetCache.find prediction_dataset_uri,subjectid
+        prediction_dataset = Lib::DatasetCache.find prediction_dataset_uri
         internal_server_error "prediction dataset not found: '"+prediction_dataset_uri.to_s+"'" unless prediction_dataset
         
         # allow missing prediction feature if there are no compounds in the prediction dataset

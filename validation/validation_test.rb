@@ -33,18 +33,21 @@ $logger = OTLogger.new(STDOUT)
 $logger.datetime_format = "%Y-%m-%d %H:%M:%S "
 $logger.formatter = Logger::Formatter.new
 
+# Authorisation happens in opentox-client.rb
+=begin
 if $aa[:uri]
   #TEST_USER = "mgtest"
   #TEST_PW = "mgpasswd"
   TEST_USER = "guest"
   TEST_PW = "guest"
-  SUBJECTID = OpenTox::Authorization.authenticate(TEST_USER,TEST_PW)
+  #SUBJECTID = OpenTox::Authorization.authenticate(TEST_USER,TEST_PW)
   raise "could not log in" unless SUBJECTID
   puts "logged in: "+SUBJECTID.to_s
 else
   puts "AA disabled"
   SUBJECTID = nil
 end
+=end
 
 #Rack::Test::DEFAULT_HOST = "local-ot" #"/validation"
 
@@ -374,8 +377,8 @@ class ValidationTest < Test::Unit::TestCase
   
   def run_test(select=nil, overwrite={}, delete=false )
     
-    if $aa[:uri] && SUBJECTID && delete
-      policies_before = OpenTox::Authorization.list_policy_uris(SUBJECTID)
+    if $aa[:uri] && OpenTox::RestClientWrapper.subjectid && delete
+      policies_before = OpenTox::Authorization.list_policy_uris(OpenTox::RestClientWrapper.subjectid)
     end
     
     puts ValidationExamples.list unless select
@@ -383,7 +386,6 @@ class ValidationTest < Test::Unit::TestCase
     validationExamples.each do |vv|
       vv.each do |v| 
         ex = v.new
-        ex.subjectid = SUBJECTID
         
         overwrite.each do |k,v|
           ex.send(k.to_s+"=",v)
@@ -401,8 +403,8 @@ class ValidationTest < Test::Unit::TestCase
         #break
         
         if !delete and ex.validation_uri
-          if SUBJECTID
-            puts ex.validation_uri+"?subjectid="+CGI.escape(SUBJECTID)
+          if OpenTox::RestClientWrapper.subjectid
+            puts ex.validation_uri+"?subjectid="+CGI.escape(OpenTox::RestClientWrapper.subjectid)
           else
             puts ex.validation_uri
           end
@@ -412,8 +414,8 @@ class ValidationTest < Test::Unit::TestCase
           ex.report
         end
         if !delete and ex.report_uri
-          if SUBJECTID  
-            puts ex.report_uri+"?subjectid="+CGI.escape(SUBJECTID)
+          if OpenTox::RestClientWrapper.subjectid  
+            puts ex.report_uri+"?subjectid="+CGI.escape(OpenTox::RestClientWrapper.subjectid)
           else
             puts ex.report_uri
           end
@@ -424,8 +426,8 @@ class ValidationTest < Test::Unit::TestCase
       end
     end
     
-    if $aa[:uri] && SUBJECTID && delete
-      policies_after= OpenTox::Authorization.list_policy_uris(SUBJECTID)
+    if $aa[:uri] && OpenTox::RestClientWrapper.subjectid && delete
+      policies_after= OpenTox::Authorization.list_policy_uris(OpenTox::RestClientWrapper.subjectid)
       diff = policies_after.size - policies_before.size
       if (diff != 0)
         policies_before.each do |k,v|

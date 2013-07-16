@@ -60,7 +60,7 @@ module Reports
     # call-seq:
     #   create_report(type, validation_uris) => string
     # 
-    def create_report(type, validation_uris, identifier=nil, params={}, subjectid=nil, task=nil)
+    def create_report(type, validation_uris, identifier=nil, params={}, task=nil)
       
       internal_server_error "params is no hash" unless params.is_a?(Hash)
       $logger.info "create report of type '"+type.to_s+"'"
@@ -80,7 +80,7 @@ module Reports
           filter_params[key] = params[key].to_f
         end
       end
-      validation_set = Reports::ValidationSet.new(validation_uris, identifier, filter_params, subjectid)
+      validation_set = Reports::ValidationSet.new(validation_uris, identifier, filter_params)
       bad_request_error("cannot get validations from validation_uris '"+validation_uris.inspect+"'") unless validation_set and validation_set.size > 0
       $logger.debug "loaded "+validation_set.size.to_s+" validation/s"
       task.progress(10) if task
@@ -90,10 +90,10 @@ module Reports
         OpenTox::SubTask.create(task,10,90))
       $logger.debug "report created"
       Reports::quit_r
-      Reports.validation_access.delete_tmp_resources(subjectid)
+      Reports.validation_access.delete_tmp_resources
 
       #step 3: persist report if creation not failed
-      id = @@persistance.new_report(report_content, type, create_meta_data(type, validation_set, validation_uris), self, subjectid)
+      id = @@persistance.new_report(report_content, type, create_meta_data(type, validation_set, validation_uris), self)
       $logger.debug "report persisted with id: '"+id.to_s+"'"
       task.progress(100) if task
       
@@ -135,19 +135,19 @@ module Reports
     # call-seq:
     #   delete_report( type, id )
     # 
-    def delete_report( type, id, subjectid=nil )
+    def delete_report( type, id )
       
       $logger.info "delete report '"+id.to_s+"' of type '"+type.to_s+"'"
       check_report_type(type)
-      @@persistance.delete_report(type, id, subjectid)
+      @@persistance.delete_report(type, id)
     end
     
     # no api-access for this method
-    def delete_all_reports( type, subjectid=nil )
+    def delete_all_reports( type )
       
       $logger.info "deleting all reports of type '"+type.to_s+"'"
       check_report_type(type)
-      @@persistance.list_reports(type).each{ |id| @@persistance.delete_report(type, id, subjectid) }
+      @@persistance.list_reports(type).each{ |id| @@persistance.delete_report(type, id) }
     end
     
     def parse_type( report_uri )

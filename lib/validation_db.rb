@@ -87,8 +87,6 @@ module Validation
     index :training_dataset_uri
     index :test_dataset_uri
     
-    attr_accessor :subjectid
-    
     def self.create(params={})
       Ohm.connect(:thread_safe => true, :port => 6379)
       params[:date] = Time.new
@@ -121,7 +119,7 @@ module Validation
 
     def save
       super
-      OpenTox::Authorization.check_policy(validation_uri, subjectid)
+      OpenTox::Authorization.check_policy(validation_uri, OpenTox::RestClientWrapper.subjectid)
     end
     
     public
@@ -161,8 +159,6 @@ module Validation
     attribute :stratified
     attribute :loo
     
-    attr_accessor :subjectid
-    
     index :algorithm_uri
     index :algorithm_params
     index :prediction_feature
@@ -181,7 +177,7 @@ module Validation
     
     def save
       super
-      OpenTox::Authorization.check_policy(crossvalidation_uri, subjectid)
+      OpenTox::Authorization.check_policy(crossvalidation_uri, OpenTox::RestClientWrapper.subjectid)
     end
     
     public
@@ -193,12 +189,12 @@ module Validation
     # convenience method to list all crossvalidations that are unique 
     # in terms of dataset_uri,num_folds,stratified,random_seed
     # further conditions can be specified in __conditions__
-    def self.find_all_uniq(conditions={}, subjectid=nil )
+    def self.find_all_uniq(conditions={} )
       #cvs = Lib::Crossvalidation.find(:all, :conditions => conditions)
       cvs = Crossvalidation.find( conditions )
       uniq = []
       cvs.each do |cv|
-        next if $aa[:uri] and !OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"GET",subjectid)
+        next if $aa[:uri] and !OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"GET",OpenTox::RestClientWrapper.subjectid)
         match = false
         uniq.each do |cv2|
           if cv.dataset_uri == cv2.dataset_uri and cv.num_folds == cv2.num_folds and 
