@@ -141,8 +141,8 @@ module Lib
         if CHECK_VALUES
           prediction_dataset.compounds.size.times do |c_idx| 
             c = prediction_dataset.compounds[c_idx]
-            internal_server_error "predicted compound not found in test dataset:\n"+c.uri+"\ntest-compounds:\n"+
-              test_dataset.compounds.collect{|c| c.uri}.join("\n") if prediction_dataset.data_entry_value(c_idx,predicted_variable)!=nil and test_dataset.compounds.include?(c)
+            internal_server_error "predicted compound #{c.uri}\nfrom prediction dataset #{prediction_dataset.uri}\nnot found in test-dataset #{test_dataset.uri}\ntest-compounds:\n"+
+              test_dataset.compounds.collect{|c| c.uri}.join("\n") if prediction_dataset.data_entry_value(c_idx,predicted_variable)!=nil and !test_dataset.compounds.include?(c)
           end
         end
         

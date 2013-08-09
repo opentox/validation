@@ -119,7 +119,7 @@ module Validation
 
     def save
       super
-      OpenTox::Authorization.check_policy(validation_uri, OpenTox::RestClientWrapper.subjectid)
+      OpenTox::Authorization.check_policy(validation_uri)
     end
     
     public

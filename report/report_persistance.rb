@@ -243,7 +243,7 @@ module Reports
       internal_server_error "report meta data missing" unless meta_data
       meta_data[:report_type] = type
       report = ReportData.create(meta_data)
-      OpenTox::Authorization.check_policy(report.report_uri, OpenTox::RestClientWrapper.subjectid)
+      OpenTox::Authorization.check_policy(report.report_uri)
       new_report_with_id(report_content, type, report.id)
     end
     

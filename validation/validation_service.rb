@@ -164,9 +164,8 @@ module Validation
       internal_server_error "validation_type missing" unless self.validation_type
       $logger.debug "validating model '"+self.model_uri+"'"
       
-      #model = OpenTox::Model::PredictionModel.find(self.model_uri)
-      #resource_not_found_error "model not found: "+self.model_uri.to_s unless model
-      model = OpenTox::Model::Generic.new(self.model_uri)
+      model = OpenTox::Model::Generic.find(self.model_uri)
+      resource_not_found_error "model not found: "+self.model_uri.to_s unless model
       
       unless self.algorithm_uri
         self.algorithm_uri = model.metadata[RDF::OT.algorithm]
@@ -213,8 +212,7 @@ module Validation
     end
     
     def compute_prediction_data_with_model(model=nil, task=nil)
-      #model = OpenTox::Model::Generic.find(self.model_uri, self.subjectid) if model==nil and self.model_uri
-      model = OpenTox::Model.find(self.model_uri) if model==nil and self.model_uri
+      model = OpenTox::Model::Generic.find(self.model_uri) if model==nil and self.model_uri
       resource_not_found_error "model not found: "+self.model_uri.to_s unless model
             
       feature_type = model.feature_type 
