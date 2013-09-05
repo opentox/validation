@@ -27,7 +27,7 @@ class Reports::ValidationDB
         
         if same_service?u
           unauthorized_error "Not authorized: GET "+u.to_s if
-            $aa[:uri] and !OpenTox::Authorization.authorized?(u,"GET",OpenTox::RestClientWrapper.subjectid)
+            $aa[:uri] and !OpenTox::Authorization.authorized?(u,"GET")
           Ohm.connect(:thread_safe => true, :port => 6379)
           cv = Validation::Crossvalidation[cv_id]
           resource_not_found_error "crossvalidation with id "+cv_id.to_s+" not found" unless cv
@@ -61,7 +61,7 @@ class Reports::ValidationDB
     
     if same_service? uri
       unauthorized_error "Not authorized: GET "+uri.to_s if
-        $aa[:uri] and !OpenTox::Authorization.authorized?(uri,"GET",OpenTox::RestClientWrapper.subjectid)
+        $aa[:uri] and !OpenTox::Authorization.authorized?(uri,"GET")
       Ohm.connect(:thread_safe => true, :port => 6379)
       v = Validation::Validation[validation_id]
     else
@@ -95,7 +95,7 @@ class Reports::ValidationDB
     if same_service?cv_uri
       cv_id = cv_uri.split("/")[-1]
       unauthorized_error "Not authorized: GET "+cv_uri.to_s if
-        $aa[:uri] and !OpenTox::Authorization.authorized?(cv_uri,"GET",OpenTox::RestClientWrapper.subjectid)
+        $aa[:uri] and !OpenTox::Authorization.authorized?(cv_uri,"GET")
       Ohm.connect(:thread_safe => true, :port => 6379)
       cv = Validation::Crossvalidation[cv_id]
       resource_not_found_error "crossvalidation with id "+crossvalidation_id.to_s+" not found" unless cv
