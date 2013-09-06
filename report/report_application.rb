@@ -1,6 +1,6 @@
 require "./report/environment.rb"
 
-class Validation::Application < OpenTox::Service
+class Validation::Application < OpenTox::Application
 
   def perform
     @@report_service = Reports::ReportService.instance( to("/validation/report", :full) ) unless defined?@@report_service  

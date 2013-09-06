@@ -177,7 +177,7 @@ module Validation
     
     def save
       super
-      OpenTox::Authorization.check_policy(crossvalidation_uri, OpenTox::RestClientWrapper.subjectid)
+      OpenTox::Authorization.check_policy(crossvalidation_uri)
     end
     
     public

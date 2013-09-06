@@ -1,8 +1,6 @@
 require 'rubygems'
-#gem "opentox-ruby"
-[ 'sinatra', 'ohm', 'benchmark' ].each do |lib|
-  require lib
-end
+require 'benchmark'
+require 'opentox-server'
 
 require "./test/test_application.rb"
 require "./report/report_application.rb"

@@ -5,7 +5,7 @@ end
 require './lib/dataset_cache.rb'
 require './validation/validation_service.rb'
 
-class Validation::Application < OpenTox::Service
+class Validation::Application < OpenTox::Application
   
     helpers do
       def check_stratified(params)
