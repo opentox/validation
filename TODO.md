@@ -9,6 +9,7 @@ Refactoring
 * remove redis, replace with 4store
 * remove gnuplot, replace with R
 * to_json support
+* change object ids to uuids (?)
 
 Pitfalls
 --------
