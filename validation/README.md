@@ -11,7 +11,7 @@ General
  * **test-set-validation** input: model and test-set, no algorithm, no training-set
  * **training-test-validation** input: algorithm, test-set, training-set
  * **training-test-split** input: algorithm, dataset, split-ratio
- * **boostrapping** input: algorithm, dataset
+ * **bootstrapping** input: algorithm, dataset
 * k-fold *crossvalidation* creates k *validation* objects and an additional *validation* object that stores the aggregated statistics
 
 Code
