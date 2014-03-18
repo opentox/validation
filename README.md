@@ -9,7 +9,7 @@ OpenTox Validation
 General:
 --------
 
-* validation and reported is seperated in code (see below)
+* validation and reporting is seperated in code (see below)
 * see validation/README and report/README for more general info
 
 Source Directories:
