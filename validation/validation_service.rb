@@ -126,7 +126,9 @@ module Validation
           alg_param = alg_params.split("=",2)
           bad_request_error "invalid algorithm param: '"+alg_params.to_s+"'" unless alg_param.size==2 or alg_param[0].to_s.size<1 or alg_param[1].to_s.size<1
           $logger.warn "algorihtm param contains empty space, encode? "+alg_param[1].to_s if alg_param[1] =~ /\s/
-          params[alg_param[0].to_sym] = alg_param[1]
+          v = alg_param[1]
+          v = v.split(",") if v.include?(",")
+          params[alg_param[0].to_sym] = v
         end
       end
       
