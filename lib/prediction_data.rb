@@ -151,23 +151,35 @@ module Lib
         
         test_dataset.compounds.size.times do |test_c_idx|
           c = test_dataset.compounds[test_c_idx].uri
-          pred_c_idx = prediction_dataset.compound_index(test_dataset,test_c_idx)
-          if pred_c_idx==nil
-            internal_server_error "internal error: mapping failed" if prediction_dataset.compounds.collect{|c| c.uri}.include?(c)
+
+          # handle special case before mapping: the test compound might occur multiple times in the training dataset ..
+          # .. and is therefore added multiple times without predicted variable into the prediction dataset
+          pred_c_idx = prediction_dataset.compound_indices(c)
+          if (pred_c_idx and pred_c_idx.size>1 and pred_c_idx.all?{|idx| prediction_dataset.data_entry_value(idx,predicted_variable)==nil})
             predicted_values << nil
             confidence_values << nil
           else
-            internal_server_error "internal error: mapping failed" unless c==prediction_dataset.compounds[pred_c_idx].uri  
-            case feature_type
-            when "classification"
-              predicted_values << classification_val(prediction_dataset, pred_c_idx, predicted_variable, accept_values)
-            when "regression"
-              predicted_values << numeric_val(prediction_dataset, pred_c_idx, predicted_variable)
-            end
-            if predicted_confidence
-              confidence_values << numeric_val(prediction_dataset, pred_c_idx, predicted_confidence)
-            else
+            # find single corresponding compound for test-compound in prediction-dataset
+            pred_c_idx = prediction_dataset.compound_index(test_dataset,test_c_idx)
+            if pred_c_idx==nil
+              # mapping index = nil, make sure that compound-uri is really not included
+              internal_server_error "internal error: mapping failed" if prediction_dataset.compounds.collect{|c| c.uri}.include?(c)
+              predicted_values << nil
               confidence_values << nil
+            else
+              # mapping index != nil, make sure that compound-uri is really equal
+              internal_server_error "internal error: mapping failed" unless c==prediction_dataset.compounds[pred_c_idx].uri  
+              case feature_type
+              when "classification"
+                predicted_values << classification_val(prediction_dataset, pred_c_idx, predicted_variable, accept_values)
+              when "regression"
+                predicted_values << numeric_val(prediction_dataset, pred_c_idx, predicted_variable)
+              end
+              if predicted_confidence
+                confidence_values << numeric_val(prediction_dataset, pred_c_idx, predicted_confidence)
+              else
+                confidence_values << nil
+              end
             end
           end
         end
