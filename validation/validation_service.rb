@@ -363,9 +363,13 @@ module Validation
     
     # creates the cv folds
     def create_cv_datasets( task=nil )
-      if self.loo=="true"
+      if self.loo=="true" or self.loo=="uniq"
         orig_dataset = Lib::DatasetCache.find(self.dataset_uri)
-        self.num_folds = orig_dataset.compounds.size
+        if self.loo=="uniq"
+          self.num_folds = orig_dataset.compounds.collect{|c| c.uri}.uniq.size
+        else
+          self.num_folds = orig_dataset.compounds.size
+        end
         self.random_seed = 0
         self.stratified = "false"
       else
@@ -425,9 +429,6 @@ module Validation
             v.prediction_feature == prediction_feature and
             URI.accessible?(v.training_dataset_uri) and 
             URI.accessible?(v.test_dataset_uri)
-            # CH: Dataset.exist? has been removed, URI.accessible? is cheaper because it needs only HEAD requests 
-            #OpenTox::Dataset.exist?(v.training_dataset_uri,self.subjectid) and 
-            #OpenTox::Dataset.exist?(v.test_dataset_uri,self.subjectid)
           #make sure self.id is set
           #self.save if self.new?
           tmp_val << { :validation_type => "crossvalidation",
@@ -461,12 +462,23 @@ module Validation
       meta = { RDF::DC.creator => self.crossvalidation_uri }
       case stratified
       when "false"
-        if self.loo=="true"
-          shuffled_compound_indices = (0..(orig_dataset.compounds.size-1)).to_a
+        unless self.loo=="uniq"
+          if self.loo=="true"
+            shuffled_compound_indices = (0..(orig_dataset.compounds.size-1)).to_a
+          else
+            shuffled_compound_indices = (0..(orig_dataset.compounds.size-1)).to_a.shuffle( self.random_seed )
+          end  
+          split_compound_indices = shuffled_compound_indices.chunk( self.num_folds.to_i )
         else
-          shuffled_compound_indices = (0..(orig_dataset.compounds.size-1)).to_a.shuffle( self.random_seed )
-        end  
-        split_compound_indices = shuffled_compound_indices.chunk( self.num_folds.to_i )
+          #loo uniq
+          shuffled_compound_indices = []
+          split_compound_indices = []
+          orig_dataset.compounds.collect{|c| c.uri}.uniq.each do |c|
+            idx = orig_dataset.compound_indices(c)
+            shuffled_compound_indices += idx
+            split_compound_indices << idx
+          end
+        end
         $logger.debug "cv: num instances for each fold: "+split_compound_indices.collect{|c| c.size}.join(", ")
           
         self.num_folds.to_i.times do |n|
@@ -482,7 +494,7 @@ module Validation
           end
           internal_server_error "internal error, num test compounds not correct,"+
             " is '#{test_compound_indices.size}', should be '#{(shuffled_compound_indices.size/self.num_folds.to_i)}'" unless 
-            (shuffled_compound_indices.size/self.num_folds.to_i - test_compound_indices.size).abs <= 1 
+            (shuffled_compound_indices.size/self.num_folds.to_i - test_compound_indices.size).abs <= 1 or self.loo="uniq"
           internal_server_error "internal error, num train compounds not correct, should be '"+(shuffled_compound_indices.size-test_compound_indices.size).to_s+
             "', is '"+train_compound_indices.size.to_s+"'" unless shuffled_compound_indices.size - test_compound_indices.size == train_compound_indices.size
           datasetname = 'dataset fold '+(n+1).to_s+' of '+self.num_folds.to_s        

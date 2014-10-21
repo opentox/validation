@@ -87,8 +87,8 @@ class Validation::Application < OpenTox::Application
       $logger.info "crossvalidation cleanup, starting..."
       content_type "text/uri-list"
       deleted = []
-      Validation::Crossvalidation.all.collect.delete_if{|cv| cv.finished}.each do |cv|
-        if OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"DELETE",OpenTox::RestClientWrapper.subjectid)
+      Validation::Crossvalidation.all.collect.select{|cv| !cv.finished}.each do |cv|
+        if OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"DELETE")
           $logger.debug "delete cv with id:"+cv.id.to_s+", finished is false"
           deleted << cv.crossvalidation_uri
           cv.delete_crossvalidation
@@ -111,7 +111,7 @@ class Validation::Application < OpenTox::Application
                       :algorithm_params => params[:algorithm_params],
                       :prediction_feature => params[:prediction_feature],  
                       :algorithm_uri => params[:algorithm_uri],
-                      :loo => "true" }
+                      :loo => (params[:loo]=="uniq" ? "uniq" : "true") }
         cv = Validation::Crossvalidation.create cv_params
         cv.perform_cv( OpenTox::SubTask.create(task,0,95))
         # computation of stats is cheap as dataset are already loaded into the memory
@@ -520,8 +520,8 @@ class Validation::Application < OpenTox::Application
       $logger.info "validation cleanup, starting..."
       content_type "text/uri-list"
       deleted = []
-      Validation::Validation.all.collect.delete_if{|val| val.finished}.each do |val|
-        if OpenTox::Authorization.authorized?(val.validation_uri,"DELETE",OpenTox::RestClientWrapper.subjectid)
+      Validation::Validation.all.collect.select{|val| !val.finished}.each do |val|
+        if OpenTox::Authorization.authorized?(val.validation_uri,"DELETE")
           $logger.debug "delete val with id:"+val.id.to_s+", finished is false"
           deleted << val.validation_uri
           val.delete_validation
@@ -546,7 +546,7 @@ class Validation::Application < OpenTox::Application
       end
       deleted = []
       OpenTox::Dataset.all.each do |d|
-        if !used_datasets.include?(d.uri) and OpenTox::Authorization.authorized?(d.uri,"DELETE",OpenTox::RestClientWrapper.subjectid)
+        if !used_datasets.include?(d.uri) and OpenTox::Authorization.authorized?(d.uri,"DELETE")
           deleted << d.uri
           d.delete
           sleep 1 if $aa[:uri]
