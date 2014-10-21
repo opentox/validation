@@ -109,7 +109,7 @@ module Lib
           # add boxplots including training, test and predicted values
           val_str = training_data_available ? "training=#{[res[r]["Training value"]].join(",")};" : ""
           val_str << "test=#{[res[r]["Test value"]].join(",")};predicted=#{[res[r]["Predicted value"]].join(",")}"
-          res[r]["Boxplot"] = File.join($validation[:uri],"/report/boxplot/#{val_str};hline=#{hline}")
+          res[r]["Boxplot"] = File.join($validation[:uri],"/report/boxplot/#{val_str}?hline=#{hline}")
         end
         # format values
         if format
