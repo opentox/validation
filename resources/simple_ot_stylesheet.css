@@ -12,9 +12,40 @@ padding: 0;
 }
 table {
 font-size: 100%;
+text-align: left;
 }
 table td{
 padding: 3px;
+}
+table.tablesorter {
+/*	background-color: #CDCDCD;*/
+	margin:10px 0pt 15px;
+	width: 100%;
+}
+table.tablesorter thead tr th, table.tablesorter tfoot tr th {
+	background-color: #e6EEEE;
+}
+table.tablesorter thead tr .header {
+	background-image: url(http://localhost:8087/validation/resources/bg.gif);
+	background-repeat: no-repeat;
+	background-position: center right;
+	cursor: pointer;
+}
+table.tablesorter tbody td {
+	color: #3D3D3D;
+	background-color: #FFF;
+}
+table.tablesorter tbody tr.odd td {
+	background-color:#F0F0F6;
+}
+table.tablesorter thead tr .headerSortUp {
+	background-image: url(http://localhost:8087/validation/resources/asc.gif);
+}
+table.tablesorter thead tr .headerSortDown {
+	background-image: url(http://localhost:8087/validation/resources/desc.gif);
+}
+table.tablesorter thead tr .headerSortDown, table.tablesorter thead tr .headerSortUp {
+ background-color: #8dbdd8; 
 }
 a {
 color: #5D308A;

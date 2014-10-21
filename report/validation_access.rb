@@ -193,11 +193,19 @@ class Reports::ValidationDB
     # we need compound info, cannot reuse stored prediction data
     data = Lib::PredictionData.create( validation.feature_type, validation.test_dataset_uri, 
       validation.prediction_feature, validation.prediction_dataset_uri, validation.predicted_variable, 
-      validation.predicted_confidence, OpenTox::SubTask.create(task, 0, 80 ) )
+      validation.predicted_confidence, OpenTox::SubTask.create(task, 0, 40 ) )
     data = Lib::PredictionData.filter_data( data.data, data.compounds, 
       filter_params[:min_confidence], filter_params[:min_num_predictions], filter_params[:max_num_predictions] ) if filter_params!=nil
-    task.progress(100) if task
-    Lib::OTPredictions.new( data.data, data.compounds )
+	task.progress(80) if task
+    training_values = {}
+    if validation.training_dataset_uri
+      d = Lib::DatasetCache.find(validation.training_dataset_uri)
+      data.compounds.each do |c|
+        training_values[c] = (d.compound_indices(c) ? d.compound_indices(c).collect{|idx| d.data_entry_value(idx,validation.prediction_feature)} : nil)
+      end
+    end
+    task.progress(90) if task
+    Lib::OTPredictions.new( data.data, data.compounds, training_values )
   end
   
   def get_accept_values( validation )

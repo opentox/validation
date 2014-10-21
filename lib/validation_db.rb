@@ -5,6 +5,7 @@
 require "./lib/merge.rb"
 
 Ohm.connect(:thread_safe => true, :port => 6379)
+#Ohm.flush # flush deletes entire datasbase
 
 
 module Validation

@@ -6,6 +6,10 @@ ENV['SAXON_JAR'] = "saxonhe9-2-0-3j/saxon9he.jar" unless ENV['SAXON_JAR']
 
 OT_STYLESHEET = File.join($validation[:uri],"resources/simple_ot_stylesheet.css")
 
+JAVASCRIPT = "<script src='#{$validation[:uri]}/resources/jquery-2.1.1.min.js'></script>\n"
+JAVASCRIPT << "<script type='text/javascript' src='#{$validation[:uri]}/resources/jquery.tablesorter.min.js'></script>\n"
+JAVASCRIPT << "<script type='text/javascript'> $(document).ready(function() { $('table').tablesorter(); } ); </script>"
+
 # = Reports::ReportFormat
 # 
 # provides functions for converting reports from xml to other formats
@@ -78,6 +82,13 @@ module Reports::ReportFormat
       end
     end
     internal_server_error "error during conversion" unless $?==0
+
+    # HACK to add java script to html file (modifying the xsl would probably be the clean correct solution)
+    html_file = File.join(directory,html_filename.to_s)
+    content = File.read(html_file, :encoding=>"ISO-8859-1").gsub(/\<\//, "\n</")
+    content = content.gsub(/\<body\s/,"\n#{JAVASCRIPT}\n<body ")
+    content = content.gsub(/table summary="Predic/,"table class=\"tablesorter\" summary=\"Predic")
+    File.open(html_file, 'wb', :encoding=>"ISO-8859-1") { |file| file.write(content) }
   end
   
 end

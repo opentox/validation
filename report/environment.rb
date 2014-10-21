@@ -1,6 +1,6 @@
 ['rubygems', 'logger', 'fileutils', 'sinatra', #'rest_client', 
   'yaml', 'fileutils', 'mime/types', 'abbrev', 
-  'rexml/document',  'ruby-plot' ].each do |g|
+  'rexml/document',  'ruby-plot', 'base64', 'rinruby' ].each do |g|
     require g
 end
 
