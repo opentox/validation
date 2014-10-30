@@ -73,7 +73,7 @@ class Reports::ReportContent
       @xml_report.add_paragraph(section_table, section_text) if section_text
       v_uris = validation_set.validations.collect{|v| Array.new(v.num_instances.to_i,v.validation_uri)} if add_validation_uris
       @xml_report.add_table(section_table, table_title, Lib::OTPredictions.to_array(validation_set.validations.collect{|v| v.get_predictions}, 
-        true, true, v_uris))
+        true, v_uris))
     else
       @xml_report.add_paragraph(section_table, "No prediction info available.")
     end

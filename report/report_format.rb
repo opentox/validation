@@ -85,9 +85,11 @@ module Reports::ReportFormat
 
     # HACK to add java script to html file (modifying the xsl would probably be the clean correct solution)
     html_file = File.join(directory,html_filename.to_s)
-    content = File.read(html_file, :encoding=>"ISO-8859-1").gsub(/\<\//, "\n</")
-    content = content.gsub(/\<body\s/,"\n#{JAVASCRIPT}\n<body ")
-    content = content.gsub(/table summary="Predic/,"table class=\"tablesorter\" summary=\"Predic")
+    content = File.read(html_file, :encoding=>"ISO-8859-1")
+    content.gsub!(/\<\//, "\n</") # for better readability of the html source
+    content.gsub!(/&lt;br&gt;/,"<br>") # there is no straightforward way to add line breaks in docbook
+    content.gsub!(/\<body\s/,"\n#{JAVASCRIPT}\n<body ")
+    content.gsub!(/table summary="Predic/,"table class=\"tablesorter\" summary=\"Predic")
     File.open(html_file, 'wb', :encoding=>"ISO-8859-1") { |file| file.write(content) }
   end
   

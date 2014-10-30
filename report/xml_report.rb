@@ -165,17 +165,29 @@ module Reports
       element << table
       table
     end
-    
-    def add_image( element, url ) #, scale=false )
-      image = Element.new("imageobject")
-      params = {"fileref" => url, "format"=>"PNG"}
+
+    def self.image( image_url, link_url=nil )
+      img = Element.new("imageobject")
+      params = {"fileref" => image_url, "format"=>"PNG"}
       #params["contentwidth"] = "2in"
       imagedata = Reports::XMLReportUtil.attribute_element("imagedata",params) 
-      image << imagedata
-      element << image
-      return image    
+      img << imagedata
+      unless link_url
+        img
+      else
+        ulink = Element.new("ulink")
+        ulink.add_attributes({"url" => link_url })
+        ulink << img
+        ulink
+      end
     end
     
+    def add_image( element, image_url, link_url=nil )
+      img = XMLReport.image( image_url, link_url )
+      element << img
+      img    
+    end
+
     # adds a table to a REXML:Element, _table_values_ should be a multi-dimensional-array, returns the table as element
     # 
     # call-seq:
@@ -210,7 +222,7 @@ module Reports
           if auto_link_urls && v.to_s =~ /^http(s?):\/\//
             add_url(entry, v.to_s)
           else
-            entry.text = v.to_s
+            entry.text = v.to_s.gsub(/\n/,"<br>") # will be xml-escaped, post-processing required
           end
           row << entry
         end
@@ -223,8 +235,10 @@ module Reports
         row = Element.new("row")
         r.each do |v|
           entry = Element.new("entry")
-          if auto_link_urls && (v.to_s =~ /depict|boxplot|media=image|.png$/) #PENDING 
-            add_image(entry, v.to_s)
+          if v.is_a?(Element)
+            entry << v
+          elsif auto_link_urls && (v.to_s =~ /depict|boxplot|media=image|.png$/) #PENDING 
+            add_image(entry, v.to_s, (v.to_s=~/\?/ ? v.to_s.split("?").first : nil))
           elsif auto_link_urls && v.to_s =~ /^http(s?):\/\//
            #add_url(entry, v.to_s, v.to_s)
            v.to_s.split(" ").each do |vv|
@@ -236,6 +250,7 @@ module Reports
          else
            text = v.to_s
            text.gsub!(/\+\-/,"&plusmn;")
+           text.gsub!(/\n/,"&lt;br&gt;") # is xml-escaped, post-processing required
            entry << Text.new(text, true, nil, true)
           end
           row << entry
@@ -292,7 +307,8 @@ module Reports
         end
       end
       
-      @doc.write(out) #,2, true, true)
+      @doc.write(out)
+      # @doc.write(out, 2)
       out.flush
     end
   
@@ -303,16 +319,17 @@ module Reports
   
       rep = Reports::XMLReport.new("Demo report", "subtitle" "Fistname", "Surname")
       section1 = rep.add_section(rep.get_root_element, "First Section")
-      rep.add_paragraph(section1, "some text")
-      rep.add_paragraph(section1, "even more text")
-      rep.add_imagefigure(section1, "Figure", "http://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Siegel_der_Albert-Ludwigs-Universit%C3%A4t_Freiburg.svg/354px-Siegel_der_Albert-Ludwigs-Universit%C3%A4t_Freiburg.svg", "SVG", 100, "this is the logo of freiburg university")
-      section2 = rep.add_section(rep.get_root_element,"Second Section")
-      rep.add_section(section2,"A Subsection")
-      rep.add_section(section2,"Another Subsection")
-      rep.add_url(section2,"www.google.de", "link zu google")
-      sec3 = rep.add_section(rep.get_root_element,"Third Section")
-      rep.add_paragraph(sec3, "some    \n              more text for section 3",true)
-      rep.add_image(sec3, "http://ambit.uni-plovdiv.bg:8080/ambit2/depict/cdk?search=c1ccccc1")
+      rep.add_table(section1, "Table", [["a\n1","b"],["c","d"]])
+#      rep.add_paragraph(section1, "some text")
+#      rep.add_paragraph(section1, "even more text")
+#      rep.add_imagefigure(section1, "Figure", #"http://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Siegel_der_Albert-Ludwigs-Universit%C3%A4t_Freiburg.svg/354px-Siegel_der_Albert-Ludwigs-Universit%C3%A4t_Freiburg.svg", "SVG", 100, "this is the logo of freiburg university")
+#      section2 = rep.add_section(rep.get_root_element,"Second Section")
+#      rep.add_section(section2,"A Subsection")
+#      rep.add_section(section2,"Another Subsection")
+#      rep.add_url(section2,"www.google.de", "link zu google")
+#      sec3 = rep.add_section(rep.get_root_element,"Third Section")
+#      rep.add_paragraph(sec3, "some    \n              more text for section 3",true)
+#      rep.add_image(sec3, "http://ambit.uni-plovdiv.bg:8080/ambit2/depict/cdk?search=c1ccccc1")
       
       #vals= [["a", "b", "c"],["a2", "b2", "c2"],["1", "2", "http://3"]]
       #rep.add_table(rep.get_root_element, "demo-table", vals)

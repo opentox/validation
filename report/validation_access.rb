@@ -201,11 +201,11 @@ class Reports::ValidationDB
     if validation.training_dataset_uri
       d = Lib::DatasetCache.find(validation.training_dataset_uri)
       data.compounds.each do |c|
-        training_values[c] = (d.compound_indices(c) ? d.compound_indices(c).collect{|idx| d.data_entry_value(idx,validation.prediction_feature)} : nil)
+        training_values[c] = d.compound_indices(c).collect{|idx| d.data_entry_value(idx,validation.prediction_feature)} if d.compound_indices(c)
       end
     end
     task.progress(90) if task
-    Lib::OTPredictions.new( data.data, data.compounds, training_values )
+    Lib::OTPredictions.new( data.data, data.compounds, training_values, OpenTox::Feature.new(validation.prediction_feature).title )
   end
   
   def get_accept_values( validation )

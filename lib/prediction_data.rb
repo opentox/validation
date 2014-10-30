@@ -9,7 +9,7 @@ module Lib
     def self.filter_data( data, compounds, min_confidence, min_num_predictions, max_num_predictions, prediction_index=nil )
       
       internal_server_error "cannot filter anything, no confidence values available" if data[:confidence_values][0]==nil
-      bad_request_error "please specify either min_confidence or max_num_predictions" if 
+      bad_request_error "please specify either min_confidence XOR max_num_predictions" if 
         (min_confidence!=nil and max_num_predictions!=nil) || (min_confidence==nil and max_num_predictions==nil)
       bad_request_error "min_num_predictions only valid for min_confidence" if 
         (min_confidence==nil and min_num_predictions!=nil)

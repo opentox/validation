@@ -35,51 +35,6 @@ class Validation::Application < OpenTox::Application
     end
   end
 
-  # produces a boxplot
-  # params should be given in URI, e.g. : ..boxplot/test_values=5.8,5.6,5.3;predicted=5.9
-  # ; separates series (or categories)
-  # = seperates key and values for each series
-  # , seperates values for each series
-  # 'hline=<float>' can be given as optional param (with '?') to specifiy the stepwidth of horizontal lines
-  # (default is 1.0, horizontal lines allow to compare different plots)
-  get '/validation/report/boxplot/:vals' do
-
-    filename = "#{Base64.encode64(params[:vals].inspect+params[:hline].inspect)}.png"
-    unless (File.exists?("/tmp/#{filename}"))
-      # retrieve values
-      vals = {}
-      params[:vals].split(";").collect do |x|
-          y = x.split("=")
-          vals[y[0]] = (y[1] ? y[1].split(",").collect{|z| z.to_f} : nil)
-      end
-      names = "c(\""+vals.keys.join("\",\"")+"\")"
-      values = vals.values.collect{|a| "c("+(a ? a.join(",") : "")+")"}.join(",")
-      
-      # the min range is set to hline*2 to draw at least two horizontal lines
-      hline = params[:hline] ? params[:hline].to_f : 1.0
-      min = vals.values.flatten.compact.min
-      max = vals.values.flatten.compact.max
-      if (max-min<(hline*2))
-        to_add = (hline*2)-(max-min)
-        min -= to_add/2.0
-        max += to_add/2.0
-      end
-      range = "c(#{min},#{max})"
-
-      # return "boxplot(#{values},col=c('red','blue','green'),names=#{names},ylim=#{range})"
-      @r = RinRuby.new(true,false)
-      @r.eval "png(\"/tmp/#{filename}\",width=300,height=150)"
-      @r.eval "par(mai=c(0.5,0.5,0.2,0.2))"
-      @r.eval "boxplot(#{values},col=c('red','blue','green'),names=#{names},ylim=#{range})"
-      # seq defines were to draw hline
-      # example: min -9.5, max 10.5, hline = 2 -> seq(-10,12,by=2) -> produces lines from -10 to 12 with step-width 2
-      @r.eval "abline(h=seq(floor(#{min}/#{hline})*#{hline}, round(#{max}/#{hline})*#{hline}, by=#{hline}),lty=2,col='dimgrey')" 
-      @r.eval 'dev.off()'
-      @r.quit
-    end
-    send_file("/tmp/#{filename}",:filename=>"#{params[:vals]}.png",:type=>'image/png',:disposition => 'inline')
-  end
-  
   get '/validation/report/?' do
     perform do |rs|
       case request.env['HTTP_ACCEPT'].to_s
