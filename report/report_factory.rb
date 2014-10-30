@@ -136,8 +136,8 @@ module Reports::ReportFactory
     bad_request_error("crossvalidation-id not unique and != nil: "+
       validation_set.get_values(:crossvalidation_id,false).inspect) if validation_set.unique_value(:crossvalidation_id)==nil
     validation_set.load_cv_attributes
-    bad_request_error("num validations ("+validation_set.size.to_s+") is not equal to num folds ("+
-      validation_set.unique_value(:num_folds).to_s+")") unless validation_set.unique_value(:num_folds).to_i==validation_set.size
+    #bad_request_error("num validations ("+validation_set.size.to_s+") is not equal to num folds ("+
+    #  validation_set.unique_value(:num_folds).to_s+")") unless validation_set.unique_value(:num_folds).to_i==validation_set.size
     bad_request_error("num different folds is not equal to num validations") unless validation_set.num_different_values(:crossvalidation_fold)==validation_set.size
     bad_request_error("validations must have unique feature type, i.e. must be either all regression, "+
       "or all classification validations") unless validation_set.unique_feature_type

@@ -13,6 +13,15 @@ class Validation::Application < OpenTox::Application
         bad_request_error "stratified != true|false|super, is #{params[:stratified]}" unless
           params[:stratified]=~/true|false|super/
       end
+
+      def filter_validation(validation, params)
+        if (params[:min_confidence] or params[:min_num_predictions] or params[:max_num_predictions])
+          min_confidence = params[:min_confidence] ? params[:min_confidence].to_f : nil
+          min_num_predictions = params[:min_num_predictions] ? params[:min_num_predictions].to_i : nil
+          max_num_predictions = params[:max_num_predictions] ? params[:max_num_predictions].to_i : nil
+          validation.filter_predictions(min_confidence,min_num_predictions,max_num_predictions)
+        end
+      end
     end
     
     before do
@@ -105,18 +114,19 @@ class Validation::Application < OpenTox::Application
       bad_request_error "algorithm_uri missing" unless params[:algorithm_uri].to_s.size>0
       bad_request_error "prediction_feature missing" unless params[:prediction_feature].to_s.size>0
       bad_request_error "illegal param: num_folds, stratified, random_seed not allowed for loo-crossvalidation" if params[:num_folds] or 
-        params[:stratified] or params[:random_seed]
+        params[:stratified] or (params[:random_seed] and !params[:skip_ratio])
       task = OpenTox::Task.run( "Perform loo-crossvalidation", to("/validation/crossvalidation/loo", :full) ) do |task| #, params
         cv_params = { :dataset_uri => params[:dataset_uri],
                       :algorithm_params => params[:algorithm_params],
                       :prediction_feature => params[:prediction_feature],  
                       :algorithm_uri => params[:algorithm_uri],
-                      :loo => (params[:loo]=="uniq" ? "uniq" : "true") }
+                      :loo => (params[:loo]=="uniq" ? "uniq" : "true"),
+                      :random_seed => params[:random_seed]}
         cv = Validation::Crossvalidation.create cv_params
-        cv.perform_cv( OpenTox::SubTask.create(task,0,95))
+        cv.perform_cv( OpenTox::SubTask.create(task,0,95), (params[:skip_ratio] ? params[:skip_ratio].to_f : nil))
         # computation of stats is cheap as dataset are already loaded into the memory
         Validation::Validation.from_cv_statistics( cv.id, OpenTox::SubTask.create(task,95,100) )
-        cv.clean_loo_files( !(params[:algorithm_params] && params[:algorithm_params] =~ /feature_dataset_uri/) )
+        #cv.clean_loo_files( !(params[:algorithm_params] && params[:algorithm_params] =~ /feature_dataset_uri/) )
         cv.crossvalidation_uri
       end
       return_task(task)
@@ -189,6 +199,7 @@ class Validation::Application < OpenTox::Application
       
       $logger.info "get crossvalidation statistics for crossvalidation with id "+params[:id].to_s
       v = Validation::Validation.from_cv_statistics( params[:id] )
+      filter_validation(v,params)
       case request.env['HTTP_ACCEPT'].to_s
       when /text\/html/
         related_links = 
@@ -218,6 +229,10 @@ class Validation::Application < OpenTox::Application
       props = v.probabilities(params[:confidence].to_s.to_f,params[:prediction].to_s)
       content_type "text/x-yaml"
       props.to_yaml
+    end
+
+    get '/validation/crossvalidation/:id/prediction_data' do
+      Validation::Validation.from_cv_statistics( params[:id] ).prediction_data.to_yaml
     end
     
     delete '/validation/crossvalidation/:id/?' do
@@ -664,6 +679,7 @@ class Validation::Application < OpenTox::Application
     #  end
       validation = Validation::Validation[params[:id]]
       resource_not_found_error "Validation '#{params[:id]}' not found." unless validation
+      filter_validation(validation,params)
        
       case request.env['HTTP_ACCEPT'].to_s
       when "application/rdf+xml"

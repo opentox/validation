@@ -269,8 +269,8 @@ module Validation
     end
     
     def filter_predictions( min_confidence, min_num_predictions, max_num_predictions, prediction=nil )
-      self.prediction_data = nil
-      self.save
+      #self.prediction_data = nil
+      #self.save
       
       bad_request_error "only supported for classification" if prediction!=nil and classification_statistics==nil
       bad_request_error "illegal confidence value #{min_confidence}" unless 
@@ -315,9 +315,9 @@ module Validation
   
   class Crossvalidation
     
-    def perform_cv ( task=nil )
+    def perform_cv ( task=nil, skip_ratio=nil )
       create_cv_datasets( OpenTox::SubTask.create(task, 0, 33) )
-      perform_cv_validations( OpenTox::SubTask.create(task, 33, 100) )
+      perform_cv_validations( OpenTox::SubTask.create(task, 33, 100), skip_ratio )
     end
     
     def clean_loo_files( delete_feature_datasets )
@@ -370,13 +370,12 @@ module Validation
         else
           self.num_folds = orig_dataset.compounds.size
         end
-        self.random_seed = 0
         self.stratified = "false"
       else
-        self.random_seed = 1 unless self.random_seed
         self.num_folds = 10 unless self.num_folds
         self.stratified = "false" unless self.stratified
       end
+      self.random_seed = 1 unless self.random_seed
       if copy_cv_datasets()
         # dataset folds of a previous crossvalidaiton could be used 
         task.progress(100) if task
@@ -386,18 +385,20 @@ module Validation
     end
     
     # executes the cross-validation (build models and validates them)
-    def perform_cv_validations( task=nil )
+    def perform_cv_validations( task=nil, skip_ratio=nil )
       
       $logger.debug "perform cv validations"
-      i = 0
+      i = -1
       task_step = 100 / self.num_folds.to_f;
+      skip = @tmp_validations.size.times.collect{|i| i < (skip_ratio*@tmp_validations.size) }.shuffle(self.random_seed) if skip_ratio
       @tmp_validations.each do | val |
+        i += 1
+        next if skip and skip[i]
         validation = Validation.create val
         validation.validate_algorithm( OpenTox::SubTask.create(task, i * task_step, ( i + 1 ) * task_step) )
         internal_server_error "validation '"+validation.validation_uri+"' for crossvaldation could not be finished" unless 
-          validation.finished
-        i += 1
-        $logger.debug "fold "+i.to_s+" done: "+validation.validation_uri.to_s
+        validation.finished
+        $logger.debug "fold "+(i+1).to_s+" done: "+validation.validation_uri.to_s
       end
       
 #      self.attributes = { :finished => true }
@@ -412,13 +413,14 @@ module Validation
     # returns true if successfull, false otherwise
     def copy_cv_datasets( )
       # for downwards compatibilty: search prediction_feature=nil is ok
-      cvs = Crossvalidation.find( { 
+      p = { 
         :dataset_uri => self.dataset_uri, 
         :num_folds => self.num_folds, 
         :stratified => self.stratified, 
-        :random_seed => self.random_seed,
         :loo => self.loo,
-        :finished => true} ).reject{ |cv| (cv.id == self.id || 
+        :finished => true}
+      p[:random_seed] = self.random_seed unless self.loo=="uniq"
+      cvs = Crossvalidation.find( p ).reject{ |cv| (cv.id == self.id || 
                                           (cv.prediction_feature && 
                                            cv.prediction_feature != self.prediction_feature)) }
       cvs.each do |cv|
