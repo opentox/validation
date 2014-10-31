@@ -249,7 +249,7 @@ module Reports
     
     def list_reports(type, filter_params={})
       filter_params[:report_type] = type
-      $logger.debug "find reports for params: "+filter_params.inspect
+      # $logger.debug "find reports for params: "+filter_params.inspect
       reports = Lib::OhmUtil.find( ReportData, filter_params )
       reports.collect{ |r| r.id }
     end
