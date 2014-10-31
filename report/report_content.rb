@@ -247,6 +247,11 @@ class Reports::ReportContent
     end
     
   end
+
+  def add_binning_confidence_plot( validation_uri )
+    uri = Reports::PlotFactory.create_binning_confidence_plot( validation_uri )
+    @xml_report.add_image(@current_section, uri)
+  end
   
   def add_confidence_plot( validation_set,
                             performance_attribute,

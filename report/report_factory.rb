@@ -169,6 +169,7 @@ module Reports::ReportFactory
           end
         end
         report.add_confidence_plot(validation_set,:accuracy,nil,split_attribute)
+#        report.add_binning_confidence_plot(validation_set.unique_value(:crossvalidation_uri))
         validation_set.get_accept_values.each do |accept_value|
           report.add_confidence_plot(validation_set, :true_positive_rate, accept_value, split_attribute)
           report.add_confidence_plot(validation_set, :positive_predictive_value, accept_value, split_attribute)

@@ -7,6 +7,8 @@ CONF_PLOT_RANGE = { :accuracy => [0.45,1.05], :true_positive_rate => [0.45,1.05]
   :negative_predictive_value => [0.45,1.05], :r_square => [0, 1.05],  :sample_correlation_coefficient => [0, 1.05],
   :concordance_correlation_coefficient => [0, 1.05] }
 
+require "./report/plot_binning.rb"
+
 class Array
   def swap!(i,j)
     tmp = self[i]
@@ -184,6 +186,11 @@ module Reports
       title = perf+" vs Confidence Plot"
       title += " (with True-Class: '"+true_class.to_s+"')" if true_class!=nil 
       {:title =>title, :performance => perf}
+    end
+
+    def self.create_binning_confidence_plot( val_uri )
+      prediction_data = YAML.load(OpenTox::RestClientWrapper.get(File.join(val_uri,"/prediction_data")))
+      Reports::PlotBinning.plot(prediction_data[:confidence_values], prediction_data[:predicted_values], prediction_data[:actual_values])
     end
     
     def self.create_confidence_plot( out_files, validation_set, performance_attribute, performance_accept_value, split_set_attribute=nil, show_single_curves=false )
