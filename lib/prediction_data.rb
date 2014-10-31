@@ -61,10 +61,7 @@ module Lib
       prediction_dataset_uris = [prediction_dataset_uris] unless prediction_dataset_uris.is_a?(Array)
       predicted_variables = [predicted_variables] unless predicted_variables.is_a?(Array)
       predicted_confidences = [predicted_confidences] unless predicted_confidences.is_a?(Array)
-      $logger.debug "loading prediction -- test-dataset:       "+test_dataset_uris.inspect
-      $logger.debug "loading prediction -- prediction-dataset: "+prediction_dataset_uris.inspect
-      $logger.debug "loading prediction -- predicted_variable: "+predicted_variables.inspect
-      $logger.debug "loading prediction -- predicted_confidence: "+predicted_confidences.inspect
+      $logger.debug "loading prediction - test-dataset: "+test_dataset_uris.inspect+" - prediction-dataset: "+prediction_dataset_uris.inspect+" - predicted_variable: "+predicted_variables.inspect+" - predicted_confidence: "+predicted_confidences.inspect
       $logger.debug "loading prediction -- prediction_feature: "+prediction_feature.to_s
       internal_server_error "prediction_feature missing" unless prediction_feature
       
@@ -96,7 +93,7 @@ module Lib
               "test_dataset: '"+test_dataset_uri.to_s+"'\n"+  
               "available features are: "+test_dataset.features.inspect if test_dataset.find_feature_uri(prediction_feature)==nil
         
-        $logger.debug "test dataset size: "+test_dataset.compounds.size.to_s
+        # $logger.debug "test dataset size: "+test_dataset.compounds.size.to_s
         internal_server_error "test dataset is empty "+test_dataset_uri.to_s unless test_dataset.compounds.size>0
         
         if feature_type=="classification"
