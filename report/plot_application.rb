@@ -3,9 +3,9 @@ require 'digest/md5'
 class Validation::Application < OpenTox::Application
 
   helpers do
-    def eval_r(r, cmd)
-      $logger.debug cmd
-      r.eval cmd
+    def r_eval(cmd)
+#      $logger.debug cmd
+      @r.eval cmd
     end
   end
 
@@ -48,15 +48,15 @@ class Validation::Application < OpenTox::Application
       # return "boxplot(#{values},col=c('red','blue','green'),names=#{names}#{ylim})"
       @r = RinRuby.new(true,false)
       size = (params[:size] ? params[:size].to_i : 300)
-      eval_r(@r,"png(\"/tmp/#{filename}\",width=#{2*size},height=#{size})")
-      eval_r(@r,"par(mai=c(0.5,0.5,0.2,0.2))")
-      eval_r(@r,"boxplot(#{values},col=c('red','blue','green'),names=#{names}#{ylim})")
+      r_eval "png(\"/tmp/#{filename}\",width=#{2*size},height=#{size})"
+      r_eval "par(mai=c(0.5,0.5,0.2,0.2))"
+      r_eval "boxplot(#{values},col=c('red','blue','green'),names=#{names}#{ylim})"
       if hline
         # seq defines were to draw hline
         # example: min -9.5, max 10.5, hline = 2 -> seq(-10,12,by=2) -> produces lines from -10 to 12 with step-width 2
-        eval_r(@r,"abline(h=seq(floor(#{min}/#{hline})*#{hline}, round(#{max}/#{hline})*#{hline}, by=#{hline}),lty=2,col='dimgrey')")
+        r_eval "abline(h=seq(floor(#{min}/#{hline})*#{hline}, round(#{max}/#{hline})*#{hline}, by=#{hline}),lty=2,col='dimgrey')"
       end
-      eval_r(@r,'dev.off()')
+      r_eval 'dev.off()'
       @r.quit
     end
     send_file("/tmp/#{filename}",:filename=>"#{params[:vals]}.png",:type=>'image/png',:disposition => 'inline')
@@ -87,16 +87,16 @@ class Validation::Application < OpenTox::Application
       xvals << xvals[0]
       yvals << yvals[0]
 
-      eval_r(@r,"x <- c(#{xvals.join(",")})")
-      eval_r(@r,"y <- c(#{yvals.join(",")})")
-      eval_r(@r,"png(\"/tmp/#{filename}\",width=#{2*size},height=#{size})")
-#      eval_r(@r,"par(mai=c(0.5,0.5,0.2,0.2))")
-#      eval_r(@r,"par(mfrow=c(2,4))")
-      eval_r(@r,"plot(x,y,type='n', xlim=rev(range(x)), ylim=c(0,max(y)), xlab='#{params[:xlab]}', ylab='#{params[:ylab]}')")# type='n',
-#      eval_r(@r,"par(pch=22, col='red')")
-      eval_r(@r,"lines(x,y, type='l', col='red')")
-      eval_r(@r,"title(main='#{params[:title]}')")
-      eval_r(@r,'dev.off()')
+      r_eval "x <- c(#{xvals.join(",")})"
+      r_eval "y <- c(#{yvals.join(",")})"
+      r_eval "png(\"/tmp/#{filename}\",width=#{2*size},height=#{size})"
+#      r_eval "par(mai=c(0.5,0.5,0.2,0.2))"
+#      r_eval "par(mfrow=c(2,4))"
+      r_eval "plot(x,y,type='n', xlim=rev(range(x)), ylim=c(0,max(y)), xlab='#{params[:xlab]}', ylab='#{params[:ylab]}')" # type='n',
+#      r_eval "par(pch=22, col='red')"
+      r_eval "lines(x,y, type='l', col='red')"
+      r_eval "title(main='#{params[:title]}')"
+      r_eval 'dev.off()'
       @r.quit
     end
     send_file("/tmp/#{filename}",:filename=>"#{params[:vals]}.png",:type=>'image/png',:disposition => 'inline')
