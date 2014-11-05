@@ -424,7 +424,7 @@ module Validation
                                           (cv.prediction_feature && 
                                            cv.prediction_feature != self.prediction_feature)) }
       cvs.each do |cv|
-        next if $aa[:uri] and !OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"GET",OpenTox::RestClientWrapper.subjectid)
+        next if $aa[:uri] and !OpenTox::Authorization.authorized?(cv.crossvalidation_uri,"GET")
         tmp_val = []
         Validation.find( :crossvalidation_id => cv.id, :validation_type => "crossvalidation" ).each do |v|
           break unless 
