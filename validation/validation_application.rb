@@ -28,11 +28,23 @@ class Validation::Application < OpenTox::Application
       $url_provider = self
     end
     
-    # for service check
+    # @!group URI Routes
+
+    # @method head_validation
+    # @overload head "/validation/?"
+    # Head request to check service availability.
+    # @return [String] only HTTP headers.
     head '/validation/?' do
       #$logger.debug "Validation service is running."
     end
-    
+
+    # @method get_cv
+    # @overload get "/validation/crossvalidation/?"
+    # List crossvalidation URIs.
+    # @param header [hash]
+    #   * Accept [optional, String] <text/uri-list, text/html>
+    #   * subjectid [String] authorization token
+    # @return [String] text/uri-list, text/html List of crossvalidations.
     get '/validation/crossvalidation/?' do
       $logger.info "list all crossvalidations "+params.inspect
       model_uri = params.delete("model") || params.delete("model_uri")
@@ -65,7 +77,26 @@ class Validation::Application < OpenTox::Application
         uri_list
       end
     end
-    
+
+    # @method post_cv
+    # @overload post "/validation/crossvalidation/?"
+    # Performs a k-fold cross-validation.
+    # @param header [Hash] header values
+    #   * Accept [String] <'multipart/form-data'>
+    #   * subjectid [String] authorization token
+    # @param [Hash] params
+    #   * dataset_uri [String] dataset URI
+    #   * algorithm_uri [String] algorithm URI
+    #   * prediction_feature [String] URI to prediction feature
+    #   * algorithm_params [String] @todo is it optional?
+    #   * stratified [String, Optional]
+    #   * num_fold [Integer] number of folds default=10
+    #   * random_seed [Integer] default=1
+    #   * y_scramble [Boolean], default=false
+    #   * y_scramble_seed [Integer] default=1
+    # @return [String] text/uri-list Task URI.
+    # @raise [BadRequestError] without params: dataset_uri, algorithm_uri and prediction_feature.
+    # @raise [BadRequestError] unless param: num_fold is integer and > 1
     post '/validation/crossvalidation/?' do
       $logger.info "creating crossvalidation "+params.inspect
       bad_request_error "dataset_uri missing" unless params[:dataset_uri].to_s.size>0
@@ -717,5 +748,5 @@ class Validation::Application < OpenTox::Application
       content_type "text/plain"
       validation.delete_validation
     end 
-
+    # @!endgroup
 end

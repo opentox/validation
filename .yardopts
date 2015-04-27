@@ -1,1 +1,4 @@
-application.rb
+--readme README.md
+--title 'OpenTox Validation Documentation'
+--charset utf-8
+*.rb **/*.rb - README.md ChangeLog VERSION LICENSE
