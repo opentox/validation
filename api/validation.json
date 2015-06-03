@@ -1,0 +1,94 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "An OpenTox REST Webservice for validation and reporting\n",
+        "version": "1.0.0",
+        "title": "OpenTox Validation",
+        "contact": {
+            "name": "Martin Guetlein, Christoph Helma"
+        },
+        "license": {
+            "name": "GNU GENERAL PUBLIC LICENSE",
+            "url": "https://github.com/opentox/validation/blob/master/LICENSE"
+        }
+    },
+    "host": "enm.in-silico.ch",
+    "basePath": "/",
+    "schemes": [
+        "https"
+    ],
+    "paths": {
+        "/validation/test_set_validation": {
+            "post": {
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "tags": [
+                    "test_set_validation"
+                ],
+                "summary": "Validates a model on a test dataset",
+                "description": "",
+                "produces": [
+                    "application/rdf+xml",
+                    "application/x-yaml",
+                    "text/html",
+                    "text/uri-list"
+                ],
+                "parameters": [
+                    {
+                        "name": "subjectid",
+                        "in": "header",
+                        "description": "authorization token",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "name": "model_uri",
+                        "description": "model URI",
+                        "type": "string",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "name": "test_dataset_uri",
+                        "description": "test dataset URI",
+                        "type": "string",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "name": "test_target_dataset_uri",
+                        "description": "test target dataset URI (default=test_dataset_uri)",
+                        "type": "string",
+                        "in": "formData",
+                        "required": false
+                    },
+                    {
+                        "name": "prediction_feature",
+                        "description": "prediction feature URI (default= dependent variable of model)",
+                        "type": "string",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK - Task URI"
+                    },
+                    "202": {
+                        "description": "Accepted - Task URI"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "404": {
+                        "description": "Not Authorized"
+                    },
+                    "500": {
+                        "description": "Server Error"
+                    }
+                }
+            }
+        }
+    }
+}
