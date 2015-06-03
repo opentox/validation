@@ -5,6 +5,12 @@ end
 require './lib/dataset_cache.rb'
 require './validation/validation_service.rb'
 
+# @see http://opentox.org/dev/apis/api-1.2/Validation OpenTox API 1.2 Validation
+
+# @!macro default_raises
+#   @raise [NotFoundError] Not Found 400
+#   @raise [NotAuthorizedError] Not Authorized 404
+
 class Validation::Application < OpenTox::Application
   
     helpers do
@@ -31,7 +37,7 @@ class Validation::Application < OpenTox::Application
     # @!group URI Routes
 
     # @method head_validation
-    # @overload head "/validation/?"
+    # @overload head "/validation"
     # Head request to check service availability.
     # @return [String] only HTTP headers.
     head '/validation/?' do
@@ -39,7 +45,7 @@ class Validation::Application < OpenTox::Application
     end
 
     # @method get_cv
-    # @overload get "/validation/crossvalidation/?"
+    # @overload get "/validation/crossvalidation"
     # List crossvalidation URIs.
     # @param header [hash]
     #   * Accept [optional, String] <text/uri-list, text/html>
@@ -79,7 +85,7 @@ class Validation::Application < OpenTox::Application
     end
 
     # @method post_cv
-    # @overload post "/validation/crossvalidation/?"
+    # @overload post "/validation/crossvalidation"
     # Performs a k-fold cross-validation.
     # @param header [Hash] header values
     #   * Accept [String] <'multipart/form-data'>
@@ -95,6 +101,7 @@ class Validation::Application < OpenTox::Application
     #   * y_scramble [Boolean], default=false
     #   * y_scramble_seed [Integer] default=1
     # @return [String] text/uri-list Task URI.
+    # @!macro default_raises
     # @raise [BadRequestError] without params: dataset_uri, algorithm_uri and prediction_feature.
     # @raise [BadRequestError] unless param: num_fold is integer and > 1
     post '/validation/crossvalidation/?' do
@@ -139,6 +146,20 @@ class Validation::Application < OpenTox::Application
       deleted.join("\n")+"\n"
     end
     
+    # Performs a leave-one-out cross-validation.
+	   # @method post_cv_loo
+    # @overload post /validation/crossvalidation/loo
+    # @param header [Hash] header values
+    #   * Accept [String] <'multipart/form-data'>
+    #   * subjectid [String] authorization token
+    # @param [Hash] params
+    #   * algorithm_uri [String]
+    #   * prediction_feature [String]
+    #   * algorithm_params [String] default=""
+    #   * y_scramble [Boolean] default=false
+    #   * y_scramble_seed [Integer] default=1
+    # @return [String] text/uri-list Task URI.
+    # @raise [BadRequestError] without params: dataset_uri, algorithm_uri and prediction_feature.
     post '/validation/crossvalidation/loo/?' do
       $logger.info "creating loo-crossvalidation "+params.inspect
       bad_request_error "dataset_uri missing" unless params[:dataset_uri].to_s.size>0
@@ -188,7 +209,15 @@ class Validation::Application < OpenTox::Application
       end
       
     end
-    
+
+    # Retrieves a cross-validation representation in one of the supported MIME types
+	   # @method get_cv_id
+    # @overload get /validation/crossvalidation/:id
+    # @param header [Hash] header values
+    #   * Accept [String] <application/rdf+xml, text/html, application/serialize, application/x-yaml>
+    #   * subjectid [String] authorization token
+    # @return [String] application/rdf+xml, text/html, application/serialize, application/x-yaml.
+    # @raise [NotFoundError] Not Found
     get '/validation/crossvalidation/:id' do
       $logger.info "get crossvalidation with id "+params[:id].to_s
     #  begin
@@ -265,7 +294,15 @@ class Validation::Application < OpenTox::Application
     get '/validation/crossvalidation/:id/prediction_data' do
       Validation::Validation.from_cv_statistics( params[:id] ).prediction_data.to_yaml
     end
-    
+
+    # Deletes a cross-validation.
+    # @method delete_cv_id
+    # @overload delete /validation/crossvalidation/:id
+    # @param header [Hash] header values
+    #   * subjectid [String] authorization token
+    # @return [String] .
+    # @raise [NotFoundError] Not Found
+    # @raise [NotAuthorizedError] Not Authorized
     delete '/validation/crossvalidation/:id/?' do
       $logger.info "delete crossvalidation with id "+params[:id].to_s
       content_type "text/plain"
@@ -320,7 +357,15 @@ class Validation::Application < OpenTox::Application
     #    p
     #  end
     #end
-    
+
+    # Get all validations. List of validation URIs
+    # @method get_validation
+    # @overload get /validation
+    # @param header [Hash] header values
+    #   * Accept [String] <application/rdf+xml, text/html, application/serialize, application/x-yaml>
+    #   * subjectid [String] authorization token
+    # @return [String] application/rdf+xml, text/html, application/serialize, application/x-yaml.
+    # @raise [NotFoundError] Not Found
     get '/validation/?' do
       
       $logger.info "list all validations, params: "+params.inspect+" #{Validation::Validation}"
@@ -350,7 +395,20 @@ class Validation::Application < OpenTox::Application
     post '/validation/?' do
       bad_request_error "Post not supported, to perfom a validation use '/test_set_validation', '/training_test_validation', 'bootstrapping', 'training_test_split'"
     end
-    
+
+    # Validates a model on a test dataset
+    # @method post_test_set_validation
+    # @overload post	/validation/test_set_validation
+    # @param header [Hash] header values
+    #   * subjectid [String] authorization token
+    #   * Accept [String] accepted response type <application/rdf+xml, application/x-yaml, text/html, text/uri-list>
+    # @param [Hash] params
+    #   * model_uri [String] model URI
+    #   * test_dataset_uri [String] test dataset URI 
+    #   * test_target_dataset_uri [String] default=test_dataset_uri
+    #   * prediction_feature [String] (default = dependent variable of model)
+    # @return [String] text/uri-list Task URI.
+    # @raise [BadRequestError] without params: model_uri, test_dataset_uri and prediction_feature.
     post '/validation/test_set_validation' do
       $logger.info "creating test-set-validation "+params.inspect
       if params[:model_uri].to_s.size>0 and params[:test_dataset_uri].to_s.size>0 and 

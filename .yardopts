@@ -1,4 +1,4 @@
 --readme README.md
 --title 'OpenTox Validation Documentation'
 --charset utf-8
-*.rb **/*.rb - README.md ChangeLog VERSION LICENSE
+*.rb validation/*.rb lib/*.rb report/*.rb - README.md ChangeLog VERSION LICENSE
